@@ -2007,10 +2007,13 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
   new MutationObserver(sync).observe(document.getElementById('fcLogin'), { attributes: true });
   document.getElementById('instBtn').onclick = function () {
     if (evt) { evt.prompt(); evt.userChoice.then(function (c) { if (c.outcome === 'accepted') { done = true; sync(); } evt = null; }); return; }
-    var samsung = /SamsungBrowser/i.test(navigator.userAgent);
-    document.getElementById('instText').innerHTML = '<b>이렇게 설치해요</b>' + (samsung
-      ? '아래 메뉴(≡) → <b style="display:inline">현재 페이지 추가</b> → 홈 화면'
-      : '오른쪽 위 메뉴(⋮) → <b style="display:inline">앱 설치</b> → 설치');
+    var ua = navigator.userAgent, B = function (t) { return '<b style="display:inline">' + t + '</b>'; }, how;
+    if (/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp/i.test(ua))
+      how = '여기(앱 안 브라우저)에선 설치가 안 돼요. 오른쪽 아래 ⋮ → ' + B('다른 브라우저로 열기') + ' → 삼성 인터넷이나 크롬';
+    else if (/SamsungBrowser/i.test(ua)) how = '오른쪽 아래 메뉴(≡) → ' + B('현재 페이지 추가') + ' → ' + B('홈 화면');
+    else if (/iPhone|iPad/i.test(ua)) how = '아래 공유 버튼 → ' + B('홈 화면에 추가');
+    else how = '오른쪽 위 메뉴(⋮) → ' + B('앱 설치') + ' → 설치';
+    document.getElementById('instText').innerHTML = '<b>이렇게 설치해요</b>' + how;
     document.getElementById('instBtn').hidden = true;
   };
   sync();
