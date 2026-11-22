@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>승훈스 고정비앱 V1</title>
+<meta name="theme-color" content="#f2f4f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101013" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="승훈스 고정비앱 V1">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+  :root { --bg: #f2f4f6; --ink: #191f28; --muted: #8b95a1; --accent: #f26b0f; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #101013; --ink: #f2f3f5; --muted: #868b94; --accent: #ff8133; } }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: var(--bg); }
+  .splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; background: var(--bg); transition: opacity .25s; z-index: 2; padding: 24px; text-align: center; }
+  .splash.off { opacity: 0; pointer-events: none; }
+  .splash img { width: 84px; height: 84px; border-radius: 22px; }
+  .splash b { font-size: 17px; letter-spacing: -.03em; }
+  .splash p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.55; max-width: 300px; }
+  .splash a { display: none; margin-top: 4px; padding: 13px 22px; border-radius: 13px; background: var(--accent); color: #fff; font-weight: 600; font-size: 14.5px; text-decoration: none; }
+  .splash.help a { display: inline-block; }
+  .dots { display: flex; gap: 6px; } .dots i { width: 6px; height: 6px; border-radius: 3px; background: var(--muted); opacity: .4; animation: d 1s infinite; }
+  .dots i:nth-child(2) { animation-delay: .15s; } .dots i:nth-child(3) { animation-delay: .3s; }
+  .splash.help .dots { display: none; }
+  @keyframes d { 50% { opacity: 1; } }
+</style>
+</head>
+<body>
+<div class="splash" id="splash">
+  <img src="icons/icon-192.png" alt="">
+  <b>승훈스 고정비앱 V1</b>
+  <div class="dots"><i></i><i></i><i></i></div>
+  <p id="msg"></p>
+  <a id="go" href="#" target="_self">구글 계정으로 열기</a>
+</div>
+<script>
+  // 실제 앱(구글 Apps Script 웹 앱) 주소. 이 페이지는 그 앱을 감싸서 휴대폰에 '진짜 앱'처럼 설치되게만 해요.
+  var APP = 'https://script.google.com/macros/s/AKfycbww5i92oly5x6-JFIsOl1kBH_gUCIlOTvaZ-TVmWzBqaNiB0he55QtpTIEyfDVrb23gBA/exec';
+  var sp = document.getElementById('splash'), ready = false;
+  var f = document.createElement('iframe');
+  f.src = APP + '?embed=1';
+  f.allow = 'clipboard-write';
+  f.title = '승훈스 고정비앱 V1';
+  document.body.appendChild(f);
+  window.addEventListener('message', function (e) {
+    if (e.data === 'fc-ready' && !ready) { ready = true; sp.className = 'splash off'; }
+  });
+  // 처음 쓰는 기기라 구글 로그인·권한 허용이 필요하면 이 안에서는 안 열려서(구글 보안 정책) 바깥에서 한 번 열게 안내
+  setTimeout(function () {
+    if (ready) return;
+    sp.className = 'splash help';
+    document.getElementById('msg').textContent = '처음 한 번은 구글 로그인과 권한 허용이 필요해요. 아래 버튼으로 열어서 허용한 뒤, 이 앱을 다시 켜주세요.';
+    document.getElementById('go').href = APP;
+  }, 15000);
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+</script>
+</body>
+</html>
