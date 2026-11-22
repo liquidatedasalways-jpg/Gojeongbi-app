@@ -309,7 +309,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
   <p>매달 나가는 돈을 달력으로 보고, 결제일은 구글 캘린더에 자동으로 넣어줘요.</p>
   <button class="gbtn" id="fcGo" type="button"><svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글 계정으로 로그인</button>
   <div class="err" id="fcErr"></div>
-  <small>내 시트와 캘린더는 고른 구글 계정에만 저장돼요. 처음에 '확인되지 않은 앱' 화면이 나오면 고급 → 이동을 눌러주세요.</small>
+  <small>내 고정비 목록은 고른 구글 계정에만 저장되고, 결제일은 그 계정 구글 캘린더에 들어가요. 처음에 '확인되지 않은 앱' 화면이 나오면 고급 → 이동을 눌러주세요.</small>
 </div>
 <div class="inst" id="inst">
   <img src="icons/icon-192.png" alt="">
@@ -356,7 +356,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 
 <div class="toast" id="toast"><span id="toastTxt"></span><button id="toastBtn" type="button"></button></div>
 
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -427,33 +427,54 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
     return new Promise(function (res) { waiting.push(res); });
   }
 
-  function errText(d, status) {
+  function rawErr(d) {
     var e = d && d.error;
-    if (!e) return '연결이 안 됐어요 (' + status + ')';
+    if (!e) return '';
     var det = e.details && e.details[0];
-    if (det && det.errorMessage) return det.errorMessage;
-    if (status === 403 && /disabled|not been used/i.test(e.message || '')) return 'Apps Script API가 꺼져 있어요. 구글 클라우드에서 켜주세요.';
-    if (status === 404) return '앱 서버(스크립트 배포)를 못 찾았어요. API 실행 파일로 배포됐는지 확인해주세요.';
-    return e.message || ('연결이 안 됐어요 (' + status + ')');
+    return String((det && det.errorMessage) || e.message || e.status || '');
+  }
+  var NOT_OWNER = /permission to access the requested document|요청한 문서.*권한|문서에 액세스할 권한/i;
+  /** 구글이 영어로 주는 오류를 알아듣게 바꿈. 처음 보는 건 원문을 괄호에. */
+  function errText(d, status) {
+    var m = rawErr(d);
+    if (!m) return '연결이 안 됐어요. 다시 해주세요. (' + status + ')';
+    if (/disabled|not been used/i.test(m)) return 'Apps Script API가 꺼져 있어요. 앱 만든 사람에게 알려주세요.';
+    if (status === 404 || /not found|Requested entity was not found/i.test(m) && !/function/i.test(m)) return '앱 서버를 못 찾았어요. 앱 만든 사람에게 알려주세요.';
+    if (/Script function not found/i.test(m)) return '앱 서버가 옛 버전이에요. 앱 만든 사람에게 알려주세요.';
+    if (NOT_OWNER.test(m)) return '이 계정으로는 아직 쓸 수 없어요. 앱 만든 사람에게 알려주세요.';
+    if (/caller does not have permission|PERMISSION_DENIED/i.test(m)) return '앱 서버에 들어갈 권한이 없어요. 앱 만든 사람에게 알려주세요.';
+    if (/insufficient authentication scopes|SCOPE_INSUFFICIENT|Authorization is required/i.test(m)) return '권한 허용이 덜 됐어요. 메뉴에서 로그아웃 후 다시 로그인해서 모두 허용해주세요.';
+    if (/too many times|quota|Rate Limit|RESOURCE_EXHAUSTED/i.test(m)) return '구글 사용 한도에 잠깐 걸렸어요. 1분쯤 뒤에 다시 해주세요.';
+    if (/maximum execution time|timed out|DEADLINE/i.test(m)) return '시간이 너무 오래 걸렸어요. 다시 해주세요.';
+    if (/Service (error|unavailable)|internal error|UNAVAILABLE|backendError/i.test(m)) return '구글 쪽이 잠깐 불안정해요. 다시 해주세요.';
+    if (/[가-힣]/.test(m)) return m;
+    return '문제가 생겼어요. 다시 해주세요. (' + m + ')';
   }
 
-  // 배포 ID로 먼저 부르고, 구글이 못 찾으면(404) 스크립트 ID로 다시 (맞는 쪽을 기억)
+  /* 서버는 두 군데:
+   *  - 주인 서버(시트에 붙은 스크립트): 시트 주인만 들어갈 수 있음. 주인 시트를 그대로 씀.
+   *  - 모두용 서버(독립 스크립트, C.otherId): 다른 계정. 시트 없이 앱 저장 공간 + 자기 캘린더.
+   * 주인 서버에 먼저 가 보고 '문서 권한 없음'이면 모두용 서버로 (계정별로 기억). */
   var ids = [C.scriptId].concat(C.altIds || []), idIx = 0;
   try { var sv = Number(localStorage.getItem('fc_idix')); if (sv > 0 && sv < ids.length) idIx = sv; } catch (e) {}
-  function run(fn, args) {
+  function target() { return (get().srv === 'other' && C.otherId) ? C.otherId : ids[idIx]; }
+  function run(fn, args, tries, force) {
+    tries = tries || 0;
     return ensure().then(function (tok) {
-      return fetch('https://script.googleapis.com/v1/scripts/' + encodeURIComponent(ids[idIx]) + ':run', {
+      var id = force || target();
+      return fetch('https://script.googleapis.com/v1/scripts/' + encodeURIComponent(id) + ':run', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + tok, 'Content-Type': 'application/json' },
         body: JSON.stringify({ 'function': fn, parameters: args, devMode: false })
       }).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (d) {
-          if (r.status === 401) { var x = get(); delete x.token; put(x); return run(fn, args); }
-          if (r.status === 404 && idIx < ids.length - 1) { idIx++; try { localStorage.setItem('fc_idix', String(idIx)); } catch (e) {} return run(fn, args); }
+          if (r.status === 401 && tries < 2) { var x = get(); delete x.token; put(x); return run(fn, args, tries + 1, force); }
+          if (!force && r.status === 404 && id !== C.otherId && idIx < ids.length - 1) { idIx++; try { localStorage.setItem('fc_idix', String(idIx)); } catch (e) {} return run(fn, args, tries); }
+          if (!force && C.otherId && id !== C.otherId && NOT_OWNER.test(rawErr(d))) { var y = get(); y.srv = 'other'; put(y); return run(fn, args, tries); }
           if (!r.ok || d.error) throw new Error(errText(d, r.status));
           return d.response ? d.response.result : undefined;
         });
-      });
+      }, function () { throw new Error('인터넷 연결을 확인해주세요.'); });
     });
   }
 
@@ -491,8 +512,13 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
   window.FC_AUTH = {
     appUrl: APP_URL,
     email: email,
-    switchAccount: function () { var x = get(); delete x.token; delete x.email; put(x); go('select_account'); },
-    logout: function () { put({}); location.reload(); }
+    switchAccount: function () { var x = get(); delete x.token; delete x.email; delete x.srv; put(x); go('select_account'); },
+    logout: function () { put({}); location.reload(); },
+    /** 시트 → 앱 저장 공간 옮기기용: 모두용 서버(other) / 주인 서버(owner)를 골라서 부름 */
+    hasOther: !!C.otherId,
+    onOther: function () { return !!C.otherId && target() === C.otherId; },
+    runOn: function (which, fn, args) { return run(fn, args || [], 0, which === 'other' ? C.otherId : ids[idIx]); },
+    useOther: function () { var x = get(); x.srv = 'other'; put(x); }
   };
 })();
 
@@ -669,7 +695,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
     if (!S) {
       // 구글 계정이 여러 개 로그인된 브라우저에서 구글 쪽이 다른 계정으로 요청을 보내 생기는 문제 → 해결 방법을 바로 보여줌
       var multi = !window.FC_AUTH && /권한|permission|access|authoriz/i.test(msg);
-      $('home').innerHTML = '<div class="fatal"><b>' + (multi ? '구글 계정이 섞였어요' : '시트를 못 불러왔어요') + '</b>' +
+      $('home').innerHTML = '<div class="fatal"><b>' + (multi ? '구글 계정이 섞였어요' : '불러오지 못했어요') + '</b>' +
         (multi ? '이 브라우저에 구글 계정이 2개 이상 로그인돼 있으면 구글이 다른 계정으로 시트를 열려고 해서 생기는 문제예요.<br><br>' +
           '<span style="text-align:left;display:inline-block">① 이 브라우저에서 구글 계정을 모두 로그아웃<br>② 이 앱에 쓸 계정 하나로만 로그인<br>③ 다시 시도</span><br><br><small style="opacity:.6">' + esc(msg) + '</small>' : esc(msg)) +
         '<br><br><button class="btn primary" style="display:inline-flex;padding:0 22px" id="retry" type="button">다시 시도</button></div>';
@@ -1623,7 +1649,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
     });
   }
   function openAccounts(refresh, back) {
-    if (!S || !S.accounts) { toast("시트의 '설정' 탭에서 출금 계좌·카드 목록을 못 찾았어요."); return; }
+    if (!S || !S.accounts) { toast('결제 수단 목록을 못 찾았어요. 새로고침해주세요.'); return; }
     var list = S.accounts;
     var h = '<div class="tip" style="padding-top:0">통장·카드를 한 번 저장해두면 항목을 넣을 때 눌러서 골라요. 최대 ' + S.accMax + '개까지.</div><div class="grp">';
     list.forEach(function (a, i) {
@@ -1765,12 +1791,14 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
       '<div class="glabel">결제 수단</div><div class="grp">' +
       '<button class="li" type="button" id="mAcc"><span>결제 수단 관리</span><span class="r">' + (S.accounts ? (S.accounts.length ? esc(S.accounts.length + '개') : '아직 없음') : '') + '</span></button>' +
       '</div>' +
-      '<div class="glabel">내 시트</div><div class="grp">' +
-      '<a class="li" href="' + esc(S.url) + '" target="_blank" rel="noopener"><span>구글 시트 열기</span><span class="r">' + esc(S.sheetName || '') + '</span></a>' +
-      '<button class="li" type="button" id="mReload"><span>새로고침</span><span class="r">시트에서 다시 불러오기</span></button>' +
+      '<div class="glabel">' + (S.virtual ? '내 목록' : '내 시트') + '</div><div class="grp">' +
+      (S.virtual || !S.url ? '' : '<a class="li" href="' + esc(S.url) + '" target="_blank" rel="noopener"><span>구글 시트 열기</span><span class="r">' + esc(S.sheetName || '') + '</span></a>') +
+      '<button class="li" type="button" id="mReload"><span>새로고침</span><span class="r">' + (S.virtual ? '다시 불러오기' : '시트에서 다시 불러오기') + '</span></button>' +
       '<button class="li" type="button" id="mRestore"><span>방금 지운 항목 되살리기</span></button>' +
       '</div>' +
-      (S.home ? '<div class="grp"><button class="li" type="button" id="mShare"><span>친구에게 공유</span><span class="r">각자 자기 계정·캘린더로</span></button></div>' : '') +
+      (WEB && WEB.hasOther && S.home && !WEB.onOther() ? '<div class="glabel">시트 없이 쓰기</div><div class="grp"><button class="li" type="button" id="mMove"><span>내 시트 내용을 앱으로 옮기기</span><span class="r">' + S.items.filter(function (i) { return !i.sep; }).length + '개</span></button></div>' +
+        '<div class="tip">옮기면 앱 안에 저장되고 구글 시트는 더는 안 써요. 다 옮겨진 걸 확인한 뒤에 시트를 지우면 돼요.</div>' : '') +
+      '<div class="grp"><button class="li" type="button" id="mShare"><span>친구에게 공유</span><span class="r">각자 자기 계정·캘린더로</span></button></div>' +
       (WEB ? '<div class="glabel">계정</div><div class="grp">' +
         '<div class="kv"><span class="k">로그인</span><span class="v">' + esc(WEB.email() || S.email || '') + '</span></div>' +
         '<button class="li" type="button" id="mSwitch"><span>다른 구글 계정으로 로그인</span></button>' +
@@ -1779,7 +1807,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
       '아이폰: Safari → 공유 → 홈 화면에 추가<br>갤럭시: 크롬 → ⋮ → 홈 화면에 추가<br>PC: 즐겨찾기에 추가' +
       (fullUrl ? '<div style="margin-top:8px;color:var(--muted);font-size:12.5px">주소창 없이 쓰고 싶으면 이 주소로 홈 화면에 추가해봐요 (구글 로그인이 한 번 더 나올 수 있어요).</div><div class="linkbox">' + esc(fullUrl) + '</div>' : '') +
       '</div></div>') +
-      '<div class="tip" style="text-align:center">' + (S.email ? esc(S.email) + '<br>' : '') + '불러온 시각 ' + new Date(S.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' · 시트가 원본이에요</div>';
+      '<div class="tip" style="text-align:center">' + (S.email ? esc(S.email) + '<br>' : '') + '불러온 시각 ' + new Date(S.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + (S.virtual ? ' · 이 계정에만 저장돼요' : ' · 시트가 원본이에요') + '</div>';
     if (refresh) { if (sheetMode !== 'menu') return; $('sheetBody').innerHTML = h; }
     else openSheet('설정', h, 'menu');
     var offSure = false;
@@ -1794,10 +1822,55 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
       }, function (e) { cal.syncing = false; chip(); toast('실패했어요: ' + ((e && e.message) || e), { error: true }); });
     };
     var cn = $('mCalNow'); if (cn) cn.onclick = function () { scheduleSync(); };
-    $('mReload').onclick = function () { closeSheet(); toast('시트에서 다시 불러오는 중'); enqueue({ type: 'load' }); };
+    $('mReload').onclick = function () { closeSheet(); toast(S.virtual ? '다시 불러오는 중' : '시트에서 다시 불러오는 중'); enqueue({ type: 'load' }); };
     $('mRestore').onclick = function () { closeSheet(); restore(); };
     $('mAcc').onclick = function () { openAccounts(false, function () { openMenu(false); }); };
     var ms = $('mShare'); if (ms) ms.onclick = function () { openShare(false); };
+    var mv = $('mMove'); if (mv) mv.onclick = function () { moveToApp(mv); };
+  }
+
+  /* ---------- 시트 → 앱 저장 공간 (시트 주인, 설치용 앱에서) ---------- */
+  var moveSure = false;
+  function moveToApp(btn) {
+    var WEB = window.FC_AUTH;
+    if (!WEB || !S || btn.disabled) return;
+    if (!moveSure) { moveSure = true; toast('한 번 더 누르면 옮겨요. 시트는 그대로 남아요.'); return; }
+    var lab = {};
+    S.meta.fields.forEach(function (f) { lab[f.col] = f.label; });
+    var data = {
+      items: S.items.filter(function (i) { return !i.sep; }).map(function (i) {
+        var f = {};
+        for (var col in (i.v || {})) if (lab[col]) f[lab[col]] = i.v[col];
+        f[lab[S.meta.nameCol] || '항목명'] = i.name;
+        return { f: f, checked: !!i.checked, paid: i.paid || '', prev: i.prev || '' };
+      }),
+      accounts: (S.accounts || []).map(function (a) { return { name: a.name, memo: a.memo }; }),
+      sort: S.sort, ack: S.ack || {}
+    };
+    var label = btn.querySelector('span');
+    btn.disabled = true; label.innerHTML = '<span class="spin" style="display:inline-block;vertical-align:-2px;margin-right:6px"></span>옮기는 중';
+    var fail = function (m) { btn.disabled = false; moveSure = false; label.textContent = '다시 시도'; toast(m, { error: true, ms: 8000 }); };
+    var doImport = function (force) {
+      return WEB.runOn('other', 'api_import', [data, force]).then(function (r) {
+        if (r && !r.ok && r.exists && !force) {
+          if (!window.confirm('앱 저장 공간에 이미 항목이 ' + r.exists + '개 있어요. 시트 내용으로 바꿀까요?')) throw new Error('취소했어요.');
+          return doImport(true);
+        }
+        if (!r || !r.ok) throw new Error((r && r.error) || '못 옮겼어요.');
+        return r;
+      });
+    };
+    doImport(false).then(function (r) {
+      // 시트 쪽 캘린더 자동 맞추기는 끔 (두 군데서 맞추면 서로 지움)
+      return WEB.runOn('owner', 'api_calendar', ['off']).catch(function () {}).then(function () { return r; });
+    }).then(function (r) {
+      WEB.useOther();
+      closeSheet();
+      apply(r);
+      scheduleSync();
+      var notes = (r.notes || []).filter(Boolean);
+      toast('다 옮겼어요 (' + r.name + '). 이제 시트 없이 앱에서 써요.' + (notes.length ? '\n' + notes.join('\n') : ''), { ms: 6000 });
+    }, function (e) { fail('못 옮겼어요: ' + ((e && e.message) || e)); });
   }
 
   /* ================= 처음 시작 (친구가 처음 열었을 때) ================= */
@@ -1871,30 +1944,18 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
   }
   function openShare(refresh) {
     var url = (window.FC_AUTH && window.FC_AUTH.appUrl) || S.appUrl || '';
-    var h = '<div class="tip" style="padding-top:0">친구는 이 주소를 열고 자기 구글 계정으로 로그인하면 자기 드라이브에 자기 시트가 생기고, 자기 구글 캘린더에 연동돼요. 내 내용은 안 보여요.</div>' +
-      '<div class="grp steps">' +
-      '<div class="kv"><span class="k">1</span><span class="v">친구용 빈 시트(템플릿) 만들기<small>' + (S.tplUrl ? '만들어져 있어요' : '아직 없어요') + '</small></span></div>' +
-      '<button class="li" type="button" id="shTpl" style="padding-left:52px"><span>' + (S.tplUrl ? '다시 만들기' : '템플릿 만들기') + '</span><span class="r">내 항목·계좌는 안 들어가요</span></button>' +
-      '<div class="kv"><span class="k">2</span><span class="v">템플릿을 열고 공유 → 일반 액세스를 \'링크가 있는 모든 사용자 · 뷰어\'로</span></div>' +
-      (S.tplUrl ? '<a class="li" href="' + esc(S.tplUrl) + '" target="_blank" rel="noopener" style="padding-left:52px"><span>템플릿 열기</span></a>' : '') +
-      '<div class="kv"><span class="k">3</span><span class="v">이 주소를 친구에게 보내기' + (url ? '<div class="linkbox">' + esc(url) + '</div>' : '') + '</span></div>' +
-      (url ? '<button class="li" type="button" id="shCopy" style="padding-left:52px"><span>주소 복사</span></button>' : '') +
+    var h = '<div class="tip" style="padding-top:0">친구는 이 주소를 열고 자기 구글 계정으로 로그인하면 바로 써요. 결제일은 친구 구글 캘린더에만 들어가고, 친구 드라이브에 시트가 생기지 않아요. 서로 내용은 안 보여요.</div>' +
+      '<div class="grp">' +
+      (url ? '<div class="kv" style="display:block"><div class="linkbox" style="margin-top:0">' + esc(url) + '</div></div>' +
+        '<button class="li" type="button" id="shCopy"><span>주소 복사</span></button>' +
+        (navigator.share ? '<button class="li" type="button" id="shSend"><span>카톡 등으로 보내기</span></button>' : '') : '<div class="kv">주소를 못 찾았어요.</div>') +
       '</div>' +
-      '<div class="tip">처음 열 때 \'확인되지 않은 앱\' 화면이 나오면 고급 → 이동을 누르면 돼요. 구글 심사를 안 받은 개인 앱이라 나오는 화면이에요. 이 상태로는 100명까지 쓸 수 있어요.</div>';
+      '<div class="tip">처음 로그인할 때 \'확인되지 않은 앱\' 화면이 나오면 고급 → 이동을 누르면 돼요. 구글 심사를 안 받은 개인 앱이라 나오는 화면이에요.</div>';
     if (refresh) { if (sheetMode !== 'share') return; $('sheetBody').innerHTML = h; }
     else openSheet('친구에게 공유', h, 'share', function () { openMenu(false); });
     var cp = $('shCopy'); if (cp) cp.onclick = function () { copyText(url); };
-    var tb = $('shTpl');
-    if (tb) tb.onclick = function () {
-      if (tb.disabled) return;
-      tb.disabled = true;
-      tb.querySelector('span').innerHTML = '<span class="spin" style="display:inline-block;vertical-align:-2px;margin-right:6px"></span>만드는 중 (20초쯤)';
-      call('api_template').then(function (r) {
-        if (!r || !r.ok) { tb.disabled = false; tb.querySelector('span').textContent = '다시 시도'; toast((r && r.error) || '못 만들었어요', { error: true }); return; }
-        S.tplUrl = r.url;
-        toast('템플릿을 만들었어요. 2번처럼 공유만 해주세요.', { ms: 5000 });
-        openShare(true);
-      }, function (e) { tb.disabled = false; tb.querySelector('span').textContent = '다시 시도'; toast('연결이 안 됐어요: ' + ((e && e.message) || e), { error: true }); });
+    var sd = $('shSend'); if (sd) sd.onclick = function () {
+      try { navigator.share({ title: '승훈스 고정비앱 V1', text: '매달 나가는 돈 달력 앱. 구글 계정으로 로그인하면 내 캘린더에 결제일이 들어가요.', url: url }).catch(function () {}); } catch (e) {}
     };
   }
 
