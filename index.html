@@ -2010,7 +2010,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
     var ua = navigator.userAgent, B = function (t) { return '<b style="display:inline">' + t + '</b>'; }, how;
     if (/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp/i.test(ua))
       how = '여기(앱 안 브라우저)에선 설치가 안 돼요. 오른쪽 아래 ⋮ → ' + B('다른 브라우저로 열기') + ' → 삼성 인터넷이나 크롬';
-    else if (/SamsungBrowser/i.test(ua)) how = '오른쪽 아래 메뉴(≡) → ' + B('현재 페이지 추가') + ' → ' + B('홈 화면');
+    else if (/SamsungBrowser/i.test(ua)) how = '주소창 오른쪽 ' + B('⤓ 아이콘') + ' → 설치 (안 보이면 오른쪽 아래 ⋮ → ' + B('현재 페이지 추가') + ' → 앱스 화면)';
     else if (/iPhone|iPad/i.test(ua)) how = '아래 공유 버튼 → ' + B('홈 화면에 추가');
     else how = '오른쪽 위 메뉴(⋮) → ' + B('앱 설치') + ' → 설치';
     document.getElementById('instText').innerHTML = '<b>이렇게 설치해요</b>' + how;
