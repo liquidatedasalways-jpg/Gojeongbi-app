@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>서버 코드 복사</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#f2f4f6;--card:#fff;--ink:#191f28;--muted:#6b7684;--accent:#f26b0f;--ok:#03b26c}
+@media (prefers-color-scheme:dark){:root{--bg:#101013;--card:#1c1c21;--ink:#f2f4f6;--muted:#9aa1ab}}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Pretendard","Apple SD Gothic Neo","Malgun Gothic",sans-serif}
+main{max-width:560px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:20px;margin:0 0 6px}p{margin:0 0 18px;color:var(--muted);font-size:14px}
+.card{background:var(--card);border-radius:16px;padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.card b{display:block;font-size:16px}.card small{display:block;color:var(--muted);font-size:13px;margin:2px 0 12px}
+button{width:100%;height:50px;border:0;border-radius:12px;background:var(--accent);color:#fff;font-size:16px;font-weight:700;cursor:pointer}
+button.done{background:var(--ok)}button:disabled{opacity:.5}
+</style></head><body><main>
+<h1>서버 코드 복사</h1>
+<p>버튼을 누르면 파일 전체가 복사돼요. 편집 화면에서 Ctrl+A → Ctrl+V 하면 끝.</p>
+<div class="card"><b>① Code.gs</b><small id="i1">불러오는 중…</small><button id="b1" disabled>Code.gs 전체 복사</button></div>
+<div class="card"><b>② appsscript.json</b><small id="i2">불러오는 중…</small><button id="b2" disabled>appsscript.json 전체 복사</button></div>
+<script>
+function setup(file, btn, info) {
+  var b = document.getElementById(btn), i = document.getElementById(info), text = '';
+  fetch(file + '?v=' + Date.now()).then(function (r) { if (!r.ok) throw 0; return r.text(); }).then(function (t) {
+    text = t; i.textContent = '전체 ' + t.split('\n').length.toLocaleString() + '줄'; b.disabled = false;
+  }).catch(function () { i.textContent = '못 불러왔어요. 새로고침해주세요.'; });
+  b.onclick = function () {
+    var label = b.textContent;
+    var ok = function () { b.classList.add('done'); b.textContent = '복사됨 ✓ (' + text.split('\n').length.toLocaleString() + '줄)'; };
+    var fb = function () { var ta = document.createElement('textarea'); ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0'; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy') ? ok() : alert('복사가 안 됐어요'); } catch (e) { alert('복사가 안 됐어요'); } ta.remove(); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fb); else fb();
+  };
+}
+setup('Code.gs.txt', 'b1', 'i1');
+setup('appsscript.json.txt', 'b2', 'i2');
+</script></main></body></html>
