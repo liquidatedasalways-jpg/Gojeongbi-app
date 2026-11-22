@@ -503,6 +503,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 
 </script>
 <script>
+/* 설치 신호는 페이지 뜨자마자 올 수 있어서 제일 먼저 받아 둠 */
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__bip = e; });
 /* 카카오톡·라인 안 브라우저에서 열리면 구글 로그인이 막혀서, 바로 폰 기본 브라우저로 넘김 */
 (function () {
   var ua = navigator.userAgent, u = location.href;
@@ -2372,24 +2374,29 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 <script>
 (function () {
   var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-  var evt = null, done = false;
+  var evt = window.__bip || null, done = false, installed = false;
+  var B = function (t) { return '<b style="display:inline">' + t + '</b>'; };
   function sync() {
     var login = document.getElementById('fcLogin');
     document.getElementById('inst').classList.toggle('on', !standalone && !done && login.classList.contains('on'));
   }
-  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); evt = e; sync(); });
+  function say(t) { document.getElementById('instText').innerHTML = t; document.getElementById('instBtn').hidden = true; }
+  window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); evt = e; installed = false; sync(); });
   window.addEventListener('appinstalled', function () { done = true; sync(); });
   new MutationObserver(sync).observe(document.getElementById('fcLogin'), { attributes: true });
+  if (navigator.getInstalledRelatedApps) navigator.getInstalledRelatedApps().then(function (a) { if (a && a.length) installed = true; }).catch(function () {});
   document.getElementById('instBtn').onclick = function () {
-    if (evt) { evt.prompt(); evt.userChoice.then(function (c) { if (c.outcome === 'accepted') { done = true; sync(); } evt = null; }); return; }
-    var ua = navigator.userAgent, B = function (t) { return '<b style="display:inline">' + t + '</b>'; }, how;
-    if (/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line\/|DaumApps|everytimeApp/i.test(ua))
-      how = '여기(앱 안 브라우저)에선 설치가 안 돼요. 오른쪽 아래 ⋮ → ' + B('다른 브라우저로 열기') + ' → 삼성 인터넷이나 크롬';
-    else if (/SamsungBrowser/i.test(ua)) how = '주소창 오른쪽 ' + B('⤓ 아이콘') + ' → 설치 (안 보이면 오른쪽 아래 ⋮ → ' + B('현재 페이지 추가') + ' → 앱스 화면)';
-    else if (/iPhone|iPad/i.test(ua)) how = '아래 공유 버튼 → ' + B('홈 화면에 추가');
-    else how = '오른쪽 위 메뉴(⋮) → ' + B('앱 설치') + ' → 설치';
-    document.getElementById('instText').innerHTML = '<b>이렇게 설치해요</b>' + how;
-    document.getElementById('instBtn').hidden = true;
+    evt = evt || window.__bip;
+    if (evt) { var e = evt; evt = window.__bip = null; e.prompt(); e.userChoice.then(function (c) { if (c.outcome === 'accepted') { done = true; sync(); } }); return; }
+    if (installed) { say('<b>이미 설치돼 있어요</b>홈 화면(앱스 화면)의 ' + B('승훈스 고정비앱 V1') + ' 아이콘으로 여세요'); return; }
+    var ua = navigator.userAgent, how;
+    if (/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line[/]|DaumApps|everytimeApp/i.test(ua))
+      how = '여기(앱 안 브라우저)에선 설치가 안 돼요. 메뉴 → ' + B('다른 브라우저로 열기') + ' → 크롬이나 삼성 인터넷에서 다시 눌러주세요';
+    else if (/SamsungBrowser/i.test(ua)) how = '오른쪽 아래 ' + B('≡ 메뉴') + ' → ' + B('현재 페이지 추가') + ' → ' + B('홈 화면');
+    else if (/iPhone|iPad/i.test(ua)) how = '아래 가운데 ' + B('공유 버튼(□↑)') + ' → ' + B('홈 화면에 추가');
+    else if (/Android/i.test(ua)) how = '오른쪽 위 ' + B('⋮') + ' → ' + B('홈 화면에 추가') + ' → ' + B('설치');
+    else how = '주소창 오른쪽 끝 ' + B('설치 아이콘(화면+↓)') + ' → 설치';
+    say('<b>이렇게 설치해요</b>' + how);
   };
   sync();
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
