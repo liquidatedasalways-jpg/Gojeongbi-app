@@ -19,6 +19,7 @@
  * 설치: 확장 프로그램 → Apps Script → 기본 코드를 전부 지우고 이 내용을 붙여넣기 → 저장 → 시트 새로고침
  */
 
+var SERVER_VER = 6;     // 서버 코드 버전 (앱이 새 버전 있는지 볼 때 씀)
 var SHEET = '고정비 목록';
 var FIRST = 8;          // 첫 항목 줄 (7줄은 '이번 달 낼 것' 제목)
 var ADD_ROW = 6;        // '새 항목 추가' 입력 줄 (5줄은 그 제목)
@@ -1371,6 +1372,7 @@ function api_import(data, force) {
       return {};
     });
     if (data.ack) stProps_().setProperty('app_missed_ack', JSON.stringify(data.ack));
+    PropertiesService.getUserProperties().setProperty('vs_admin', '1');   // 시트를 옮겨 온 사람 = 앱 주인 (서버 업데이트 버튼)
     if (r.error) return r;
     if (failed.length) NOTES_.push('못 옮긴 항목: ' + failed.join(', '));
     return { name: added + '개' };
@@ -1918,6 +1920,8 @@ function appState_(forceMeta) {
   res.email = appMe_();
   res.home = isHome_();
   res.virtual = isVirtual_(ss);
+  res.ver = SERVER_VER;
+  res.admin = !!PropertiesService.getUserProperties().getProperty('vs_admin');
   var tplId = res.home ? PropertiesService.getScriptProperties().getProperty('template_id') : '';
   res.tplUrl = tplId ? 'https://docs.google.com/spreadsheets/d/' + tplId + '/edit' : '';
   res.meta = { fields: meta.fields, sorts: meta.sorts, nameCol: c.NAME, parentCol: c.PARENT, orderCol: c.ORDER || 0 };
@@ -3336,6 +3340,39 @@ var APP_HTML = [
   "    if ((sheetMode === 'item' || sheetMode === 'edit') && openName && !findItem(openName)) closeSheet();",
   "    else if (sheetMode === 'item' && openName) openItem(openName, true);",
   "    else if (sheetMode === 'acc') openAccounts(true, sheetBackFn);",
+  "    checkServerUpdate();",
+  "    autoMove();",
+  "  }",
+  "",
+  "  /* ---------- 서버 업데이트 (앱 주인만, 버튼 하나) ---------- */",
+  "  var updAsked = false, updating = false;",
+  "  function isAdmin() {",
+  "    var W = window.FC_AUTH;",
+  "    if (!W || !W.canUpdate || !W.onOther() || !S) return false;",
+  "    if (S.admin) { try { localStorage.setItem('fc_admin', '1'); } catch (e) {} return true; }",
+  "    try { return localStorage.getItem('fc_admin') === '1'; } catch (e) { return false; }",
+  "  }",
+  "  function needUpdate() { return isAdmin() && typeof S.ver === 'number' && S.ver < window.FC_AUTH.serverVer; }",
+  "  function checkServerUpdate() {",
+  "    if (updAsked || updating || !needUpdate()) return;",
+  "    updAsked = true;",
+  "    toast('새 버전이 있어요.', { action: '업데이트', ms: 12000, onAction: runServerUpdate });",
+  "  }",
+  "  function runServerUpdate() {",
+  "    if (updating) return;",
+  "    updating = true;",
+  "    toast('업데이트하는 중… (10초쯤)', { ms: 30000 });",
+  "    var p = window.FC_AUTH.updateServer();",
+  "    p && p.then(updDone, updFail);",
+  "  }",
+  "  function updDone(v) {",
+  "    updating = false;",
+  "    toast('업데이트했어요 (서버 v' + v + ').', { ms: 4000 });",
+  "    enqueue({ type: 'load' });",
+  "  }",
+  "  function updFail(e) {",
+  "    updating = false;",
+  "    toast('업데이트 못 했어요: ' + ((e && e.message) || e), { error: true, ms: 12000 });",
   "  }",
   "  function flash(name) {",
   "    var el = els['i:' + name];",
@@ -4005,6 +4042,7 @@ var APP_HTML = [
   "      '</div>' +",
   "      (WEB && WEB.hasOther && S.home && !WEB.onOther() ? '<div class=\"glabel\">시트 없이 쓰기</div><div class=\"grp\"><button class=\"li\" type=\"button\" id=\"mMove\"><span>내 시트 내용을 앱으로 옮기기</span><span class=\"r\">' + S.items.filter(function (i) { return !i.sep; }).length + '개</span></button></div>' +",
   "        '<div class=\"tip\">옮기면 앱 안에 저장되고 구글 시트는 더는 안 써요. 다 옮겨진 걸 확인한 뒤에 시트를 지우면 돼요.</div>' : '') +",
+  "      (isAdmin() ? '<div class=\"glabel\">앱 관리</div><div class=\"grp\"><button class=\"li\" type=\"button\" id=\"mUpd\"><span>서버 업데이트</span><span class=\"r\">' + (needUpdate() ? '새 버전 있음' : '최신') + '</span></button></div>' : '') +",
   "      '<div class=\"grp\"><button class=\"li\" type=\"button\" id=\"mShare\"><span>친구에게 공유</span><span class=\"r\">각자 자기 계정·캘린더로</span></button></div>' +",
   "      (WEB ? '<div class=\"glabel\">계정</div><div class=\"grp\">' +",
   "        '<div class=\"kv\"><span class=\"k\">로그인</span><span class=\"v\">' + esc(WEB.email() || S.email || '') + '</span></div>' +",
@@ -4034,14 +4072,25 @@ var APP_HTML = [
   "    $('mAcc').onclick = function () { openAccounts(false, function () { openMenu(false); }); };",
   "    var ms = $('mShare'); if (ms) ms.onclick = function () { openShare(false); };",
   "    var mv = $('mMove'); if (mv) mv.onclick = function () { moveToApp(mv); };",
+  "    var mu = $('mUpd'); if (mu) mu.onclick = function () { closeSheet(); runServerUpdate(); };",
   "  }",
   "",
   "  /* ---------- 시트 → 앱 저장 공간 (시트 주인, 설치용 앱에서) ---------- */",
   "  var moveSure = false;",
-  "  function moveToApp(btn) {",
+  "  var moving = false;",
+  "  /** 시트 주인이 설치용 앱으로 열면 자동으로: 시트 내용을 앱 저장 공간으로 옮기고 그쪽으로 바꿈 (시트는 그대로 둠).",
+  "   *  다른 기기에서 이미 옮겼으면 옮기지 않고 그쪽으로만 바꿈. */",
+  "  function autoMove() {",
   "    var WEB = window.FC_AUTH;",
-  "    if (!WEB || !S || btn.disabled) return;",
-  "    if (!moveSure) { moveSure = true; toast('한 번 더 누르면 옮겨요. 시트는 그대로 남아요.'); return; }",
+  "    if (moving || !WEB || !WEB.hasOther || !S || !S.home || S.virtual || WEB.onOther()) return;",
+  "    moveToApp(null, true);",
+  "  }",
+  "  function moveToApp(btn, auto) {",
+  "    var WEB = window.FC_AUTH;",
+  "    if (!WEB || !S || moving || (btn && btn.disabled)) return;",
+  "    if (!auto && !moveSure) { moveSure = true; toast('한 번 더 누르면 옮겨요. 시트는 그대로 남아요.'); return; }",
+  "    moving = true;",
+  "    if (auto) toast('시트 내용을 앱으로 옮기는 중… (10초쯤)', { ms: 30000 });",
   "    var lab = {};",
   "    S.meta.fields.forEach(function (f) { lab[f.col] = f.label; });",
   "    var data = {",
@@ -4054,12 +4103,14 @@ var APP_HTML = [
   "      accounts: (S.accounts || []).map(function (a) { return { name: a.name, memo: a.memo }; }),",
   "      sort: S.sort, ack: S.ack || {}",
   "    };",
-  "    var label = btn.querySelector('span');",
-  "    btn.disabled = true; label.innerHTML = '<span class=\"spin\" style=\"display:inline-block;vertical-align:-2px;margin-right:6px\"></span>옮기는 중';",
-  "    var fail = function (m) { btn.disabled = false; moveSure = false; label.textContent = '다시 시도'; toast(m, { error: true, ms: 8000 }); };",
+  "    var label = btn ? btn.querySelector('span') : null;",
+  "    if (btn) { btn.disabled = true; label.innerHTML = '<span class=\"spin\" style=\"display:inline-block;vertical-align:-2px;margin-right:6px\"></span>옮기는 중'; }",
+  "    var fail = function (m) { moving = false; if (btn) { btn.disabled = false; moveSure = false; label.textContent = '다시 시도'; } toast(m, { error: true, ms: 8000 }); };",
+  "    var already = false;",
   "    var doImport = function (force) {",
   "      return WEB.runOn('other', 'api_import', [data, force]).then(function (r) {",
   "        if (r && !r.ok && r.exists && !force) {",
+  "          if (auto) { already = true; return WEB.runOn('other', 'api_load', [false]); }   // 다른 기기에서 이미 옮김 → 그쪽 그대로 씀",
   "          if (!window.confirm('앱 저장 공간에 이미 항목이 ' + r.exists + '개 있어요. 시트 내용으로 바꿀까요?')) throw new Error('취소했어요.');",
   "          return doImport(true);",
   "        }",
@@ -4072,11 +4123,13 @@ var APP_HTML = [
   "      return WEB.runOn('owner', 'api_calendar', ['off']).catch(function () {}).then(function () { return r; });",
   "    }).then(function (r) {",
   "      WEB.useOther();",
+  "      try { localStorage.setItem('fc_admin', '1'); } catch (e) {}",
   "      closeSheet();",
+  "      moving = false;",
   "      apply(r);",
   "      scheduleSync();",
   "      var notes = (r.notes || []).filter(Boolean);",
-  "      toast('다 옮겼어요 (' + r.name + '). 이제 시트 없이 앱에서 써요.' + (notes.length ? '\\n' + notes.join('\\n') : ''), { ms: 6000 });",
+  "      toast(already ? '앱 저장 공간으로 바꿨어요.' : '시트 내용 ' + r.name + '를 앱으로 옮겼어요. 이제 시트 없이 앱에서 써요.' + (notes.length ? '\\n' + notes.join('\\n') : ''), { ms: 6000 });",
   "    }, function (e) { fail('못 옮겼어요: ' + ((e && e.message) || e)); });",
   "  }",
   "",
@@ -4260,6 +4313,10 @@ var APP_HTML = [
   "  var cached = load('fc_state');",
   "  if (cached && cached.items && cached.meta) { S = cached; renderAll(); chip(); }",
   "  enqueue({ type: 'load' });",
+  "  (function () {   // 구글 권한 허용하고 돌아온 직후면 서버 업데이트 이어서",
+  "    var p = window.FC_AUTH && window.FC_AUTH.resumeUpdate && window.FC_AUTH.resumeUpdate();",
+  "    if (p) { updating = true; updAsked = true; toast('업데이트하는 중… (10초쯤)', { ms: 30000 }); p.then(updDone, updFail); }",
+  "  })();",
   "})();",
   "</script>",
   "</body>",
