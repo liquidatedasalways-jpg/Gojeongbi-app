@@ -491,7 +491,7 @@ t('auto-check-server', async () => {
   g.setNow('2027-01-27T09:00'); g.call(ME, 'api_load', [false]);
   ok(r.opts.auto === false && sItem(g, '월세').paid === '2026-12-25' && g.user(ME).props.auto_skip === undefined, '끄면 1월분은 자동으로 체크 안 함, 기록도 지움');
 });
-t('auto-check-holiday-and-daily', async () => {
+t('auto-check-holiday', async () => {
   // 결제일이 주말·공휴일이면 다음 영업일까지 기다림 (2026-11-21 토, 12-25 금 크리스마스)
   const g = GAS.create({ holidays: { '2026-12-25': '크리스마스' } });
   g.setNow('2026-11-02'); g.call(ME, 'api_load', [false]);
@@ -508,10 +508,15 @@ t('auto-check-holiday-and-daily', async () => {
   ok(sItem(g, '통신비').paid === '2026-11-25', '평일(수 11/25) 결제는 다음 날 냄 처리');
   g.setNow('2026-12-27T10:00'); g.call(ME, 'api_load', [false]);
   ok(sItem(g, '통신비').paid === '2026-11-25' && sItem(g, '통신비').next === '2026-12-25', '크리스마스(금 12/25) 결제: 일요일(12/27)엔 아직 안 냄');
-  // 앱을 안 열어도 새벽 예약 실행이 체크하고 캘린더에 ✅
+  // 새벽 예약 실행은 목록을 안 바꿈 (앱에서 한 저장과 겹치지 않게). 앱을 열 때 체크하고, 이어서 캘린더에 ✅
   g.call(ME, 'api_sync', []);
+  const before = JSON.stringify(Object.keys(g.user(ME).props).filter((k) => /^vs_data/.test(k)).sort().map((k) => g.user(ME).props[k]));
   g.setNow('2026-12-29T04:10'); g.call(ME, 'calendarDaily', []);
-  ok(sItem(g, '통신비').paid === '2026-12-25', '다음 영업일(월 12/28) 다음 날 새벽 예약 실행이 냄 처리');
+  const after = JSON.stringify(Object.keys(g.user(ME).props).filter((k) => /^vs_data/.test(k)).sort().map((k) => g.user(ME).props[k]));
+  ok(before === after, '새벽 예약 실행은 저장된 목록을 건드리지 않음');
+  g.setNow('2026-12-29T08:00'); g.call(ME, 'api_load', [false]);
+  ok(sItem(g, '통신비').paid === '2026-12-25', '다음 영업일(월 12/28) 다음 날 앱을 열면 냄 처리');
+  g.call(ME, 'api_sync', []);
   ok(g.events(ME).some((e) => kday(e) === '2026-12-25' && /^✅ 통신비/.test(e.title)), '캘린더 일정에도 ✅가 붙음');
 });
 
