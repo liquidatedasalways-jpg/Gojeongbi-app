@@ -20,6 +20,11 @@ const srvItem = (h, name) => h.gas.call(h.email, 'api_load', [true]).items.find(
 const homeHas = (p, name) => p.evaluate((n) => !!document.querySelector('#home .row[data-name="' + n + '"]'), name);
 const toastState = (p) => p.evaluate(() => { const e = document.getElementById('toast'); return { on: e.classList.contains('on'), sticky: e.classList.contains('sticky'), txt: document.getElementById('toastTxt').textContent, btn: document.getElementById('toastBtn').textContent }; });
 const realErrors = (h) => h.errors.filter((e) => !/ERR_INTERNET_DISCONNECTED/.test(e));   // 일부러 끊은 연결은 빼고
+/** + 버튼 → (분류 고르는 화면이 뜨면 '기타') → 새 항목 양식 */
+async function addForm(p) {
+  await p.click('#addBtn'); await p.waitForTimeout(350);
+  if (await p.$('#catGrid [data-cat="8"]')) { await p.click('#catGrid [data-cat="8"]'); await p.waitForTimeout(100); }
+}
 const sheetOn = (p) => p.evaluate(() => document.getElementById('sheet').classList.contains('on'));
 
 /* ---------- 꼭 1: 연결이 끊긴 채 체크 ---------- */
@@ -61,7 +66,7 @@ t('offline-check-auto-retry', async () => {
 t('offline-add-form', async () => {
   const h = await H.open(LIFE); const p = h.page;
   await sleep(p, 1500);
-  await p.click('#addBtn'); await sleep(p, 450);
+  await addForm(p); await sleep(p, 450);
   await p.fill('#sheetBody input[data-col="3"], #f3', '수도요금').catch(() => {});
   const nameSel = await p.evaluate(() => { const f = document.querySelector('#sheetBody input'); return f ? f.id : ''; });
   await p.fill('#' + nameSel, '수도요금');
@@ -129,7 +134,7 @@ t('back-tab-and-datepicker', async () => {
   await sleep(p, 1200);
   await p.click('.tabbar [data-tab="list"]'); await sleep(p, 400);
   ok((await tabNow(p)) === 'tab-list', '목록 탭으로');
-  await p.click('#addBtn'); await sleep(p, 450);
+  await addForm(p); await sleep(p, 450);
   await p.click('#moreBtn'); await sleep(p, 250);
   await p.click('#sheetBody [data-seg] button[data-v="date"]'); await sleep(p, 400);
   const dpOn = () => p.evaluate(() => !!document.querySelector('.dp.on'));
@@ -137,7 +142,9 @@ t('back-tab-and-datepicker', async () => {
   await back(p);
   ok(!(await dpOn()) && (await sheetOn(p)), '뒤로 가기 → 날짜 고르기만 닫히고 양식은 그대로');
   await back(p);
-  ok(!(await sheetOn(p)) && (await tabNow(p)) === 'tab-list', '뒤로 가기 → 양식 닫힘, 목록 탭 그대로');
+  ok((await sheetOn(p)) && (await p.evaluate(() => !!document.getElementById('catGrid'))), '뒤로 가기 → 분류 고르기 화면으로');
+  await back(p);
+  ok(!(await sheetOn(p)) && (await tabNow(p)) === 'tab-list', '뒤로 가기 → 창 닫힘, 목록 탭 그대로');
   await back(p);
   ok((await tabNow(p)) === 'tab-cal', '뒤로 가기 → 결제 달력 탭으로');
   ok((await histState(p)) === 0, '기록이 처음 상태로 (다음 뒤로 가기는 앱 나가기)');
@@ -364,7 +371,7 @@ t('framed-hidden', async () => {
 t('small-form-button', async () => {
   const h = await H.open(LIFE); const p = h.page;
   await sleep(p, 1200);
-  await p.click('#addBtn'); await sleep(p, 450);
+  await addForm(p); await sleep(p, 450);
   const nameId = await p.evaluate(() => document.querySelector('#sheetBody input[type="text"]').id);
   await p.fill('#' + nameId, '수도요금');
   await p.click('#saveBtn'); await sleep(p, 200);
@@ -386,7 +393,7 @@ t('small-chip-toast-and-empty', async () => {
   await p.click('.tabbar [data-tab="list"]'); await sleep(p, 400);
   const empty = await p.evaluate(() => (document.querySelector('#list .empty') || {}).textContent || '');
   ok(/아직 넣은 고정비가 없어요/.test(empty) && !/다 냈어요/.test(empty), '항목이 0개일 때 문구: "' + empty + '"');
-  await p.click('#addBtn'); await sleep(p, 450);
+  await addForm(p); await sleep(p, 450);
   await p.click('#sheetBody [data-addacc]'); await sleep(p, 200);
   await p.fill('#sheetBody .chipin input', '국민 월급통장');
   await p.click('#sheetBody .chipin .ok'); await h.idle(600);
@@ -397,7 +404,7 @@ t('small-chip-toast-and-empty', async () => {
 t('small-layout-320', async () => {
   const h = await H.open(Object.assign({}, LIFE, { viewport: SMALL })); const p = h.page;
   await sleep(p, 1200);
-  await p.click('#addBtn'); await sleep(p, 450);
+  await addForm(p); await sleep(p, 450);
   await p.click('#moreBtn'); await sleep(p, 250);
   await p.click('#sheetBody [data-seg] button[data-v="date"]'); await sleep(p, 400);
   await p.click('.dp.on .dpg button[data-d="20"]'); await sleep(p, 400);
@@ -452,7 +459,7 @@ t('revamp-list-and-form', async () => {
   ok(ct.indexOf('한 달 평균 ' + avg.toLocaleString('en-US') + '원') >= 0, '목록 맨 위 한 달 평균이 서버 값과 같음: "' + ct + '"');
   ok(await p.evaluate(() => document.querySelectorAll('#list .th').length === 1), '표 머리글(항목·금액·결제일)은 맨 위 한 번만');
   // 새 항목: 꼭 필요한 칸만 보이고 나머지는 "더 적기"에
-  await p.click('#addBtn'); await sleep(p, 450);
+  await addForm(p); await sleep(p, 450);
   const f0 = await p.evaluate(() => ({ more: document.getElementById('moreBox').classList.contains('on'), seg: document.querySelectorAll('[data-cyc] button').length, foot: !!document.querySelector('#sheetFoot #saveBtn'), h: Math.round(document.getElementById('saveBtn').getBoundingClientRect().height) }));
   ok(!f0.more && f0.seg === 5 && f0.foot && f0.h >= 48, '새 항목: 더 적기는 접혀 있고, 주기 버튼 5개, 추가 버튼은 아래에 고정 ' + JSON.stringify(f0));
   await p.fill('#sheetBody [data-money]', '1234567'); await sleep(p, 150);
@@ -480,6 +487,51 @@ t('revamp-list-and-form', async () => {
   ok(await p.evaluate(() => document.getElementById('moreBox').classList.contains('on')), '고칠 때는 더 적기가 펼쳐져 있음 (칸이 숨지 않음)');
   ok(realErrors(h).length === 0, '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
   await h.close();
+});
+t('cat-pick', async () => {
+  for (const vp of [VP, SMALL]) {
+    for (const dark of [false, true]) {
+      const h = await H.open(Object.assign({}, LIFE, { viewport: vp, dark })); const p = h.page;
+      await sleep(p, 1200);
+      await p.click('#addBtn'); await sleep(p, 450);
+      const g = await p.evaluate(() => { const b = document.querySelectorAll('#catGrid .cat'); const r = [...b].map((x) => x.getBoundingClientRect()); const sb = document.getElementById('sheetBody'); return { n: b.length, names: [...b].map((x) => x.textContent), minH: Math.min(...r.map((x) => x.height)), cols: new Set(r.map((x) => Math.round(x.left))).size, over: sb.scrollHeight > sb.clientHeight + 1, cut: [...b].some((x) => { const s = x.querySelector('span'); return s.scrollWidth > s.clientWidth; }) }; });
+      const tag = '폭 ' + vp.width + (dark ? ' 다크' : '') + ': ';
+      ok(g.n === 9 && g.cols === 3 && g.minH >= 44, tag + '+ 누르면 분류 9개가 3칸으로: ' + g.names.join(','));
+      ok(!g.cut, tag + '분류 이름 안 잘림');
+      ok(!g.over, tag + '분류 화면은 스크롤 없이 다 보임');
+      if (vp === VP && !dark) await h.shot('t-cat-grid');
+      if (vp === VP && dark) await h.shot('t-cat-grid-dark');
+      if (vp === SMALL && !dark) await h.shot('t-cat-grid-320');
+      await p.click('#catGrid [data-cat="1"]'); await sleep(p, 450);
+      const f = await p.evaluate(() => ({ pick: (document.getElementById('catPick') || {}).textContent || '', focus: document.activeElement && document.activeElement.closest('.fld') ? document.activeElement.closest('.fld').querySelector('label').textContent : '' }));
+      ok(/주거비/.test(f.pick) && /이름/.test(f.focus), tag + '한 번 누르면 바로 양식, 맨 위에 고른 분류, 이름 칸에 커서: ' + JSON.stringify(f));
+      if (vp === VP && !dark) await h.shot('t-cat-form');
+      if (vp === VP && dark) await h.shot('t-cat-form-dark');
+      if (vp === VP && !dark) {
+        await p.fill('#sheetBody .fld input[type="text"]', '수도요금 고지');
+        await p.goBack(); await sleep(p, 500);
+        const back = await p.evaluate(() => ({ grid: !!document.getElementById('catGrid'), on: (document.querySelector('#catGrid .cat.on') || {}).textContent || '' }));
+        ok(back.grid && back.on === '주거비', '폰 뒤로 가기 → 분류 화면으로, 고른 것 표시: ' + JSON.stringify(back));
+        await p.click('#catGrid [data-cat="2"]'); await sleep(p, 450);
+        const kept = await p.evaluate(() => ({ nm: document.querySelector('#sheetBody .fld input[type="text"]').value, pick: document.getElementById('catPick').textContent, toast: document.getElementById('toast').classList.contains('on') }));
+        ok(kept.nm === '수도요금 고지' && /공과금/.test(kept.pick) && !kept.toast, '분류만 바꾸고 적던 이름은 그대로 (알림 없이): ' + JSON.stringify(kept));
+        await p.fill('#sheetBody [data-money]', '42000');
+        await p.click('#dayBtn'); await sleep(p, 400); await p.click('.dayp .dg button[data-d="25"]'); await sleep(p, 400);
+        await p.click('#saveBtn'); await h.idle(1500);
+        ok((srvItem(h, '수도요금 고지') || {}).cat === '공과금', '시트 목록에 없는 새 분류도 저장됨: ' + JSON.stringify((srvItem(h, '수도요금 고지') || {}).cat));
+        ok(!(await sheetOn(p)), '저장하면 창 닫힘');
+        ok(await p.evaluate(() => history.state == null || !history.state.fcd), '저장하면 쌓아 둔 뒤로 가기 기록도 다 되돌림 (분류 화면 칸까지)');
+        await p.click('#addBtn'); await sleep(p, 450);
+        await p.click('#catGrid [data-cat="0"]'); await sleep(p, 450);
+        await p.click('#catPick'); await sleep(p, 450);
+        ok(await p.evaluate(() => !!document.getElementById('catGrid')), '양식 맨 위 분류 줄을 누르면 다시 고르기');
+        await p.goBack(); await sleep(p, 450);
+        ok(!(await sheetOn(p)), '분류 화면에서 뒤로 가기 → 창 닫힘 (앱은 그대로)');
+      }
+      ok(realErrors(h).length === 0, tag + '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+      await h.close();
+    }
+  }
 });
 t('revamp-empty-and-login', async () => {
   const h = await H.open({ seed: 'empty', now: '2026-11-23T21:30', viewport: VP, latency: 60 }); const p = h.page;
@@ -513,7 +565,7 @@ t('revamp-tap-size', async () => {
     await p.click('.tabbar [data-tab="list"]'); await sleep(p, 400);
     const b = await small(p);
     ok(b.length === 0, '폭 ' + vp.width + ' 목록: 44px보다 낮은 버튼 0개 ' + JSON.stringify(b.slice(0, 6)));
-    await p.click('#addBtn'); await sleep(p, 500);
+    await addForm(p); await sleep(p, 500);
     const c = await small(p);
     ok(c.length === 0, '폭 ' + vp.width + ' 새 항목 창: 44px보다 낮은 버튼 0개 ' + JSON.stringify(c.slice(0, 6)));
     await p.evaluate(() => { try { localStorage.removeItem('fc_draft'); } catch (e) {} });
@@ -871,7 +923,7 @@ t('gap-save-fail', async () => {
   ok(srvItem(h, '관리비').checked === true && !(await homeHas(p, '관리비')), '"다시 시도"를 누르면 저장됨');
   // 새 항목 추가가 저장 실패
   failSaves(h.gas, 1);
-  await p.click('#addBtn'); await p.waitForSelector('#saveBtn');
+  await addForm(p); await p.waitForSelector('#saveBtn');
   await p.fill('#f3', '저장실패항목'); await p.click('#saveBtn');
   await sleep(p, 2500); await h.idle();
   ok(!srvItem(h, '저장실패항목') && !(await bodyHas(p, '저장실패항목')) || (await sheetOn(p)), '추가가 저장 안 되면 목록에 남지 않음');
@@ -928,7 +980,7 @@ t('gap-account-switch', async () => {
     const h = await H.open(Object.assign({}, LIFE, { latency: 1200 })); const p = h.page;
     h.gas.call(B_ACC, 'api_load', [false]);
     await sleep(p, 1500); await h.idle();
-    await p.click('#addBtn'); await p.waitForSelector('#saveBtn');
+    await addForm(p); await p.waitForSelector('#saveBtn');
     await p.fill('#f3', 'A의 비밀 항목'); await sleep(p, 600);
     await p.click('#sheetClose'); await sleep(p, 300);
     // A의 로그인 표가 만료됐고, 조용히 새로 받기도 실패 → 로그인 화면
@@ -955,7 +1007,7 @@ t('gap-account-switch', async () => {
   ok(!(await bodyHas(p, '서버 업데이트')), 'B의 ⋯ 메뉴에 앱 주인 메뉴(서버 업데이트)가 안 보임');
   ok(await bodyHas(p, B_ACC), '메뉴의 로그인 계정이 B로 나옴');
   await p.click('#sheetClose'); await sleep(p, 300);
-  await p.click('#addBtn'); await p.waitForSelector('#saveBtn'); await sleep(p, 300);
+  await addForm(p); await p.waitForSelector('#saveBtn'); await sleep(p, 300);
   ok((await p.inputValue('#f3')) === '', 'B가 + 를 열어도 A가 쓰던 내용이 안 나옴');
   const ls = await p.evaluate(() => Object.keys(localStorage).filter((k) => /^fc_draft(?!_who)|^fc_admin/.test(k)));
   ok(ls.length === 0, '이 기기에 남아 있던 A의 쓰던 내용·주인 표시가 지워짐 ' + JSON.stringify(ls));
@@ -968,7 +1020,7 @@ t('gap-account-switch', async () => {
   await p.waitForFunction(() => !document.getElementById('fcLogin').classList.contains('on'), null, { timeout: 8000 });
   await h.idle(3000);
   ok(await bodyHas(p, '정수기 렌탈'), '같은 계정(A)으로 다시 로그인하면 A 목록이 나옴');
-  await p.click('#addBtn'); await p.waitForSelector('#saveBtn'); await sleep(p, 300);
+  await addForm(p); await p.waitForSelector('#saveBtn'); await sleep(p, 300);
   ok((await p.inputValue('#f3')) === 'A의 비밀 항목', '같은 계정이면 쓰던 내용을 그대로 불러옴');
   await h.close();
 });
