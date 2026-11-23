@@ -281,6 +281,71 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .onb b { display: block; font-size: 15px; font-weight: 700; margin-bottom: 4px; letter-spacing: -.03em; }
 .onb span { display: block; font-size: 12.5px; color: var(--muted); margin-bottom: 16px; }
 .onb .btns { margin: 0; }
+
+/* 첫 화면: 날짜 미정 */
+.ndb { display: flex; align-items: center; gap: 10px; width: 100%; margin: 0 0 10px; padding: 11px 12px 11px 14px; border-radius: 16px; background: var(--sel); text-align: left; box-shadow: var(--shadow); }
+.ndb .ic { flex: none; width: 22px; height: 22px; border-radius: 50%; background: var(--red); color: #fff; font-size: 13px; font-weight: 800; line-height: 22px; text-align: center; }
+.ndb .tx { flex: 1; min-width: 0; }
+.ndb .tx b { display: block; font-size: 14px; font-weight: 700; color: var(--ink); letter-spacing: -.03em; }
+.ndb .tx small { display: block; font-size: 11.5px; font-weight: 500; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ndb .go { flex: none; height: 30px; padding: 0 12px; border-radius: 10px; background: var(--accent); color: var(--accent-ink); font-size: 12.5px; font-weight: 700; line-height: 30px; }
+.qd { position: relative; display: flex; align-items: center; gap: 10px; padding: 10px 14px 10px 18px; min-height: 54px; }
+.qd .l { flex: 1; min-width: 0; }
+.qd .l b { display: block; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.qd .l small { display: block; font-size: 11.5px; color: var(--muted); }
+.qd .dw { flex: none; display: flex; align-items: center; gap: 4px; font-size: 14px; font-weight: 600; color: var(--sub); }
+.qd input { height: 38px; border: 0; border-radius: 10px; background: var(--fill); padding: 0 10px; font-size: 15px; font-weight: 600; text-align: center; outline: none; }
+.qd input:focus { box-shadow: inset 0 0 0 1.5px var(--accent); }
+.qd .dw input { width: 56px; }
+.qd input[type=date] { width: 150px; }
+.grp > .qd + .qd::after { content: ""; position: absolute; left: 18px; right: 18px; top: 0; height: 1px; background: var(--line); }
+
+/* 목록 탭: 시트처럼 표 */
+.tbl { --cols: 40px minmax(0, 1fr) 92px 58px; }
+.tbl > .row.tr { display: block; min-height: 0; }
+.tbl > * + *::after { left: 0 !important; right: 0 !important; }
+.tg { display: grid; grid-template-columns: var(--cols); align-items: stretch; min-height: 44px; }
+.tg > * { min-width: 0; }
+.tg .chk { width: auto; }
+.tg .chk i { width: 20px; height: 20px; }
+.tc { display: flex; align-items: center; padding: 0 10px; font-size: 14px; border-left: 1px solid var(--line); min-height: 44px; cursor: pointer; }
+.tc.nmc { gap: 6px; border-left: 0; padding-left: 2px; }
+.tc.nmc .nm { flex: 0 1 auto; font-size: 14px; }
+.tc.nmc .tag { flex: none; font-size: 11px; font-weight: 600; }
+.tc.amc { justify-content: flex-end; font-weight: 700; letter-spacing: -.03em; white-space: nowrap; }
+.tc.dyc { justify-content: center; flex-direction: column; gap: 0; font-weight: 600; white-space: nowrap; padding: 0 4px; }
+.tc.dyc small { font-size: 10px; font-weight: 500; color: var(--muted); line-height: 1.1; }
+.tc .nod { color: var(--red); font-weight: 700; font-size: 12.5px; }
+.tc .emp { color: var(--faint); font-weight: 500; }
+.tc input.ci { width: 100%; height: 32px; border: 0; border-radius: 8px; background: var(--fill); padding: 0 6px; font-size: 14px; font-weight: 700; text-align: right; outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.tc.dyc input.ci { text-align: center; }
+.th { display: grid; grid-template-columns: var(--cols); background: var(--fill); font-size: 11px; font-weight: 600; color: var(--muted); position: relative; }
+.th span { padding: 6px 10px; border-left: 1px solid var(--fill2); }
+.th span:first-child, .th span:nth-child(2) { border-left: 0; }
+.th span:nth-child(2) { padding-left: 2px; }
+.th span:nth-child(3) { text-align: right; } .th span:nth-child(4) { text-align: center; padding: 6px 4px; }
+.row.tr.child .tg .chk { margin-left: 0; }
+.row.tr.child .tc.nmc { padding-left: 14px; }
+.row.tr.child .tc.nmc::before { content: "└"; color: var(--faint); font-size: 12px; margin-right: 2px; }
+.row.tr.open { background: var(--sel); }
+.row.tr.open .tc.nmc .nm { white-space: normal; }
+.tp { padding: 2px 14px 12px 40px; }
+.tp .kl { display: flex; gap: 10px; font-size: 12.5px; line-height: 1.5; padding: 2px 0; }
+.tp .kl span { flex: none; width: 70px; color: var(--muted); font-weight: 500; }
+.tp .kl b { flex: 1; min-width: 0; font-weight: 500; color: var(--ink2); word-break: break-all; }
+.tp .tb { display: flex; gap: 6px; margin-top: 8px; }
+.tp .tb button { height: 32px; padding: 0 12px; border-radius: 9px; background: var(--card); font-size: 12.5px; font-weight: 600; color: var(--ink2); }
+.tp .tb button.red { color: var(--red); }
+.row.tr.newr .tg { background: var(--card); }
+.newr .chk i { border-style: dashed; color: var(--muted); }
+.newr .chk.go i { border: 0; background: var(--accent); color: var(--accent-ink); }
+.newr .chk i svg { width: 11px; height: 11px; }
+.newr input { width: 100%; min-width: 0; border: 0; background: none; outline: none; font-size: 14px; padding: 0 10px; }
+.newr input::placeholder { color: var(--muted); font-weight: 500; }
+.newr .nin { padding-left: 2px; font-weight: 600; }
+.newr .ain { text-align: right; font-weight: 700; border-left: 1px solid var(--line); }
+.newr .din { text-align: center; font-weight: 600; border-left: 1px solid var(--line); padding: 0 4px; }
+.newr input:focus { background: var(--sel); }
 </style>
 <script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 7, "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
 <script>
@@ -563,6 +628,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 </header>
 
 <main class="tab on" id="tab-cal">
+  <div id="nodate"></div>
   <div class="cal" id="cal"></div>
   <div id="sumline" class="sum"></div>
   <div id="home"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
@@ -960,6 +1026,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     for (var t = (first + ld) % 7; t && t < 7; t++) h += '<div class="cd"></div>';
     h += '</div>';
     $('cal').innerHTML = h;
+    renderNoDate();
     if (!S) { $('sumline').innerHTML = ''; return; }
 
     // 한 줄 요약
@@ -995,8 +1062,6 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       head = '안 낸 결제';
       cnt = String(rem.length + un.filter(function (it) { return !it.checked; }).length);
       empty = '이번 달 낼 건 다 냈어요';
-      var miss = items().filter(isMissing).length;
-      if (miss) tail = '<button class="moreline" type="button" id="goMissing">결제일 미입력 ' + miss + '건은 달력에 안 나와요. <b>채우기</b></button>';
     } else {
       head = m + '월 결제';
       cnt = occ.length + '건';
@@ -1012,12 +1077,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!items().length && !view.sel) lh = onbHtml();
     $('home').innerHTML = lh;
 
-    var pv = $('calPrev'), nx2 = $('calNext'), td = $('calToday'), sc = $('selClear'), gm = $('goMissing');
+    var pv = $('calPrev'), nx2 = $('calNext'), td = $('calToday'), sc = $('selClear');
     pv.onclick = function () { moveMonth(-1); };
     nx2.onclick = function () { moveMonth(1); };
     if (td) td.onclick = function () { view.off = 0; view.sel = ''; renderHome(); };
     if (sc) sc.onclick = function () { view.sel = ''; renderHome(); };
-    if (gm) gm.onclick = function () { setTab('list'); setTimeout(function () { var e = els['h:nodate']; if (e) e.scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 60); };
   }
   function occRow(o) {
     var it = o.it;
@@ -1088,8 +1152,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
           r.key = 'r:' + r.remind.key;
           r.name = it.name;
           r.cls = 'row grey';
-          r.html = rowHtml({ it: it, check: 'ack', ackKey: r.remind.key,
-            line2: joinDot(['<span class="over">' + esc(fmtDate(r.remind.due)) + '분 체크 기록 없음</span>', acctTxt(it)]) });
+          r.cls = 'row tr grey';
+          r.html = trHtml(it, { check: 'ack', ackKey: r.remind.key, dayHtml: '<span class="nod">기록 없음</span>' });
           anchor = null;
           return;
         }
@@ -1098,11 +1162,188 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
         if (!it2.parent) anchor = it2.name; else if (!under) anchor = null;
         r.key = 'i:' + it2.name;
         r.name = it2.name;
-        r.cls = 'row hasx' + (under ? ' child' : '') + (it2.checked ? ' checked' : '') + (it2.pending ? ' pending' : '') + (r.cls ? ' ' + r.cls : '');
-        r.html = rowHtml({ it: it2, x: true, check: 'toggle', line2: line2For(it2, !under) });
+        r.cls = 'row tr' + (under ? ' child' : '') + (it2.checked ? ' checked' : '') + (it2.pending ? ' pending' : '') + (openRow === it2.name ? ' open' : '') + (r.cls ? ' ' + r.cls : '');
+        r.html = trHtml(it2, { check: 'toggle' });
       });
     });
     return secs;
+  }
+
+  /* ---------- 표 한 줄 ---------- */
+  var openRow = null;      // 펼친 줄 이름
+  function amtFieldOf() { return S.meta.fields.filter(isAmtField)[0]; }
+  function dayFieldOf() { return S.meta.fields.filter(isDayField)[0]; }
+  function startFieldOf() { return S.meta.fields.filter(function (f) { return /^시작일/.test(f.label); })[0]; }
+  function cycleShort(it) {
+    var e = it.every || 1;
+    if (e === 1) return '';
+    if (e === 12) return '매년';
+    return e + '개월마다';
+  }
+  function trHtml(it, o) {
+    var tag = '';
+    if (it.section === 1 && !it.checked && it.next) {
+      var d = ddays(it.next);
+      if (d < 0) tag = '<span class="tag over">' + (-d) + '일 지남</span>';
+      else if (d <= 3) tag = '<span class="tag soon">' + esc(relDay(it.next)) + '</span>';
+    }
+    if (it.last && it.section !== 5) tag += '<span class="tag lastp">마지막</span>';
+    var amt = it.amount != null ? esc(num(it.amount)) : '<span class="emp">-</span>';
+    var day = o.dayHtml || (it.day ? esc(it.day) + '일' + (cycleShort(it) ? '<small>' + esc(cycleShort(it)) + '</small>' : '')
+      : '<span class="nod">미정</span>');
+    var h = '<div class="tg">' +
+      '<button class="chk" type="button" data-act="' + o.check + '"' + (o.ackKey ? ' data-key="' + esc(o.ackKey) + '"' : '') + ' aria-label="납부 체크"><i>' + CHECK_SVG + '</i></button>' +
+      '<div class="tc nmc" data-act="expand"><span class="nm">' + esc(it.name) + '</span>' + tag + '</div>' +
+      '<div class="tc amc" data-act="cell" data-f="amt">' + amt + '</div>' +
+      '<div class="tc dyc" data-act="cell" data-f="day">' + day + '</div></div>';
+    if (openRow === it.name && !o.ackKey) {
+      var acct = String(it.account || '').trim();
+      var linked = acct ? accMemo(acct) : '';
+      var nextS = it.checked ? (it.next ? '이번 결제 냄 · 다음 ' + esc(fmtDate(it.next)) : '이번 결제 냄')
+        : it.next ? esc(fmtDate(it.next)) : esc(it.nextText || (it.day ? '' : '결제일을 넣어주세요'));
+      var period = (it.start || it.endDate || it.endText) ? esc(it.start ? fmtDate(it.start) : '시작일 없음') + ' ~ ' + esc(it.endDate ? fmtDate(it.endDate) : (it.endText || '무기한')) : '';
+      var kl = function (k, v) { return v ? '<div class="kl"><span>' + esc(k) + '</span><b>' + v + '</b></div>' : ''; };
+      h += '<div class="tp">' +
+        kl('다음 결제', nextS) +
+        kl('결제 수단', acct ? esc(acct === '?' ? '? (확인 필요)' : acct) + (linked ? ' · ' + esc(linked) : '') : '<span style="color:var(--muted)">없음</span>') +
+        kl('주기', esc(joinDot([it.cycle, it.amtType === '변동' ? '변동 금액' : '']))) +
+        kl('분류', esc(it.cat)) + kl('결제처', esc(it.vendor)) + kl('상위 항목', esc(it.parent)) +
+        kl('기간', period) + kl('메모', esc(it.memo)) +
+        '<div class="tb"><button type="button" data-act="edit">자세히 수정</button><button type="button" class="red" data-act="del">삭제</button></div></div>';
+    }
+    return h;
+  }
+  /* 칸 눌러서 그 자리에서 고치기 */
+  function editCell(cell, name, kind) {
+    if (cell.querySelector('input.ci')) return;
+    var it = findItem(name);
+    if (!it) return;
+    var yearlyNoStart = kind === 'day' && (it.every || 1) > 1 && !it.start;
+    if (yearlyNoStart) { openNoDate([name]); return; }
+    var f = kind === 'amt' ? amtFieldOf() : dayFieldOf();
+    if (!f) { openEdit(name); return; }
+    var cur = kind === 'amt' ? (it.amount != null ? num(it.amount) : '') : (it.day ? String(it.day) : '');
+    cell.innerHTML = '<input class="ci" inputmode="numeric" enterkeyhint="done" maxlength="' + (kind === 'day' ? 2 : 13) + '" placeholder="' + (kind === 'day' ? '일' : '금액') + '" value="' + esc(cur) + '">';
+    var inp = cell.querySelector('input');
+    var fin = false;
+    if (kind === 'amt') inp.addEventListener('input', function () { var dg = inp.value.replace(/[^\d]/g, ''); inp.value = dg ? Number(dg).toLocaleString('ko-KR') : ''; });
+    function end(save) {
+      if (fin) return; fin = true;
+      var v = inp.value.replace(/[^\d]/g, '');
+      var row = cell.closest('.row');
+      if (row) row._html = '';
+      cell.innerHTML = '';
+      if (save && kind === 'day' && v && (+v < 1 || +v > 31)) { toast('결제일은 1~31 사이 숫자로 적어주세요', { error: true }); save = false; }
+      if (save && v !== (kind === 'amt' ? (it.amount != null ? String(it.amount) : '') : (it.day ? String(it.day) : ''))) {
+        it.v[f.col] = v;
+        if (kind === 'amt') it.amount = v ? Number(v) : null; else it.day = Number(v) || 0;
+        var vals = {}; vals[f.col] = v;
+        enqueue({ type: 'save', oldName: name, vals: vals, onDone: function (res) { if (res.ok) toast(name + ' ' + (kind === 'amt' ? '금액' : '결제일') + ' 저장했어요', { ms: 1800 }); } });
+      }
+      renderList();
+    }
+    inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); inp.blur(); } else if (e.key === 'Escape') { end(false); } });
+    inp.addEventListener('blur', function () { end(true); });
+    inp.focus();
+    try { inp.select(); } catch (e) {}
+  }
+  /* 맨 아래 빈 줄: 바로 적으면 새 항목 */
+  function newRowHtml() {
+    return '<div class="tg"><button class="chk" type="button" id="nGo" aria-label="추가"><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></i></button>' +
+      '<input class="nin" id="nName" placeholder="새 항목 이름" enterkeyhint="next" maxlength="40">' +
+      '<input class="ain" id="nAmt" inputmode="numeric" placeholder="금액" enterkeyhint="next" maxlength="13">' +
+      '<input class="din" id="nDay" inputmode="numeric" placeholder="일" enterkeyhint="done" maxlength="2"></div>';
+  }
+  function wireNewRow(nr) {
+    var nm = nr.querySelector('#nName'), am = nr.querySelector('#nAmt'), dy = nr.querySelector('#nDay'), go = nr.querySelector('#nGo');
+    function upd() { go.classList.toggle('go', !!nm.value.trim()); }
+    nm.addEventListener('input', upd);
+    am.addEventListener('input', function () { var dg = am.value.replace(/[^\d]/g, ''); am.value = dg ? Number(dg).toLocaleString('ko-KR') : ''; });
+    dy.addEventListener('input', function () { dy.value = dy.value.replace(/[^\d]/g, ''); });
+    function add() {
+      var name = nm.value.trim();
+      if (!name) { nm.focus(); return; }
+      if (findItem(name)) { toast('"' + name + '"은(는) 이미 있어요. 이름을 조금 다르게 적어주세요.', { error: true }); nm.focus(); return; }
+      var d = dy.value.replace(/[^\d]/g, '');
+      if (d && (+d < 1 || +d > 31)) { toast('결제일은 1~31 사이 숫자로 적어주세요', { error: true }); dy.focus(); return; }
+      var vals = {};
+      S.meta.fields.forEach(function (f) { var dv = defaultFor(f); if (dv) vals[f.col] = dv; });
+      vals[S.meta.nameCol] = name;
+      var af = amtFieldOf(), df = dayFieldOf();
+      if (af) vals[af.col] = am.value.replace(/[^\d]/g, '');
+      if (df) vals[df.col] = d;
+      go.classList.remove('go');
+      nm.value = ''; am.value = ''; dy.value = '';
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+      enqueue({ type: 'save', oldName: '', vals: vals, onDone: function (res) {
+        if (!res.ok) return;
+        toast(res.name + ' 추가했어요' + (d ? '' : ' · 결제일은 나중에 넣어도 돼요'), { action: '자세히', onAction: function () { openEdit(res.name); } });
+        setTimeout(function () { flash(res.name); }, 400);
+      } });
+    }
+    go.onclick = add;
+    nm.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (nm.value.trim()) am.focus(); } });
+    am.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); dy.focus(); } });
+    dy.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); add(); } });
+  }
+
+  /* ---------- 날짜 미정 (첫 화면 맨 위) ---------- */
+  function needsDate(it) { return it.section !== 5 && (isMissing(it) || !it.day); }
+  function renderNoDate() {
+    var box = $('nodate');
+    var miss = S ? items().filter(needsDate) : [];
+    if (!miss.length) { box.innerHTML = ''; return; }
+    var names = miss.slice(0, 2).map(function (it) { return it.name; }).join(', ') + (miss.length > 2 ? ' 외 ' + (miss.length - 2) + '건' : '');
+    box.innerHTML = '<button class="ndb" type="button" id="ndBtn"><span class="ic">!</span><span class="tx"><b>날짜 미정 ' + miss.length + '건</b><small>' + esc(names) + ' · 달력에 안 나와요</small></span><span class="go">넣기</span></button>';
+    $('ndBtn').onclick = function () { openNoDate(); };
+  }
+  function openNoDate(only) {
+    var list = items().filter(function (it) { return only ? only.indexOf(it.name) >= 0 : needsDate(it); });
+    if (!list.length) return;
+    var df = dayFieldOf(), sf = startFieldOf();
+    var h = '<div class="tip">결제일을 넣으면 달력과 구글 캘린더에 바로 들어가요. 아는 것만 넣어도 돼요.</div><div class="grp">';
+    list.forEach(function (it, i) {
+      var full = (it.every || 1) > 1 && !it.start && sf;
+      h += '<div class="qd"><div class="l"><b>' + esc(it.name) + '</b><small>' + esc(joinDot([it.amount != null ? won(it.amount) : '금액 없음', it.cycle])) + '</small></div>' +
+        (full ? '<input type="date" data-q="' + i + '" aria-label="다음 결제일">'
+          : '<span class="dw">매월 <input data-q="' + i + '" inputmode="numeric" maxlength="2" placeholder="-" value="' + (it.day || '') + '" enterkeyhint="next"> 일</span>') + '</div>';
+    });
+    h += '</div><div class="btns"><button class="btn primary" type="button" id="qdSave">저장</button></div>';
+    openSheet('날짜 미정 ' + list.length + '건', h, 'nodate');
+    var ins = $('sheetBody').querySelectorAll('[data-q]');
+    ins.forEach(function (inp, k) {
+      if (inp.type !== 'date') inp.addEventListener('input', function () { inp.value = inp.value.replace(/[^\d]/g, ''); });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); if (ins[k + 1]) ins[k + 1].focus(); else $('qdSave').click(); } });
+    });
+    if (ins[0] && ins[0].type !== 'date') setTimeout(function () { ins[0].focus(); }, 320);
+    $('qdSave').onclick = function () {
+      var ops = [], bad = '';
+      ins.forEach(function (inp) {
+        var it = list[+inp.getAttribute('data-q')];
+        var vals = {};
+        if (inp.type === 'date') {
+          if (!inp.value) return;
+          vals[df.col] = String(+inp.value.slice(8, 10));
+          vals[sf.col] = inp.value;
+        } else {
+          var v = inp.value.replace(/[^\d]/g, '');
+          if (!v || +v === it.day) return;
+          if (+v < 1 || +v > 31) { bad = it.name; return; }
+          vals[df.col] = v;
+        }
+        ops.push({ name: it.name, vals: vals });
+      });
+      if (bad) { toast(bad + ': 결제일은 1~31 사이 숫자로 적어주세요', { error: true }); return; }
+      if (!ops.length) { closeSheet(); return; }
+      closeSheet();
+      var left = ops.length;
+      ops.forEach(function (o) {
+        var it = findItem(o.name);
+        if (it) { it.day = Number(o.vals[df.col]) || it.day; if (sf && o.vals[sf.col]) it.start = o.vals[sf.col]; }
+        enqueue({ type: 'save', oldName: o.name, vals: o.vals, onDone: function (res) { if (res.ok && --left === 0) toast(ops.length + '건 날짜 넣었어요'); } });
+      });
+      renderAll();
+    };
   }
 
   function renderList() {
@@ -1125,8 +1366,12 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       h.className = 'gh';
       list.appendChild(h);
       var g = get('g:' + sec.id);
-      g.className = 'grp';
+      g.className = 'grp tbl';
       list.appendChild(g);
+      var th = get('t:' + sec.id);
+      if (!th._html) { th._html = 1; th.innerHTML = '<span></span><span>항목</span><span>금액</span><span>결제일</span>'; }
+      th.className = 'th';
+      g.appendChild(th);
       if (sec.note) {
         var n = get('n:' + sec.id);
         if (n._html !== sec.note) { n.textContent = sec.note; n._html = sec.note; }
@@ -1142,12 +1387,18 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       sec.rows.forEach(function (r) {
         var el = get(r.key);
         el.setAttribute('data-name', r.name);
-        if (el._html !== r.html) { el.innerHTML = r.html; el._html = r.html; }
+        if (el._html !== r.html && !el.querySelector('input.ci')) { el.innerHTML = r.html; el._html = r.html; }
         var fl = el.classList.contains('flash') ? ' flash' : '';
         var gone = el.classList.contains('gone') ? ' gone' : '';
         el.className = r.cls + fl + gone + (el._new && !firstRender ? ' enter' : '');
         g.appendChild(el);
       });
+      if (sec.id === 'cur') {
+        var nr = get('new');
+        if (!nr._html) { nr._html = 1; nr.innerHTML = newRowHtml(); wireNewRow(nr); }
+        nr.className = 'row tr newr';
+        g.appendChild(nr);
+      }
     });
     for (var k2 in els) if (!keep[k2]) { els[k2].remove(); delete els[k2]; }
     for (var k3 in els) els[k3]._new = false;
@@ -2280,7 +2531,10 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!row) return;
     var name = row.getAttribute('data-name');
     if (act === 'toggle') toggle(name);
-    else if (act === 'del') removeItem(name);
+    else if (act === 'del') { if (openRow === name) openRow = null; removeItem(name); }
+    else if (act === 'expand') { openRow = openRow === name ? null : name; renderList(); }
+    else if (act === 'cell') editCell(b, name, b.getAttribute('data-f'));
+    else if (act === 'edit') openEdit(name);
     else {
       var it = findItem(name);
       if (it && isMissing(it)) openEdit(name); else openItem(name);
