@@ -61,7 +61,7 @@ function create(opt) {
       if (!m) throw new Error('parseDate: ' + s);
       return new FakeDate(RealDate.UTC(+m[1], +m[2] - 1, +m[3]) - off * 3600000);
     },
-    sleep(ms) { st.slept += ms; },
+    sleep(ms) { st.slept += ms; st.offset += ms; },   // 실제로 쉬지는 않고 가짜 시계만 앞으로 (시간 제한 코드가 돌도록)
     formatString(f, ...a) { let i = 0; return f.replace(/%s/g, () => String(a[i++])); }
   };
 

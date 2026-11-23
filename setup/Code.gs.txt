@@ -19,7 +19,7 @@
  * 설치: 확장 프로그램 → Apps Script → 기본 코드를 전부 지우고 이 내용을 붙여넣기 → 저장 → 시트 새로고침
  */
 
-var SERVER_VER = 7;     // 서버 코드 버전 (앱이 새 버전 있는지 볼 때 씀)
+var SERVER_VER = 8;     // 서버 코드 버전 (앱이 새 버전 있는지 볼 때 씀)
 var SHEET = '고정비 목록';
 var FIRST = 8;          // 첫 항목 줄 (7줄은 '이번 달 낼 것' 제목)
 var ADD_ROW = 6;        // '새 항목 추가' 입력 줄 (5줄은 그 제목)
@@ -748,17 +748,48 @@ function calendarDaily() {
   try { syncCalendar_(); } finally { vsSave_(); }
 }
 
-function syncCalendar_() {
-  var lock = LockService.getUserLock();   // 사람마다 자기 캘린더라 사람별 잠금
-  if (!lock.tryLock(60000)) return '다른 동기화가 진행 중이에요.';
+/* 캘린더 맞추기는 한 사람당 한 번에 하나만 돌아야 해요 (둘이 같이 돌면 일정이 두 번 생김).
+ * 예전엔 사람별 잠금을 맞추는 내내 쥐고 있었는데, 앱의 저장(run_)도 같은 잠금을 써서
+ * 일정을 넣는 몇 분 동안 체크·추가가 '앞 작업이 안 끝났어요'로 막혔어요.
+ * → '맞추는 중' 깃발(사용자 캐시)로 따로 지키고, 잠금은 깃발을 세우는 순간에만 잠깐 써요. */
+var CAL_BUSY_KEY = 'cal_busy';
+var CAL_STEP_KEY = 'cal_step';   // 앱이 끊어서 맞추는 중이라는 표시 (예약 실행이 끼어들지 않게)
+var CAL_INFO_ = null;            // 마지막 맞추기 결과: { pending, busy, done, total }
+
+function calBegin_(waitMs) {
+  var cache = CacheService.getUserCache();
+  var until = Date.now() + (waitMs || 0);
+  for (;;) {
+    var lock = null, got = false;
+    try { lock = LockService.getUserLock(); got = lock.tryLock(3000); } catch (err) {}
+    try {
+      if (!cache.get(CAL_BUSY_KEY)) { cache.put(CAL_BUSY_KEY, String(Date.now()), 330); return true; }   // 5분 30초 뒤엔 저절로 풀림
+    } finally {
+      if (got) { try { lock.releaseLock(); } catch (err2) {} }
+    }
+    if (Date.now() >= until) return false;
+    Utilities.sleep(1000);
+  }
+}
+function calEnd_() {
+  try { CacheService.getUserCache().remove(CAL_BUSY_KEY); } catch (err) {}
+}
+
+/** budgetMs를 주면 그 시간만큼만 일정을 넣고 돌아옴 (앱이 이어서 다시 부름). 안 주면 한 번에 최대 4분 30초. */
+function syncCalendar_(budgetMs) {
+  CAL_INFO_ = null;
+  if (!calBegin_(budgetMs ? 8000 : 60000)) {
+    CAL_INFO_ = { pending: true, busy: true, done: 0, total: 0 };
+    return '다른 동기화가 진행 중이에요.';
+  }
   try {
-    return doSync_();
+    return doSync_(budgetMs);
   } finally {
-    lock.releaseLock();
+    calEnd_();
   }
 }
 
-function doSync_() {
+function doSync_(budgetMs) {
   var ss = ss_();
   var sh = ss.getSheetByName(SHEET);
   var tzSheet = ss.getSpreadsheetTimeZone();
@@ -885,8 +916,9 @@ function doSync_() {
   }
 
   var nAdd = 0, nUpd = 0, nDel = 0, pending = false;
-  var deadline = Date.now() + 4.5 * 60 * 1000;   // 한 번에 최대 4분 30초만 (구글 제한 6분)
+  var deadline = Date.now() + (budgetMs || 4.5 * 60 * 1000);   // 한 번에 최대 4분 30초만 (구글 제한 6분). 앱이 끊어서 부를 땐 더 짧게
   for (var hk in have) {
+    if (!pending && Date.now() > deadline) pending = true;
     if (!want[hk] && !pending) {
       try { retry_(function () { have[hk].deleteEvent(); }); nDel++; delete have[hk]; Utilities.sleep(500); }
       catch (err) { pending = true; }
@@ -896,6 +928,7 @@ function doSync_() {
   for (var hk2 in have) if (want[hk2]) newCreated[hk2] = 1;
   for (var wk in want) {
     if (skip[wk]) continue;
+    if (!pending && Date.now() > deadline) pending = true;
     var w = want[wk];
     var ev2 = have[wk];
     if (!ev2) {
@@ -933,9 +966,13 @@ function doSync_() {
   for (var sk in skip) if (want[sk]) newSkip[sk] = 1;
   props.setProperty(CAL_PROP_CREATED, JSON.stringify(newCreated));
   props.setProperty(CAL_PROP_SKIP, JSON.stringify(newSkip));
-  scheduleContinue_(pending);
+  // 앱이 끊어서 부르는 중이면 이어서 하기 예약은 하나만 두고 (앱이 꺼졌을 때 대신 마무리), 다 끝나면 지움
+  scheduleContinue_(pending, !!budgetMs);
+  var total = 0, done = 0;
+  for (var tk in want) if (!skip[tk]) { total++; if (newCreated[tk]) done++; }
+  CAL_INFO_ = { pending: pending, busy: false, done: done, total: total };
   return '캘린더: 추가 ' + nAdd + ' · 수정 ' + nUpd + ' · 삭제 ' + nDel + ' (총 ' + Object.keys(newCreated).length + '개 일정)' +
-    (pending ? '\n일정이 많아서 나눠서 넣는 중이에요. 몇 분 뒤 나머지가 자동으로 들어가요.' : '');
+    (pending && !budgetMs ? '\n일정이 많아서 나눠서 넣는 중이에요. 몇 분 뒤 나머지가 자동으로 들어가요.' : '');
 }
 
 /** 구글이 잠깐 막을 때를 대비해 몇 번 다시 시도. */
@@ -965,16 +1002,26 @@ function retry_(fn) {
   }
 }
 
-/** 다 못 넣었으면 2분 뒤에 이어서 하도록 예약 (예약은 하나만). */
-function scheduleContinue_(pending) {
+/** 다 못 넣었으면 2분 뒤에 이어서 하도록 예약 (예약은 하나만). keep이면 이미 있는 예약은 그대로 둠. */
+function scheduleContinue_(pending, keep) {
+  var have = false;
   ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'calendarContinue') ScriptApp.deleteTrigger(t);
+    if (t.getHandlerFunction() !== 'calendarContinue') return;
+    if (pending && keep) { have = true; return; }
+    ScriptApp.deleteTrigger(t);
   });
-  if (pending) ScriptApp.newTrigger('calendarContinue').timeBased().after(2 * 60 * 1000).create();
+  if (pending && !have) ScriptApp.newTrigger('calendarContinue').timeBased().after(2 * 60 * 1000).create();
 }
 
 function calendarContinue() {
-  try { syncCalendar_(); } finally { vsSave_(); }
+  try {
+    scheduleContinue_(false);   // 한 번 돈 예약은 지움 (남겨 두면 '예약 있음'으로 잘못 봄)
+    var stepping = null;
+    try { stepping = CacheService.getUserCache().get(CAL_STEP_KEY); } catch (err) {}
+    if (stepping) { scheduleContinue_(true); return; }   // 앱이 지금 끊어서 넣는 중 → 끼어들지 않고 2분 뒤 다시 확인
+    syncCalendar_();
+    if (CAL_INFO_ && CAL_INFO_.busy) scheduleContinue_(true);
+  } finally { vsSave_(); }
 }
 
 /** 시트 날짜(Date 또는 날짜 숫자) → 'yyyy-MM-dd'. 날짜가 아니면 ''. */
@@ -1255,7 +1302,49 @@ function api_template() {
 
 /** 처음 열 때: 시트를 열 때처럼 새 달 정리까지 하고 전체 내용을 돌려줌. light면 입력 칸 정보는 캐시 사용. */
 function api_load(light) {
-  return appCall_(function () { return appRun_(true, null); }, !light);
+  return appCall_(function () {
+    try { appFillStart_(); } catch (err) {}
+    return appRun_(true, null);
+  }, !light);
+}
+
+/** 시작일이 빈 '매월' 항목에 시작일을 채워요 (앱 저장 공간을 쓰는 사람만. 실제 시트는 건드리지 않음).
+ *  시작일이 없으면 '시작월'이 달마다 이번 달로 밀려서, 지난달 달력이 통째로 비고 '지난달 놓친 결제' 알림도 못 띄워요.
+ *  그 항목이 언제부터 있었는지는 납부 기록으로만 알 수 있어서:
+ *   - 납부한 결제일(이번·이전)이 있으면 그중 가장 이른 날
+ *   - 없으면 이번 달 결제일 (지난달엔 없던 걸로 봄 → 없던 항목을 '지난달에 안 냈다'고 잘못 알리지 않음) */
+function appFillStart_() {
+  var ss = ss_();
+  if (!isVirtual_(ss)) return 0;
+  var sh = ss.getSheetByName(SHEET);
+  var c = sh ? cols_(sh) : null;
+  if (!c) return 0;
+  var ac = appCols_(appHead_(sh));
+  if (!ac.START || !ac.DAY) return 0;
+  var end = findEnd_(sh, c);
+  if (!end || end <= FIRST) return 0;
+  var tz = ss.getSpreadsheetTimeZone(), n = end - FIRST;
+  var rows = sh.getRange(FIRST, 1, n, sh.getLastColumn()).getValues();
+  var ym = Utilities.formatDate(new Date(), tz, 'yyyy-MM').split('-');
+  var dim = new Date(Number(ym[0]), Number(ym[1]), 0).getDate();
+  var filled = 0;
+  for (var i = 0; i < n; i++) {
+    var r = rows[i];
+    if (r[c.TYPE - 1] === 'SEP' || !String(r[c.NAME - 1]).trim()) continue;
+    var st = r[ac.START - 1];
+    if (!(st === '' || st === null)) continue;
+    var day = Number(r[ac.DAY - 1]);
+    if (!(day >= 1 && day <= 31)) continue;
+    var every = ac.EVERY && Number(r[ac.EVERY - 1]) >= 1 ? Number(r[ac.EVERY - 1]) : 1;
+    if (every !== 1) continue;   // 매년·분기 항목은 첫 결제일을 직접 넣게 돼 있음
+    var dd = Math.min(day, dim);
+    var first = ym[0] + '-' + ym[1] + '-' + (dd < 10 ? '0' : '') + dd;
+    var seen = [dateStr_(r[c.PAID - 1], tz), dateStr_(r[c.PREV - 1], tz)];
+    for (var k = 0; k < seen.length; k++) if (seen[k] && seen[k] < first) first = seen[k];
+    sh.getRange(FIRST + i, ac.START).setValue(Utilities.parseDate(first, tz, 'yyyy-MM-dd'));
+    filled++;
+  }
+  return filled;
 }
 
 /** map: { 항목명: true/false } — 납부 체크를 바꾸고 줄 정리. */
@@ -1321,13 +1410,18 @@ function api_sort(mode) {
   });
 }
 
-/** 지금 내용대로 캘린더 맞추기 (앱이 고친 뒤마다 부름). */
-function api_sync() {
+/** 지금 내용대로 캘린더 맞추기 (앱이 고친 뒤마다 부름).
+ *  step이 true면 12초쯤만 넣고 돌아와요: more가 true면 앱이 이어서 다시 부르고, done/total로 진행 상황을 보여줘요.
+ *  (일정 하나 만드는 데 1초 넘게 걸려서, 처음 100개 넘게 넣을 땐 몇 분이 걸림) */
+function api_sync(step) {
   if (!appBind_()) return { ok: true, off: true, msg: '' };
   if (!calIsOn_()) return { ok: true, off: true, msg: '캘린더 동기화가 꺼져 있어요.' };
-  var m = String(syncCalendar_());
+  if (step) { try { CacheService.getUserCache().put(CAL_STEP_KEY, '1', 90); } catch (err) {} }
+  var m = String(syncCalendar_(step ? 12000 : 0));
   vsSave_();
-  return { ok: true, msg: m };
+  var info = CAL_INFO_ || {};
+  if (step && !info.pending) { try { CacheService.getUserCache().remove(CAL_STEP_KEY); } catch (err2) {} }
+  return { ok: true, msg: m, more: !!(step && info.pending), busy: !!info.busy, done: info.done || 0, total: info.total || 0 };
 }
 
 /** 캘린더 동기화 켜기/끄기. */

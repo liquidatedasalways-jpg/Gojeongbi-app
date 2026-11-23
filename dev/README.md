@@ -22,8 +22,10 @@ await h.close();
 - `seed`: `'full'`(항목 15개 + 결제 수단 4개), `'empty'`, 또는 직접 만든 객체
 - `seedAt` / `now`: 자료를 넣은 날 / 화면을 여는 날 (한국 시간)
 - `afterSeed`: 자료를 넣은 뒤 서버에 할 일 (`seedlife.js`는 한 달쯤 쓴 상태를 만듦)
-- `latency`: 서버 응답 지연(ms), `h.failNext(n)`: 다음 서버 호출 n번을 끊김으로
+- `latency`: 서버 응답 지연(ms), `h.failNext(n)`: 다음 서버 호출 n번을 끊김으로 (`h.failNext(1, 'api_save')`처럼 기능 이름을 주면 그 호출만)
 - `dark`, `loggedOut`, `viewport`, `device`
+- `authFail`: 로그인 표가 만료돼 구글에 조용히 다녀올 때 실패하게 함. `h.auths()`는 구글 로그인 화면에 다녀온 횟수
+- `http://localhost:포트/__outer`: 다른 사이트가 앱을 틀(iframe)에 끼워 넣은 상황 (`h.base`의 포트를 씀)
 
 ## 파일
 

@@ -2,6 +2,15 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
+<script>
+/* 다른 사이트가 이 앱을 자기 화면 안에 끼워 넣으면(눌러야 할 곳을 가려서 속이는 수법) 화면을 숨기고 앱도 시작하지 않음.
+ * GitHub Pages는 서버 응답 머리글을 못 바꿔서 여기서 막음. */
+if (window.top !== window.self) {
+  window.FC_FRAMED = true;
+  document.documentElement.style.setProperty('display', 'none', 'important');
+  try { window.top.location = window.self.location.href; } catch (e) {}
+}
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
@@ -180,6 +189,8 @@ svg { display: block; }
 .li > span:first-child { flex: none; white-space: nowrap; }
 .li .r { margin-left: auto; min-width: 0; color: var(--muted); font-size: 12.5px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .li.red { color: var(--red); justify-content: center; }
+.li.li2 { flex-direction: column; align-items: flex-start; justify-content: center; gap: 2px; padding: 9px 18px; }
+.li.li2 small { font-size: 12px; font-weight: 500; color: var(--muted); line-height: 1.45; white-space: pre-line; }
 .switch { margin-left: auto; width: 44px; height: 26px; border-radius: 13px; background: var(--fill2); position: relative; transition: background .2s; flex: none; }
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
 .switch.on { background: var(--ok); }
@@ -208,7 +219,9 @@ svg { display: block; }
 .seg { display: flex; background: var(--fill); border-radius: 10px; padding: 2px; gap: 2px; flex: none; }
 .seg button { height: 28px; padding: 0 10px; border-radius: 8px; font-size: 12.5px; font-weight: 600; color: var(--muted); }
 .seg button.on { background: var(--card); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-.datebtn { flex: 1; min-width: 0; text-align: left; font-size: 14.5px; font-weight: 500; color: var(--ink); padding: 8px 0; }
+.datebtn { flex: 1; min-width: 0; text-align: left; font-size: 14.5px; font-weight: 500; color: var(--ink); padding: 8px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.f .ctl.wrapc { flex-wrap: wrap; row-gap: 0; padding: 6px 0; }
+.f .ctl.wrapc .datebtn { flex: 1 0 100%; padding: 6px 2px 2px; }
 .datebtn.empty { color: var(--faint); }
 .dpback { position: fixed; inset: 0; z-index: 50; background: var(--backdrop); opacity: 0; pointer-events: none; transition: opacity .2s; }
 .dpback.on { opacity: 1; pointer-events: auto; }
@@ -322,10 +335,13 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .tg .chk { width: auto; }
 .tg .chk i { width: 20px; height: 20px; }
 .tc { display: flex; align-items: center; padding: 0 10px; font-size: 14px; border-left: 1px solid var(--line); min-height: 44px; cursor: pointer; }
-.tc.nmc { gap: 6px; border-left: 0; padding-left: 2px; }
-.tc.nmc .nm { flex: 0 1 auto; font-size: 14px; }
+.tc.nmc { gap: 4px; border-left: 0; padding-left: 2px; }
+.tc.nmc .nw { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 4px 0; }
+.tc.nmc .nm { flex: none; font-size: 14px; line-height: 1.35; }
+.tc.nmc .tgs { display: flex; gap: 6px; line-height: 1.25; white-space: nowrap; overflow: hidden; }
 .tc.nmc .tag { flex: none; font-size: 11px; font-weight: 600; }
 .tc.amc { justify-content: flex-end; font-weight: 700; letter-spacing: -.03em; white-space: nowrap; }
+.tc.amc .av { min-width: 0; overflow: hidden; }
 .tc.dyc { justify-content: center; flex-direction: column; gap: 0; font-weight: 600; white-space: nowrap; padding: 0 4px; }
 .tc.dyc small { font-size: 10px; font-weight: 500; color: var(--muted); line-height: 1.1; }
 .tc .nod { color: var(--red); font-weight: 700; font-size: 12.5px; }
@@ -349,6 +365,9 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .tp .tb { display: flex; gap: 6px; margin-top: 8px; }
 .tp .tb button { height: 32px; padding: 0 12px; border-radius: 9px; background: var(--card); font-size: 12.5px; font-weight: 600; color: var(--ink2); }
 .tp .tb button.red { color: var(--red); }
+.row.tr.ghost { pointer-events: none; }
+.row.tr.ghost .tc { opacity: .5; }
+.row.tr.ghost .chk .spin { width: 14px; height: 14px; color: var(--muted); }
 .row.tr.newr .tg { background: var(--card); }
 .newr .chk i { border-style: dashed; color: var(--muted); }
 .newr .chk.go i { border: 0; background: var(--accent); color: var(--accent-ink); }
@@ -360,12 +379,13 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .newr .din { text-align: center; font-weight: 600; border-left: 1px solid var(--line); padding: 0 4px; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 7, "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 8, "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
  * 로그인 표(토큰)는 이 기기에만 저장되고 1시간마다 구글이 조용히 새로 줌. */
 (function () {
+  if (window.FC_FRAMED) return;
   var C = window.FC_CONFIG;
   var SCOPES = [
     'https://www.googleapis.com/auth/spreadsheets',
@@ -382,6 +402,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
   function valid(a) { return a.token && a.exp && Date.now() < a.exp - 60000; }
 
   function go(prompt, hint, extra) {
+    // 조용히 새 표를 받으러 갈 때(화면이 새로 열림): 앱이 보내던 작업을 적어 두게 함 → 돌아와서 이어서 함
+    if (prompt === 'none') { try { if (window.FC_AUTH && window.FC_AUTH.onLeave) window.FC_AUTH.onLeave(); } catch (e) {} }
     var st = Math.random().toString(36).slice(2);
     try { sessionStorage.setItem('fc_state', st); sessionStorage.setItem('fc_mode', prompt); } catch (e) {}
     var q = {
@@ -585,6 +607,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__bip = e; });
 /* 카카오톡·라인 안 브라우저에서 열리면 구글 로그인이 막혀서, 바로 폰 기본 브라우저로 넘김 */
 (function () {
+  if (window.FC_FRAMED) return;
   var ua = navigator.userAgent, u = location.href;
   try { if (sessionStorage.getItem('fc_ext')) return; sessionStorage.setItem('fc_ext', '1'); } catch (e) {}
   if (/KAKAOTALK/i.test(ua)) { location.replace('kakaotalk://web/openExternal?url=' + encodeURIComponent(u)); return; }
@@ -609,6 +632,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 .fcl .gbtn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; max-width: 320px; height: 50px; margin-top: 28px; border-radius: 14px; background: var(--card); color: var(--ink); font-size: 15px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 0 0 1px var(--line); }
 .fcl .err { color: var(--red); font-size: 12.5px; margin-top: 12px; min-height: 1em; }
 .fcl small { display: block; margin-top: 18px; font-size: 11.5px; color: var(--muted); line-height: 1.5; max-width: 300px; }
+.fcl .legal { display: flex; gap: 4px; margin-top: 6px; }
+.fcl .legal a { padding: 8px 8px; font-size: 12px; font-weight: 600; color: var(--sub); text-decoration: underline; text-underline-offset: 3px; }
 .inst { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 201; max-width: 460px; margin: 0 auto; background: var(--card); border-radius: 18px; padding: 12px 12px 12px 14px; display: none; align-items: center; gap: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.14); text-align: left; }
 .inst.on { display: flex; }
 .inst img { width: 40px; height: 40px; border-radius: 11px; flex: none; }
@@ -623,7 +648,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   <p>매달 나가는 돈을 달력으로 보고, 결제일은 구글 캘린더에 자동으로 넣어줘요.</p>
   <button class="gbtn" id="fcGo" type="button"><svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글 계정으로 로그인</button>
   <div class="err" id="fcErr"></div>
-  <small>내 고정비 목록은 고른 구글 계정에만 저장되고, 결제일은 그 계정 구글 캘린더에 들어가요. 처음에 '확인되지 않은 앱' 화면이 나오면 고급 → 이동을 눌러주세요.</small>
+  <small>내 고정비 목록은 고른 구글 계정 몫으로만 저장되고, 결제일은 그 계정 구글 캘린더에 들어가요. 처음에 '확인되지 않은 앱' 화면이 나오면 고급 → 이동을 눌러주세요.</small>
+  <div class="legal"><a href="privacy.html">개인정보 처리방침</a><a href="terms.html">이용약관</a></div>
 </div>
 <div class="inst" id="inst">
   <img src="icons/icon-192.png" alt="">
@@ -674,6 +700,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 <script>
 (function () {
   'use strict';
+  if (window.FC_FRAMED) return;
 
   var SHOW_AMT = true;     // 달력 날짜 밑 작은 회색 금액
 
@@ -690,7 +717,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   var firstRender = true;
   var hiddenAt = 0;
   var tab = 'cal';
-  var cal = { syncing: false, again: false, timer: null, last: '', err: false };
+  var cal = { syncing: false, again: false, timer: null, last: '', err: false, prog: '' };
   var view = { off: 0, sel: '' };
   var sheetMode = null;
   var openName = null;
@@ -710,10 +737,64 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function num(n) { return Math.round(n).toLocaleString('ko-KR'); }
   function won(n) { return n == null ? '' : num(n) + '원'; }
+  /** 달력 칸용 짧은 금액: 7,890 / 65만 / 1235만 / 1.23억 */
   function man(n) {
     if (n == null) return '';
+    if (n >= 99995000) { var e = n / 1e8; return (e >= 100 ? num(Math.round(e)) : e >= 10 ? Math.round(e * 10) / 10 : Math.round(e * 100) / 100) + '억'; }
     if (n >= 10000) { var v = n / 10000; return (v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) + '만'; }
     return num(n);
+  }
+  /** 좁은 칸에서 끝내 안 들어갈 때 쓰는 짧은 금액: 1.23억원 / 1,235만원 */
+  function wonShort(n) {
+    if (n == null) return '';
+    if (n >= 99995000) return man(n) + '원';
+    if (n >= 10000000) return num(Math.round(n / 10000)) + '만원';
+    return won(n);
+  }
+  /** box 안의 [data-fit] 글자가 칸보다 길면 글자 크기를 조금씩 줄이고, 그래도 넘치면 짧은 표기(data-short)로 바꿈 */
+  function tooWide(el) {
+    if (el.scrollWidth > el.clientWidth) return true;
+    // scrollWidth는 정수로 반올림돼서 0.5px쯤 넘친 건 못 잡음(그래도 말줄임 …은 생김) → 글자 실제 폭으로 한 번 더
+    try { var r = document.createRange(); r.selectNodeContents(el); return r.getBoundingClientRect().width > el.getBoundingClientRect().width + 0.05; } catch (e) { return false; }
+  }
+  function fitAll(box) {
+    var over = [], all = box.querySelectorAll('[data-fit]'), i, groups = {};
+    for (i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el._fit === el.textContent) continue;
+      if (!el.clientWidth) continue;   // 안 보이는 탭이면 폭을 못 재니 보일 때 다시 (setTab)
+      if (tooWide(el)) over.push(el); else el._fit = el.textContent;
+    }
+    over.forEach(function (el) {
+      var base = parseFloat(getComputedStyle(el).fontSize) || 14;
+      var shrink = function () {
+        var z = base;
+        el.style.fontSize = '';
+        while (tooWide(el) && z > base * 0.78) { z -= 0.5; el.style.fontSize = z + 'px'; }
+        return !tooWide(el);
+      };
+      var sh = el.getAttribute('data-short');
+      if (!shrink() && sh && sh !== el.textContent) { el.setAttribute('data-full', el.textContent); el.textContent = sh; shrink(); }
+      el._fit = el.textContent;
+      var g = el.getAttribute('data-fit');
+      if (g && el.style.fontSize) groups[g] = Math.min(groups[g] || 99, parseFloat(el.style.fontSize));
+    });
+    // 같은 묶음(합계 세 칸)은 가장 작아진 글자 크기로 맞춰서 들쭉날쭉하지 않게
+    Object.keys(groups).forEach(function (g) {
+      var same = box.querySelectorAll('[data-fit="' + g + '"]');
+      for (var k = 0; k < same.length; k++) same[k].style.fontSize = groups[g] + 'px';
+    });
+  }
+  /** 화면 폭이 바뀌었거나 글꼴이 늦게 왔을 때: 처음 글자·크기로 돌려놓고 다시 맞춤 */
+  function refit() {
+    var all = document.querySelectorAll('[data-fit]');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      el.style.fontSize = '';
+      if (el.hasAttribute('data-full')) { el.textContent = el.getAttribute('data-full'); el.removeAttribute('data-full'); }
+      el._fit = null;
+    }
+    fitAll(document);
   }
   function pad(n, w) { n = String(n); while (n.length < w) n = '0' + n; return n; }
   function ymd(y, m, d) { return y + '-' + pad(m, 2) + '-' + pad(d, 2); }
@@ -754,7 +835,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     for (var i = 0; i < S.items.length; i++) if (!S.items[i].sep && S.items[i].name === name) return S.items[i];
     return null;
   }
-  function items() { return S ? S.items.filter(function (x) { return !x.sep; }) : []; }
+  /** 저장이 끝난 항목들 (구분 줄, 아직 저장 중인 새 항목은 뺌) */
+  function items() { return S ? S.items.filter(function (x) { return !x.sep && !x.ghost; }) : []; }
   function call(fn) {
     var args = Array.prototype.slice.call(arguments, 1);
     return new Promise(function (resolve, reject) {
@@ -782,6 +864,62 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!opt.sticky) toastTimer = setTimeout(hideToast, opt.ms || Math.min(9000, 2600 + msg.length * 45));
   }
   function hideToast() { clearTimeout(toastTimer); $('toast').className = $('toast').className.replace(' on', '').replace(' sticky', ''); }
+
+  /* ================= 폰 뒤로 가기 =================
+   * 창(아래에서 올라오는 창, 날짜 고르기)을 열거나 목록 탭으로 갈 때마다 방문 기록을 한 칸 쌓고,
+   * 폰 뒤로 가기를 누르면 그 한 칸만 되돌림 → 앱이 꺼지지 않고 창이 닫히거나 달력 탭으로 돌아감.
+   * 기록은 화면을 누른 순간에만 쌓음 (누르지 않았는데 쌓은 기록은 크롬이 뒤로 가기 때 건너뛰어서 소용없음). */
+  var hist = [];           // 쌓아 둔 기록: 'tab' | 'sheet' | 'dp'
+  var hSkip = 0;           // 우리가 직접 되돌려서 오는 신호 개수 (뒤로 가기로 치지 않음)
+  var hWait = [];          // 되돌리기가 끝난 뒤에 할 일
+  var hTimer = null;
+  var popping = false;     // 뒤로 가기 처리 중 (이때 여는 창은 기록을 안 쌓음)
+  try { history.scrollRestoration = 'manual'; } catch (e) {}
+  function hPush(kind) {
+    try { history.pushState({ fcd: hist.length + 1 }, ''); hist.push(kind); } catch (e) {}
+  }
+  function hTop() { return hist[hist.length - 1]; }
+  /** 맨 위부터 이어진 kinds 기록이 몇 칸인지 */
+  function hCount(kinds) { var n = 0; for (var i = hist.length - 1; i >= 0 && kinds.indexOf(hist[i]) >= 0; i--) n++; return n; }
+  function hFlush() { hSkip = 0; var w = hWait; hWait = []; w.forEach(function (f) { f(); }); }
+  /** 화면 버튼으로 닫았을 때: 쌓아 둔 기록 n칸을 조용히 되돌림 */
+  function hDrop(n) {
+    if (!(n > 0)) return;
+    hist.length -= n;
+    hSkip++;
+    try { history.go(-n); } catch (e) { hSkip--; return; }
+    clearTimeout(hTimer);
+    hTimer = setTimeout(hFlush, 1200);   // 신호가 안 오는 브라우저에서도 멈추지 않게
+  }
+  /** 되돌리는 중이면 끝난 뒤에, 아니면 바로 */
+  function afterHist(fn) { if (hSkip > 0) hWait.push(fn); else fn(); }
+  /** 다른 화면으로 떠나기 전(계정 바꾸기, 로그아웃, 구글 권한 화면): 창을 닫고 쌓아 둔 기록을 다 되돌린 뒤에 떠남 */
+  function leave(fn) {
+    closeSheet();
+    if (tab === 'list') { popping = true; try { setTab('cal', 'r'); } finally { popping = false; } }   // 기록을 다 되돌리니 화면도 첫 탭으로 (돌아왔을 때 뒤로 가기가 어긋나지 않게)
+    hDrop(hist.length);
+    afterHist(fn);
+  }
+  function backOne(kind) {
+    popping = true;
+    try {
+      if (kind === 'dp') closeDatePicker(false);
+      else if (kind === 'sheet') { if (sheetMode && sheetBackFn) sheetBackFn(); else closeSheet(); }
+      else if (kind === 'tab') { if (tab === 'list' && !document.body.classList.contains('setup-on')) setTab('cal', 'r'); }
+    } finally { popping = false; }
+  }
+  window.addEventListener('popstate', function (e) {
+    if (hSkip > 0) { if (--hSkip === 0) { clearTimeout(hTimer); hFlush(); } return; }
+    var d = (e.state && e.state.fcd) || 0;
+    while (hist.length > d) backOne(hist.pop());   // 앞으로 가기(d가 더 큼)는 할 일 없음
+  });
+  /** 창 안의 ← 버튼, 저장한 뒤: 바로 위 창으로 (폰 뒤로 가기와 같은 길로) */
+  function sheetUp() {
+    if (!sheetBackFn) return;
+    if (hTop() === 'sheet' && hCount(['sheet']) > 1) { try { history.back(); return; } catch (e) {} }
+    popping = true;
+    try { sheetBackFn(); } finally { popping = false; }
+  }
 
   /* ================= 서버 작업 줄 세우기 ================= */
   function enqueue(op) {
@@ -833,8 +971,36 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (pendingState && !moveTimer) { var st = pendingState; pendingState = null; apply(st); }
       if (dirty) { dirty = false; scheduleSync(); }
     }
+    if (op.type === 'load' && S && !resumed) { resumed = true; resumePending(); }
     pump();
   }
+  /* 로그인 표(1시간짜리)가 만료되면 구글에 잠깐 다녀오느라 화면이 새로 열림.
+   * 그때 보내던 작업(체크·저장)이 사라지지 않게 이 창에 적어 두고, 돌아와서 처음 불러온 뒤에 이어서 함. */
+  var PEND = 'fc_pending', resumed = false;
+  function savePending() {
+    var ops = (curOp ? [curOp] : []).concat(queue).filter(function (o) { return o.type !== 'load'; }).map(function (o) {
+      return { type: o.type, map: o.map, oldName: o.oldName, vals: o.vals, name: o.name, mode: o.mode, list: o.list, ghost: o.ghost };
+    });
+    if (!ops.length || !S || !S.email) return;
+    try { sessionStorage.setItem(PEND, JSON.stringify({ at: Date.now(), email: S.email, ops: ops })); } catch (e) {}
+  }
+  function resumePending() {
+    var raw = null, p = null;
+    try { raw = sessionStorage.getItem(PEND); sessionStorage.removeItem(PEND); } catch (e) {}
+    if (!raw) return;
+    try { p = JSON.parse(raw); } catch (e) {}
+    if (!p || !p.ops || !p.ops.length || Date.now() - p.at > 10 * 60000) return;
+    if (!S || String(S.email || '').toLowerCase() !== String(p.email || '').toLowerCase()) return;   // 다른 계정으로 돌아왔으면 안 함
+    var n = 0;
+    p.ops.forEach(function (op) {
+      if (op.type === 'save') { try { localStorage.removeItem(op.oldName ? 'fc_draft_e:' + op.oldName : 'fc_draft'); } catch (e) {} }
+      n += opCount(op);
+      replay(op);
+    });
+    toast('로그인을 새로 확인하느라 잠깐 멈췄어요. 하던 저장 ' + n + '건을 이어서 했어요.', { ms: 6000 });
+  }
+  if (window.FC_AUTH) window.FC_AUTH.onLeave = savePending;
+
   /* 두 번 보내도 결과가 같은 작업만 자동으로 다시 보냄 (추가·삭제는 두 번 들어가면 안 되니까 제외) */
   var RESEND_OK = { load: 1, checks: 1, sort: 1, accounts: 1 };
   function isNetErr(msg) { return /인터넷 연결|불안정|오래 걸렸|연결이 안 됐/.test(msg) || navigator.onLine === false; }
@@ -845,7 +1011,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (op.type === 'checks') { for (var n in op.map) { var it = findItem(n); if (it && !!it.checked !== !!op.map[n]) toggle(n, true); } }
     else if (op.type === 'delete') { if (findItem(op.name)) removeItem(op.name); }
     else if (op.type === 'sort') changeSort(op.mode);
-    else { op.fails = 0; op.tries = 0; enqueue(op); }
+    else { op.fails = 0; op.tries = 0; if (op.ghost) addGhost(op.ghost); enqueue(op); }
   }
   function fatalHtml(msg) {
     var W = window.FC_AUTH;
@@ -879,8 +1045,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!S) {
       $('home').innerHTML = fatalHtml(msg);
       $('retry').onclick = function () { this.disabled = true; this.textContent = '불러오는 중…'; enqueue({ type: 'load' }); };
-      if ($('fSwitch')) $('fSwitch').onclick = function () { window.FC_AUTH.switchAccount(); };
-      if ($('fLogout')) $('fLogout').onclick = function () { window.FC_AUTH.logout(); };
+      if ($('fSwitch')) $('fSwitch').onclick = function () { leave(function () { window.FC_AUTH.switchAccount(); }); };
+      if ($('fLogout')) $('fLogout').onclick = function () { leave(function () { window.FC_AUTH.logout(); }); };
       return;
     }
     var st = pendingState || (lastGood ? JSON.parse(lastGood) : null);
@@ -903,7 +1069,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var c = $('sync'), t = $('syncTxt');
     if (!S) return;
     if (!S.calOn) { c.className = 'sync on'; t.textContent = '캘린더 꺼짐'; c.querySelector('.sp').style.display = 'none'; }
-    else if (cal.syncing || cal.timer) { c.className = 'sync on'; t.textContent = '캘린더 반영 중'; c.querySelector('.sp').style.display = ''; }
+    else if (cal.syncing || cal.timer) { c.className = 'sync on'; t.textContent = '캘린더 반영 중' + (cal.prog ? ' ' + cal.prog : ''); c.querySelector('.sp').style.display = ''; }
     else if (cal.err) { c.className = 'sync on err'; t.textContent = '캘린더 확인 필요'; c.querySelector('.sp').style.display = 'none'; }
     else { c.className = 'sync'; t.textContent = ''; }
     if (sheetMode === 'menu') openMenu(true);
@@ -919,17 +1085,35 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (busy || queue.length) { cal.timer = setTimeout(runSync, 500); chip(); return; }
     if (cal.syncing) { cal.again = true; return; }
     cal.syncing = true;
+    cal.prog = '';
     chip();
-    call('api_sync').then(function (r) {
-      cal.syncing = false;
-      cal.last = (r && r.msg) || '';
+    syncStep(0);
+  }
+  /** 캘린더 맞추기는 서버가 12초쯤씩 끊어서 함(일정 하나에 1초 넘게 걸림).
+   *  끊긴 사이사이에 저장이 먼저 지나가고, 얼마나 됐는지(24/127)도 보여줌. 옛 서버는 한 번에 다 하고 끝남. */
+  function syncStep(n) {
+    if (busy || queue.length) { setTimeout(function () { syncStep(n); }, 400); return; }
+    cal.again = false;   // 이번 호출이 지금 내용을 새로 읽음
+    call('api_sync', true).then(function (r) {
+      r = r || {};
+      cal.last = r.msg || '';
       cal.err = /못|실패/.test(cal.last);
-      if (r && r.off) S.calOn = false;
-      if (cal.last.indexOf('나눠서') >= 0) toast(cal.last);
+      if (r.off && S) S.calOn = false;
+      if (r.more && n < 150) {
+        cal.prog = r.total ? r.done + '/' + r.total : '';
+        chip();
+        setTimeout(function () { syncStep(n + 1); }, r.busy ? 3000 : 0);
+        return;
+      }
+      cal.syncing = false;
+      cal.prog = '';
+      if (r.more) toast('캘린더에 넣을 일정이 많아요. 나머지는 몇 분 뒤 자동으로 들어가요.');
+      else if (cal.last.indexOf('나눠서') >= 0) toast(cal.last);
       if (cal.again) { cal.again = false; runSync(); return; }
       chip();
     }, function (e) {
       cal.syncing = false;
+      cal.prog = '';
       cal.err = true;
       cal.last = '캘린더 반영 실패: ' + ((e && e.message) || e);
       if (cal.again) { cal.again = false; runSync(); return; }
@@ -1090,8 +1274,10 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     // 한 줄 요약
     var total = 0, paidSum = 0;
     occ.forEach(function (o) { if (o.amt != null) { total += o.amt; if (o.st === 'paid') paidSum += o.amt; } });
-    $('sumline').innerHTML = '<div><span>' + m + '월 전체</span><b>' + won(total) + '</b></div><div><span>낸 돈</span><b>' + won(paidSum) + '</b></div>' +
-      '<div><span>남은 돈</span><b class="acc">' + won(total - paidSum) + '</b></div>';
+    var sumB = function (n, cls) { return '<b' + (cls ? ' class="' + cls + '"' : '') + ' data-fit="sum" data-short="' + esc(wonShort(n)) + '">' + won(n) + '</b>'; };
+    $('sumline').innerHTML = '<div><span>' + m + '월 전체</span>' + sumB(total) + '</div><div><span>낸 돈</span>' + sumB(paidSum) + '</div>' +
+      '<div><span>남은 돈</span>' + sumB(total - paidSum, 'acc') + '</div>';
+    fitAll($('sumline'));
 
     // 아래 목록
     var rows = [], head = '', cnt = '', right = '', empty = '', tail = '';
@@ -1119,7 +1305,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       });
       head = '안 낸 결제';
       cnt = String(rem.length + un.filter(function (it) { return !it.checked; }).length);
-      empty = '이번 달 낼 건 다 냈어요';
+      empty = occ.length ? '이번 달 낼 건 다 냈어요' : '이번 달에 잡힌 결제가 없어요';
     } else {
       head = m + '월 결제';
       cnt = occ.length + '건';
@@ -1174,8 +1360,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var all = S.items;
     var sepAt = -1;
     for (var i = 0; i < all.length; i++) if (all[i].sep) { sepAt = i; break; }
-    var top = all.filter(function (x, i) { return !x.sep && (sepAt < 0 || i < sepAt); });
-    var bottom = all.filter(function (x, i) { return !x.sep && sepAt >= 0 && i > sepAt; });
+    var top = all.filter(function (x, i) { return !x.sep && !x.ghost && (sepAt < 0 || i < sepAt); });
+    var bottom = all.filter(function (x, i) { return !x.sep && !x.ghost && sepAt >= 0 && i > sepAt; });
+    var ghosts = all.filter(function (x) { return x.ghost; });
     var m = parse(today()).m;
     var pm = prevMonth();
 
@@ -1189,8 +1376,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var cur = top.filter(function (it) { return !isOverduePrev(it) && !isMissing(it); });
     var remain = 0, cnt = 0;
     cur.forEach(function (it) { if (it.section === 1 && !it.checked) { cnt++; if (typeof it.thisMonth === 'number') remain += it.thisMonth; } });
-    secs.push({ id: 'cur', title: m + '월에 낼 것', sub: cnt + '건 · ' + won(remain), rows: cur.map(function (it) { return { it: it }; }),
-      empty: '이번 달 낼 건 다 냈어요' });
+    secs.push({ id: 'cur', title: m + '월에 낼 것', sub: cnt + '건 · ' + won(remain),
+      rows: cur.map(function (it) { return { it: it }; }).concat(ghosts.map(function (g) { return { ghost: g }; })),
+      empty: items().length ? '이번 달 낼 건 다 냈어요' : '아직 넣은 고정비가 없어요. 아래 줄에 이름부터 적어보세요.' });
     var miss = top.filter(isMissing);
     if (miss.length) {
       secs.push({ id: 'nodate', title: '결제일 미입력', sub: miss.length + '건',
@@ -1215,6 +1403,14 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
           anchor = null;
           return;
         }
+        if (r.ghost) {   // 방금 적은 새 항목: 서버 답을 기다리는 동안 흐리게 먼저 보여줌
+          r.key = 'g:' + r.ghost.name;
+          r.name = r.ghost.name;
+          r.cls = 'row tr ghost';
+          r.html = ghostHtml(r.ghost);
+          anchor = null;
+          return;
+        }
         var it2 = r.it;
         var under = !!(it2.parent && anchor === it2.parent);
         if (!it2.parent) anchor = it2.name; else if (!under) anchor = null;
@@ -1232,20 +1428,29 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function amtFieldOf() { return S.meta.fields.filter(isAmtField)[0]; }
   function dayFieldOf() { return S.meta.fields.filter(isDayField)[0]; }
   function startFieldOf() { return S.meta.fields.filter(function (f) { return /^시작일/.test(f.label); })[0]; }
-  /** 새 매월 항목인데 결제일이 이미 지났으면 시작일을 다음 달 그날로 (방금 넣은 게 '지남'으로 안 뜨게) */
+  /** 오늘이나 그 뒤의 가장 가까운 '매월 d일'. late: 이번 달 d일이 이미 지나서 다음 달로 잡았는지 */
+  function firstDue(d) {
+    var t = parse(today());
+    if (!t || !(d >= 1 && d <= 31)) return null;
+    var dd = Math.min(d, lastDay(t.y, t.m));
+    if (dd >= t.d) return { ds: ymd(t.y, t.m, dd), late: false };
+    var ny = t.m === 12 ? t.y + 1 : t.y, nm = t.m === 12 ? 1 : t.m + 1;
+    return { ds: ymd(ny, nm, Math.min(d, lastDay(ny, nm))), late: true };
+  }
+  /** 매월 항목에 결제일을 처음 넣을 때 시작일이 비어 있으면 첫 결제일로 채움.
+   *  - 결제일이 이미 지났으면 다음 달 그날부터 (방금 넣은 게 '지남'으로 안 뜨게)
+   *  - 시작일이 있어야 다음 달에 지난달 달력과 '놓친 결제' 알림이 맞게 나옴 */
   function startNextIfPast(vals) {
     var sf = startFieldOf(), df = dayFieldOf();
     if (!sf || !df || vals[sf.col]) return '';
-    var d = +String(vals[df.col] || '').replace(/[^\d]/g, '');
-    if (!d || d < 1 || d > 31) return '';
     var cf = S.meta.fields.filter(function (f) { return /주기/.test(f.label); })[0];
     var cyc = cf ? String(vals[cf.col] || '') : '';
     if (cyc && cyc !== '매월') return '';
-    var t = parse(today());
-    if (!t || Math.min(d, lastDay(t.y, t.m)) >= t.d) return '';
-    var ny = t.m === 12 ? t.y + 1 : t.y, nm = t.m === 12 ? 1 : t.m + 1;
-    vals[sf.col] = ymd(ny, nm, Math.min(d, lastDay(ny, nm)));
-    return ' · ' + nm + '월 ' + Math.min(d, lastDay(ny, nm)) + '일부터 잡았어요';
+    var fd = firstDue(+String(vals[df.col] || '').replace(/[^\d]/g, ''));
+    if (!fd) return '';
+    vals[sf.col] = fd.ds;
+    var p = parse(fd.ds);
+    return fd.late ? ' · ' + p.m + '월 ' + p.d + '일부터 잡았어요' : '';
   }
   function cycleShort(it) {
     var e = it.every || 1;
@@ -1260,13 +1465,15 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (d < 0) tag = '<span class="tag over">' + (-d) + '일 지남</span>';
       else if (d <= 3) tag = '<span class="tag soon">' + esc(relDay(it.next)) + '</span>';
     }
-    if (it.last && it.section !== 5) tag += '<span class="tag lastp">마지막</span>';
-    var amt = it.amount != null ? esc(num(it.amount)) : '<span class="emp">-</span>';
+    if (it.last && it.section !== 5) tag += '<span class="tag lastp">마지막 결제</span>';
+    // 이름은 한 줄을 다 쓰고, 지남·임박 표시는 그 아래 작은 줄에 (옆에 두면 좁은 폰에서 이름이 한 글자만 남음)
+    var nameHtml = '<span class="nw"><span class="nm">' + esc(it.name) + '</span>' + (tag ? '<span class="tgs">' + tag + '</span>' : '') + '</span>';
+    var amt = it.amount != null ? '<span class="av" data-fit data-short="' + esc(man(it.amount)) + '">' + esc(num(it.amount)) + '</span>' : '<span class="emp">-</span>';
     var day = o.dayHtml || (it.day ? esc(it.day) + '일' + (cycleShort(it) ? '<small>' + esc(cycleShort(it)) + '</small>' : '')
       : '<span class="nod">미정</span>');
     var h = '<div class="tg">' +
       '<button class="chk" type="button" data-act="' + o.check + '"' + (o.ackKey ? ' data-key="' + esc(o.ackKey) + '"' : '') + ' aria-label="납부 체크"><i>' + CHECK_SVG + '</i></button>' +
-      '<div class="tc nmc" data-act="expand"><span class="nm">' + esc(it.name) + '</span>' + tag + '</div>' +
+      '<div class="tc nmc" data-act="expand">' + nameHtml + '</div>' +
       '<div class="tc amc" data-act="cell" data-f="amt">' + amt + '</div>' +
       '<div class="tc dyc" data-act="cell" data-f="day">' + day + '</div></div>' +
       (o.ackKey ? '' : '<button class="swdel" type="button" data-act="del" tabindex="-1">삭제</button>');
@@ -1286,6 +1493,17 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
         '<div class="tb"><button type="button" data-act="edit">수정</button></div></div>';
     }
     return h;
+  }
+  function ghostHtml(g) {
+    return '<div class="tg"><span class="chk"><span class="spin"></span></span>' +
+      '<div class="tc nmc"><span class="nw"><span class="nm">' + esc(g.name) + '</span><span class="tgs"><span class="tag">저장하는 중…</span></span></span></div>' +
+      '<div class="tc amc">' + (g.amount != null ? '<span class="av" data-fit data-short="' + esc(man(g.amount)) + '">' + esc(num(g.amount)) + '</span>' : '<span class="emp">-</span>') + '</div>' +
+      '<div class="tc dyc">' + (g.day ? g.day + '일' : '<span class="nod">미정</span>') + '</div></div>';
+  }
+  function addGhost(g) {
+    if (!S || findItem(g.name)) return;
+    S.items.push(g);
+    renderList();
   }
   /* 칸 눌러서 그 자리에서 고치기 */
   function editCell(cell, name, kind) {
@@ -1309,9 +1527,14 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       cell.innerHTML = '';
       if (save && kind === 'day' && v && (+v < 1 || +v > 31)) { toast('결제일은 1~31 사이 숫자로 적어주세요', { error: true }); save = false; }
       if (save && v !== (kind === 'amt' ? (it.amount != null ? String(it.amount) : '') : (it.day ? String(it.day) : ''))) {
+        var hadDay = !!it.day;
         it.v[f.col] = v;
         if (kind === 'amt') it.amount = v ? Number(v) : null; else it.day = Number(v) || 0;
         var vals = {}; vals[f.col] = v;
+        if (kind === 'day' && v && !hadDay && !it.start && (it.every || 1) === 1) {   // 결제일을 처음 넣음 → 시작일도 같이
+          var sf0 = startFieldOf(), fd0 = firstDue(+v);
+          if (sf0 && fd0) { vals[sf0.col] = fd0.ds; it.start = fd0.ds; }
+        }
         enqueue({ type: 'save', oldName: name, vals: vals, onDone: function (res) { if (res.ok) toast(name + ' ' + (kind === 'amt' ? '금액' : '결제일') + ' 저장했어요', { ms: 1800 }); } });
       }
       renderList();
@@ -1350,7 +1573,10 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       go.classList.remove('go');
       nm.value = ''; am.value = ''; dy.value = '';
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-      enqueue({ type: 'save', oldName: '', vals: vals, onDone: function (res) {
+      // 서버 답(몇 초)을 기다리지 않고 바로 목록에 흐리게 보여줌. 저장이 끝나면 진짜 줄로 바뀜
+      var ghost = { ghost: true, name: name, amount: af && vals[af.col] ? Number(vals[af.col]) : null, day: d ? Number(d) : 0 };
+      addGhost(ghost);
+      enqueue({ type: 'save', oldName: '', vals: vals, ghost: ghost, onDone: function (res) {
         if (!res.ok) return;
         toast(res.name + ' 추가했어요' + (d ? later : ' · 결제일은 나중에 넣어도 돼요'), { action: '자세히', onAction: function () { openEdit(res.name); } });
         setTimeout(function () { flash(res.name); }, 400);
@@ -1405,6 +1631,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
           if (!v || +v === it.day) return;
           if (+v < 1 || +v > 31) { bad = it.name; return; }
           vals[df.col] = v;
+          if (!it.day && !it.start && sf && (it.every || 1) === 1) { var fd = firstDue(+v); if (fd) vals[sf.col] = fd.ds; }
         }
         ops.push({ name: it.name, vals: vals });
       });
@@ -1501,6 +1728,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       }
     }
     firstRender = false;
+    fitAll(list);
     var n2 = items().length;
     $('countTxt').textContent = '전체 ' + n2 + '개';
     var sh = '<span id="sortLbl">' + esc(S.sort || '정렬') + '</span><svg viewBox="0 0 10 10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 3.5l3 3 3-3"/></svg><select id="sortSel" aria-label="정렬">';
@@ -1525,6 +1753,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if ((sheetMode === 'item' || sheetMode === 'edit') && openName && !findItem(openName)) closeSheet();
     else if (sheetMode === 'item' && openName) openItem(openName, true);
     else if (sheetMode === 'acc') openAccounts(true, sheetBackFn);
+    else if (sheetMode === 'menu0') { sheetMode = 'menu'; openMenu(true); }
     checkServerUpdate();
     autoMove();
   }
@@ -1541,7 +1770,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function checkServerUpdate() {
     if (updAsked || updating || !needUpdate()) return;
     updAsked = true;
-    toast('새 버전이 있어요.', { action: '업데이트', ms: 12000, onAction: runServerUpdate });
+    toast('새 버전이 있어요.', { action: '업데이트', ms: 12000, onAction: function () { leave(runServerUpdate); } });
   }
   function runServerUpdate() {
     if (updating) return;
@@ -1666,6 +1895,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   var sheetBackFn = null;
   function openSheet(title, html, mode, back) {
     hideToast();
+    // 닫혀 있다가 열리거나, 한 단계 더 들어가는 창이면 뒤로 가기용 기록을 한 칸 쌓음
+    if (!popping && (!sheetMode || back)) hPush('sheet');
     sheetMode = mode;
     sheetBackFn = back || null;
     $('sheetBack').hidden = !back;
@@ -1685,6 +1916,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     $('backdrop').className = 'backdrop';
     $('sheet').className = 'sheet';
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (DP && DP.el.classList.contains('on')) { var was = popping; popping = true; try { closeDatePicker(false); } finally { popping = was; } }
+    hDrop(hCount(['sheet', 'dp']));
   }
   function kv(k, v, sub, cls) {
     return '<div class="kv' + (cls ? ' ' + cls : '') + '"><span class="k">' + esc(k) + '</span><span class="v">' + v + (sub ? '<small>' + sub + '</small>' : '') + '</span></div>';
@@ -1858,7 +2091,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }
     var stack = f.kind === 'memo';
     return '<div class="f' + (stack ? ' stack' : '') + '" data-f="' + f.col + '"><label for="f' + f.col + '">' + esc(shortLabel(f)) + badge + '</label>' +
-      (stack ? control(f, val, it ? it.name : '') : '<span class="ctl">' + control(f, val, it ? it.name : '') + '</span>') + '</div>';
+      (stack ? control(f, val, it ? it.name : '') : '<span class="ctl' + (f.kind === 'dateOrForever' ? ' wrapc' : '') + '">' + control(f, val, it ? it.name : '') + '</span>') + '</div>';
   }
   function isMainField(f) {
     return f.col === S.meta.nameCol || isAmtField(f) || isDayField(f) || /주기/.test(f.label) || isAcctField(f);
@@ -1966,6 +2199,15 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     });
     var warned = false;
     $('saveBtn').onclick = function () { warned = submit(it, warned); };
+    // '결제일 없이 추가'로 바뀐 뒤에 결제일을 고르면 버튼과 안내를 원래대로
+    var dayF0 = dayFieldOf(), dayEl = dayF0 && $('f' + dayF0.col);
+    if (dayEl) dayEl.addEventListener('change', function () {
+      if (!warned || !dayEl.value) return;
+      warned = false;
+      $('saveBtn').textContent = it ? '저장' : '추가';
+      var fe = $('formErr');
+      if (fe && fe.className.indexOf('warn') >= 0) showErr('');
+    });
   }
   function wireChips(box) {
     box.onclick = function (e) {
@@ -2005,7 +2247,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (list.length >= (S.accMax || 0)) addBtn.remove();
       saveAccounts(list, {
         quiet: true,
-        onDone: function () { chip.classList.remove('pend'); toast(shortAcct(name) || name + ' 저장했어요. 다음부터 눌러서 골라요'); },
+        onDone: function () { chip.classList.remove('pend'); toast((shortAcct(name) || name) + ' 저장했어요. 다음부터 눌러서 골라요'); },
         onError: function (msg) { chip.remove(); if (box.getAttribute('data-val') === name) box.setAttribute('data-val', ''); toast(msg, { error: true }); }
       });
     };
@@ -2014,16 +2256,16 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   /* ---- 날짜 고르기: 누르면 바로 뜨는 앱 안 달력 (휴대폰 기본 날짜 창은 앱 안에서 안 뜨는 경우가 있어서) ---- */
   function dateBtn(id, v, hide) {
-    return '<button type="button" class="datebtn' + (v ? '' : ' empty') + '" data-datebtn="' + id + '"' + (hide ? ' style="visibility:hidden"' : '') + '>' + (v ? esc(fmtDateY(v)) : '날짜 선택') + '</button>';
+    return '<button type="button" class="datebtn' + (v ? '' : ' empty') + '" data-datebtn="' + id + '"' + (hide ? ' style="display:none"' : '') + '>' + (v ? esc(fmtDateY(v)) : '날짜 선택') + '</button>';
   }
-  function fmtDateY(ds) { var p = parse(ds); return p ? p.y + '년 ' + fmtDate(ds) : ds; }
+  function fmtDateY(ds) { var p = parse(ds); return p ? p.y + '.' + pad(p.m, 2) + '.' + pad(p.d, 2) + ' (' + wd(ds) + ')' : ds; }
   function syncDateBtn(id) {
     var b = document.querySelector('[data-datebtn="' + id + '"]'), v = $(id) && $(id).value;
     if (!b) return;
     b.textContent = v ? fmtDateY(v) : '날짜 선택';
     b.classList.toggle('empty', !v);
   }
-  function showDateBtn(id, on) { var b = document.querySelector('[data-datebtn="' + id + '"]'); if (b) b.style.visibility = on ? '' : 'hidden'; }
+  function showDateBtn(id, on) { var b = document.querySelector('[data-datebtn="' + id + '"]'); if (b) b.style.display = on ? '' : 'none'; }
   var DP = null;
   function openDatePicker(id, onClose) {
     var inp = $(id); if (!inp) return;
@@ -2047,6 +2289,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var box = inp.closest('.f'), lb = box && box.querySelector('label');
     DP.el.querySelector('.dpl').textContent = lb ? lb.textContent : '';
     drawDP();
+    if (!popping && !DP.el.classList.contains('on')) hPush('dp');
     DP.bk.classList.add('on'); DP.el.classList.add('on');
   }
   function drawDP() {
@@ -2071,6 +2314,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function closeDatePicker(picked) {
     if (!DP) return;
+    if (!popping && DP.el.classList.contains('on') && hTop() === 'dp') hDrop(1);
     DP.bk.classList.remove('on'); DP.el.classList.remove('on');
     var cb = DP.onClose; DP.onClose = null;
     if (cb) cb(picked);
@@ -2293,7 +2537,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (i == null) list.push({ name: name, memo: memo, from: '' });
       else { list[i].name = name; list[i].memo = memo; }
       saveAccounts(list, { onDone: function () { toast(i == null ? '추가했어요' : '저장했어요'); } });
-      toList();
+      sheetUp();
     };
     var sure = false;
     var del = $('accDel');
@@ -2302,7 +2546,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var list = accList();
       list.splice(i, 1);
       saveAccounts(list, { onDone: function () { toast('지웠어요'); } });
-      toList();
+      sheetUp();
     };
   }
   function markBad(el) { var f = el && el.closest('.f'); if (f) f.classList.add('badf'); }
@@ -2349,6 +2593,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function submit(it, warned) {
     var r = readForm(it);
+    $('saveBtn').textContent = it ? '저장' : '추가';
     if (r.bad.length) { showErr(r.bad.join('\n')); return false; }
     var dayF = S.meta.fields.filter(isDayField)[0];
     if (dayF && !r.vals[dayF.col] && !warned) {
@@ -2358,7 +2603,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       return true;
     }
     showErr('');
-    var later = it ? '' : startNextIfPast(r.vals);
+    var later = (!it || (!it.day && !it.start)) ? startNextIfPast(r.vals) : '';
+    if (it) later = '';
     var btn = $('saveBtn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spin"></span>' + (it ? '저장 중' : '추가 중');
@@ -2384,13 +2630,56 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
 
   /* ---------- 설정 ---------- */
+  function legalHtml() {
+    return '<div class="grp"><a class="li" href="privacy.html" data-leave><span>개인정보 처리방침</span></a><a class="li" href="terms.html" data-leave><span>이용약관</span></a></div>';
+  }
+  /** 약관 페이지로 넘어갈 때도 창을 닫고 쌓아 둔 기록을 되돌린 뒤에 감 (돌아왔을 때 뒤로 가기 한 번이 헛돌지 않게) */
+  function wireLegal() {
+    Array.prototype.forEach.call($('sheetBody').querySelectorAll('a[data-leave]'), function (a) {
+      a.onclick = function (e) {
+        if (e.ctrlKey || e.metaKey || e.shiftKey) return;
+        e.preventDefault();
+        var href = a.href;
+        leave(function () { location.href = href; });
+      };
+    });
+  }
+  function accountHtml(WEB) {
+    return '<div class="glabel">계정</div><div class="grp">' +
+      '<div class="kv"><span class="k">로그인</span><span class="v">' + esc(WEB.email() || (S && S.email) || '') + '</span></div>' +
+      '<button class="li" type="button" id="mSwitch"><span>다른 구글 계정으로 로그인</span></button>' +
+      '<button class="li" type="button" id="mLogout"><span>로그아웃</span></button></div>';
+  }
+  function wireAccount(WEB) {
+    if ($('mSwitch')) $('mSwitch').onclick = function () { leave(function () { WEB.switchAccount(); }); };
+    if ($('mLogout')) $('mLogout').onclick = function () { leave(function () { WEB.logout(); }); };
+  }
+  /** 아직 못 불러왔을 때(연결 실패 등)도 ⋯는 열림: 다시 불러오기와 계정만 있는 작은 메뉴 */
+  function openMiniMenu() {
+    if (document.body.classList.contains('setup-on')) return;
+    var WEB = window.FC_AUTH || null;
+    var loading = busy || queue.length > 0;
+    var h = '<div class="tip" style="padding-top:0">' + (loading ? '내용을 불러오는 중이에요.' : '아직 내용을 못 불러왔어요. 다시 불러오거나, 다른 계정으로 바꿔볼 수 있어요.') + '</div>' +
+      '<div class="grp"><button class="li" type="button" id="mReload"><span>다시 불러오기</span></button></div>' +
+      (WEB ? accountHtml(WEB) : '') + legalHtml();
+    openSheet('설정', h, 'menu0');
+    wireAccount(WEB);
+    wireLegal();
+    $('mReload').onclick = function () {
+      closeSheet();
+      var rt = $('retry');
+      if (rt) { rt.disabled = true; rt.textContent = '불러오는 중…'; }
+      enqueue({ type: 'load' });
+    };
+  }
   function openMenu(refresh) {
-    if (!S) return;
+    if (!S) { if (!refresh) openMiniMenu(); return; }
     var WEB = window.FC_AUTH || null;   // 설치용 앱(구글 로그인 방식)으로 열렸을 때
     var fullUrl = (!WEB && S.appUrl) ? S.appUrl + '?app=1' : '';
     var h = '<div class="glabel">구글 캘린더</div><div class="grp">' +
       '<button class="li" type="button" id="mCal"><span>결제일 자동 연동</span><span class="switch' + (S.calOn ? ' on' : '') + '"></span></button>' +
-      (S.calOn ? '<button class="li" type="button" id="mCalNow"><span>지금 다시 맞추기</span><span class="r">' + esc(cal.syncing ? '맞추는 중…' : (cal.last || '')) + '</span></button>' : '') +
+      (S.calOn ? '<button class="li li2" type="button" id="mCalNow"><span>지금 다시 맞추기</span>' +
+        ((cal.syncing || cal.last) ? '<small>' + esc(cal.syncing ? '맞추는 중…' + (cal.prog ? ' ' + cal.prog : '') : cal.last) + '</small>' : '') + '</button>' : '') +
       '</div><div class="tip">결제일은 하루 종일 일정(호박색), 종료일 있는 항목의 마지막 결제는 자주색이에요. 캘린더에서 직접 지운 날짜는 다시 안 만들어요.</div>' +
       '<div class="glabel">결제 수단</div><div class="grp">' +
       '<button class="li" type="button" id="mAcc"><span>결제 수단 관리</span><span class="r">' + (S.accounts ? (S.accounts.length ? esc(S.accounts.length + '개') : '아직 없음') : '') + '</span></button>' +
@@ -2404,20 +2693,17 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
         '<div class="tip">옮기면 앱 안에 저장되고 구글 시트는 더는 안 써요. 다 옮겨진 걸 확인한 뒤에 시트를 지우면 돼요.</div>' : '') +
       (isAdmin() ? '<div class="glabel">앱 관리</div><div class="grp"><button class="li" type="button" id="mUpd"><span>서버 업데이트</span><span class="r">' + (needUpdate() ? '새 버전 있음' : '최신') + '</span></button></div>' : '') +
       '<div class="grp"><button class="li" type="button" id="mShare"><span>친구에게 공유</span><span class="r">각자 자기 계정·캘린더로</span></button></div>' +
-      (WEB ? '<div class="glabel">계정</div><div class="grp">' +
-        '<div class="kv"><span class="k">로그인</span><span class="v">' + esc(WEB.email() || S.email || '') + '</span></div>' +
-        '<button class="li" type="button" id="mSwitch"><span>다른 구글 계정으로 로그인</span></button>' +
-        '<button class="li" type="button" id="mLogout"><span>로그아웃</span></button></div>'
+      (WEB ? accountHtml(WEB)
       : '<div class="glabel">홈 화면에 두기</div><div class="grp"><div class="kv" style="display:block;font-size:13.5px;line-height:1.55">' +
       '아이폰: Safari → 공유 → 홈 화면에 추가<br>갤럭시: 크롬 → ⋮ → 홈 화면에 추가<br>PC: 즐겨찾기에 추가' +
       (fullUrl ? '<div style="margin-top:8px;color:var(--muted);font-size:12.5px">주소창 없이 쓰고 싶으면 이 주소로 홈 화면에 추가해봐요 (구글 로그인이 한 번 더 나올 수 있어요).</div><div class="linkbox">' + esc(fullUrl) + '</div>' : '') +
-      '</div></div>') +
+      '</div></div>') + legalHtml() +
       '<div class="tip" style="text-align:center">' + (S.email ? esc(S.email) + '<br>' : '') + '불러온 시각 ' + new Date(S.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + (S.virtual ? ' · 이 계정에만 저장돼요' : ' · 시트가 원본이에요') + '</div>';
     if (refresh) { if (sheetMode !== 'menu') return; $('sheetBody').innerHTML = h; }
     else openSheet('설정', h, 'menu');
     var offSure = false;
-    if ($('mSwitch')) $('mSwitch').onclick = function () { WEB.switchAccount(); };
-    if ($('mLogout')) $('mLogout').onclick = function () { WEB.logout(); };
+    wireAccount(WEB);
+    wireLegal();
     $('mCal').onclick = function () {
       if (S.calOn && !offSure) { offSure = true; toast('한 번 더 누르면 캘린더 연동이 꺼져요. 이미 만든 일정은 그대로 둬요.'); return; }
       var on = !S.calOn;
@@ -2432,7 +2718,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     $('mAcc').onclick = function () { openAccounts(false, function () { openMenu(false); }); };
     var ms = $('mShare'); if (ms) ms.onclick = function () { openShare(false); };
     var mv = $('mMove'); if (mv) mv.onclick = function () { moveToApp(mv); };
-    var mu = $('mUpd'); if (mu) mu.onclick = function () { closeSheet(); runServerUpdate(); };
+    var mu = $('mUpd'); if (mu) mu.onclick = function () { leave(runServerUpdate); };
   }
 
   /* ---------- 시트 → 앱 저장 공간 (시트 주인, 설치용 앱에서) ---------- */
@@ -2583,11 +2869,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function setTab(t, from) {
     if (t === tab) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     tab = t;
+    if (!popping) { if (t === 'list') hPush('tab'); else if (hTop() === 'tab') hDrop(1); }
     var el = $('tab-' + t);
     if (el) { el.classList.remove('in-l', 'in-r'); void el.offsetWidth; el.classList.add(from === 'r' ? 'in-r' : 'in-l'); }
     $('title').textContent = t === 'cal' ? '고정비 결제 달력' : '고정비 목록';
     document.querySelectorAll('.tabbar [data-tab]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
     document.querySelectorAll('.tab').forEach(function (m) { m.classList.toggle('on', m.id === 'tab-' + t); });
+    if (el) fitAll(el);
     window.scrollTo(0, 0);
   }
 
@@ -2646,7 +2934,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     list.addEventListener('pointerdown', function (e) {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       var r = e.target.closest('.row.tr');
-      if (!r || r.classList.contains('newr') || r.classList.contains('grey') || e.target.closest('input, .swdel')) { row = null; return; }
+      if (!r || r.classList.contains('newr') || r.classList.contains('grey') || r.classList.contains('ghost') || e.target.closest('input, .swdel')) { row = null; return; }
       if (swipeOpen && swipeOpen !== r) closeSwipe();
       row = r; x0 = e.clientX; y0 = e.clientY; dx = 0; mode = ''; pid = e.pointerId;
     });
@@ -2711,13 +2999,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   $('sync').onclick = function () {
     if (!S) return;
     if (!S.calOn) { toast('캘린더 연동이 꺼져 있어요. 오른쪽 위 ⋯에서 켤 수 있어요.'); return; }
-    if (cal.syncing || cal.timer) { toast('캘린더에 반영하는 중이에요. 몇 초면 끝나요.'); return; }
+    if (cal.syncing || cal.timer) { toast(cal.prog ? '캘린더에 반영하는 중이에요 (' + cal.prog + '). 앱은 그대로 써도 돼요.' : '캘린더에 반영하는 중이에요. 몇 초면 끝나요.'); return; }
     toast(cal.last || '앱에서 바꾸면 구글 캘린더도 바로 바뀌어요.');
   };
   $('toast').onclick = function (e) { if (e.target.id !== 'toastBtn') hideToast(); };
   $('backdrop').onclick = closeSheet;
   $('sheetClose').onclick = closeSheet;
-  $('sheetBack').onclick = function () { if (sheetBackFn) sheetBackFn(); };
+  $('sheetBack').onclick = sheetUp;
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hiddenAt = Date.now(); return; }
     if (hiddenAt && Date.now() - hiddenAt > 30000 && !sheetMode) enqueue({ type: 'load', light: true });
@@ -2741,6 +3029,14 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     });
   })();
 
+  var rzTimer = null, rzW = window.innerWidth;
+  window.addEventListener('resize', function () {
+    if (window.innerWidth === rzW) return;   // 화면 키보드가 오르내릴 때(높이만 바뀜)는 할 일 없음
+    rzW = window.innerWidth;
+    clearTimeout(rzTimer); rzTimer = setTimeout(refit, 150);
+  });
+  try { if (document.fonts && document.fonts.ready) document.fonts.ready.then(refit); } catch (e) {}
+
   /* ================= 시작 ================= */
   renderHome();
   var cached = load('fc_state');
@@ -2756,6 +3052,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 </script>
 <script>
 (function () {
+  if (window.FC_FRAMED) return;
   var standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
   var evt = window.__bip || null, done = false, installed = false;
   var B = function (t) { return '<b style="display:inline">' + t + '</b>'; };

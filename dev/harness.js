@@ -19,6 +19,12 @@ function serve() {
   return new Promise((res) => {
     const srv = http.createServer((req, rsp) => {
       let p = decodeURIComponent(req.url.split('?')[0]).replace(/^\/Gojeongbi-app/, '');
+      // 남의 사이트가 앱을 틀(iframe)에 끼워 넣은 상황 흉내 (http://localhost:포트/__outer 로 열면 주소가 달라 다른 사이트로 침)
+      if (p === '/__outer') {
+        rsp.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        rsp.end('<h1>남의 사이트</h1><iframe id="f" src="http://127.0.0.1:' + req.socket.localPort + '/Gojeongbi-app/" style="width:360px;height:600px"></iframe>');
+        return;
+      }
       if (p.endsWith('/')) p += 'index.html';
       const f = path.join(ROOT, p);
       if (!f.startsWith(ROOT) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { rsp.writeHead(404); rsp.end('nf'); return; }
@@ -100,12 +106,12 @@ async function open(opt) {
     if (!fs.existsSync(f)) return route.abort();
     route.fulfill({ status: 200, contentType: MIME[path.extname(f)] || 'application/octet-stream', body: fs.readFileSync(f), headers: { 'Access-Control-Allow-Origin': '*' } });
   });
-  let failNext = 0;
+  let failNext = 0, failFn = '';
   await ctx.route('https://script.googleapis.com/v1/scripts/**', async (route) => {
     const body = JSON.parse(route.request().postData() || '{}');
     const t0 = Date.now();
     if (lat) await new Promise((r) => setTimeout(r, typeof lat === 'function' ? lat(body.function) : lat));
-    if (failNext > 0) { failNext--; return route.abort('internetdisconnected'); }
+    if (failNext > 0 && (!failFn || failFn === body.function)) { failNext--; return route.abort('internetdisconnected'); }
     let out;
     try { out = { done: true, response: { result: gas.call(email, body.function, body.parameters) } }; }
     catch (e) { out = { error: { code: 500, message: String(e && e.message || e), status: 'INTERNAL', details: [{ errorMessage: String(e && e.message || e) }] } }; }
@@ -113,6 +119,14 @@ async function open(opt) {
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) });
   });
   await ctx.route('https://www.googleapis.com/oauth2/v3/userinfo', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ email }) }));
+  // 구글 로그인 화면 흉내: 바로 새 로그인 표를 들고 앱으로 돌려보냄 (로그인 표가 만료돼 조용히 다녀오는 길을 검사할 때)
+  let auths = 0;
+  await ctx.route('https://accounts.google.com/o/oauth2/v2/auth**', (route) => {
+    const u = new URL(route.request().url());
+    auths++;
+    const q = opt.authFail ? 'error=interaction_required' : 'access_token=fake' + auths + '&token_type=Bearer&expires_in=3600&scope=' + encodeURIComponent(u.searchParams.get('scope') || '');
+    route.fulfill({ status: 302, headers: { location: u.searchParams.get('redirect_uri') + '#' + q + '&state=' + encodeURIComponent(u.searchParams.get('state') || '') } });
+  });
   // 브라우저 시계도 서버와 같은 날로
   await ctx.clock.install({ time: gas.now() });
   if (!opt.loggedOut) {
@@ -130,7 +144,9 @@ async function open(opt) {
   fs.mkdirSync(OUT, { recursive: true });
   const h = {
     page, ctx, browser, gas, email, calls, errors, base,
-    failNext(n) { failNext = n; },
+    /** 다음 서버 호출 n번을 연결 끊김으로. fn을 주면 그 기능을 부를 때만 */
+    failNext(n, fn) { failNext = n; failFn = fn || ''; },
+    auths: () => auths,
     async go() { await page.goto(base); await ctx.clock.resume(); await h.idle(); },
     /** 서버 작업이 다 끝날 때까지 */
     async idle(ms) {
