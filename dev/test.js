@@ -312,7 +312,7 @@ t('legal-pages', async () => {
   const h = await H.open(Object.assign({}, LIFE, { loggedOut: true })); const p = h.page;
   await p.waitForSelector('#fcLogin.on', { timeout: 8000 });
   const links = await p.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#fcLogin .legal a'), (a) => ({ t: a.textContent, href: a.getAttribute('href'), vis: a.getBoundingClientRect().height > 0 })));
-  ok(links.length === 2 && links.every((l) => l.vis), '로그인 화면에 링크 2개: ' + links.map((l) => l.t).join(', '));
+  ok(links.length === 3 && links.every((l) => l.vis), '로그인 화면에 링크 3개(처리방침·약관·문의): ' + links.map((l) => l.t).join(', '));
   for (const f of ['privacy.html', 'terms.html']) {
     const rs = await p.request.get(h.base + f);
     const body = await rs.text();
