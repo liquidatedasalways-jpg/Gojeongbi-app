@@ -995,6 +995,8 @@ t('gap-contact', async () => {
   const h = await H.open(Object.assign({}, LIFE, { viewport: SMALL })); const p = h.page;
   await sleep(p, 1500);
   await p.click('#menuBtn'); await p.waitForSelector('#mAsk');
+  const swx = await p.evaluate(() => { const sb = document.getElementById('sheetBody'); return { sw: Array.prototype.map.call(sb.querySelectorAll('.switch'), (e) => Math.round(sb.getBoundingClientRect().right - e.getBoundingClientRect().right)), wide: sb.scrollWidth - sb.clientWidth }; });
+  ok(swx.sw.length >= 2 && swx.sw.every((x) => x === swx.sw[0] && x >= 16) && swx.wide <= 0, '설정(320 폭): 스위치가 설명 글에 밀려 옆으로 나가지 않음 ' + JSON.stringify(swx));
   await p.evaluate(() => { document.getElementById('sheetBody').scrollTop = 1e6; }); await sleep(p, 200);
   const a = await p.evaluate(() => { const e = document.getElementById('mAsk'), r = document.getElementById('mAskAddr'); return { href: e.getAttribute('href'), h: Math.round(e.getBoundingClientRect().height), t: r.textContent, cut: r.scrollWidth > r.clientWidth || r.getBoundingClientRect().height > 22 }; });
   ok(a.href.indexOf('mailto:' + CONTACT) === 0 && a.h >= 44 && a.t === CONTACT && !a.cut, '설정 맨 아래에 문의 링크와 주소 (320 폭에서도 주소가 안 잘림): ' + a.t);
