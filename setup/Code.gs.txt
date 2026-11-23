@@ -309,9 +309,10 @@ function run_(isOpen, pre) {
   if (!sh) return;
   var lock = null;
   try {
-    lock = lock_();
+    // 앱에서 불렀으면 사람별 잠금을 이미 쥐고 있어요(appCall_) → 또 잡지 않음. 주인 시트는 스크립트 잠금이 따로라 그대로 잡음
+    lock = (HELD_ && !isHome_()) ? null : lock_();
     var t0 = Date.now();
-    if (!lock.tryLock(20000)) {
+    if (lock && !lock.tryLock(20000)) {
       console.log('run_: lock busy');
       note_('앞 작업이 아직 안 끝나서 이번 건 정리를 못 했어요. 몇 초 뒤 메뉴 고정비 → 줄 정리하기를 눌러주세요.', 10, true);
       return;
@@ -864,7 +865,7 @@ function calendarOnEdit(e) {
 function calendarDaily() {
   // 자동이체 자동 체크는 여기서 하지 않아요 (앱을 열거나 고칠 때만 함).
   // 새벽 예약 실행이 목록을 저장하면 그 순간 앱에서 한 저장과 겹쳐 한쪽이 사라질 수 있고, 로그아웃한 사람의 목록도 계속 바뀌게 돼서.
-  try { syncCalendar_(); } finally { vsSave_(); }
+  try { syncCalendar_(); } catch (err) { console.log('calendarDaily: ' + (err && err.message ? err.message : err)); } finally { vsSave_(); }
 }
 
 /* 캘린더 맞추기는 한 사람당 한 번에 하나만 돌아야 해요 (둘이 같이 돌면 일정이 두 번 생김).
@@ -880,7 +881,7 @@ function calBegin_(waitMs) {
   var until = Date.now() + (waitMs || 0);
   for (;;) {
     var lock = null, got = false;
-    try { lock = LockService.getUserLock(); got = lock.tryLock(3000); } catch (err) {}
+    try { if (!HELD_) { lock = LockService.getUserLock(); got = lock.tryLock(3000); } } catch (err) {}
     try {
       if (!cache.get(CAL_BUSY_KEY)) { cache.put(CAL_BUSY_KEY, String(Date.now()), 330); return true; }   // 5분 30초 뒤엔 저절로 풀림
     } finally {
@@ -1586,6 +1587,69 @@ function api_calendar(action) {
   return { ok: true, msg: String(msg), calOn: calIsOn_() };
 }
 
+/** 내 자료 모두 지우기 (그만 쓸 때). 되돌릴 수 없어요. 앱 저장 공간을 쓰는 사람만.
+ *  opt.events가 true면 이 앱이 내 구글 캘린더에 만든 일정부터 지워요. 일정 하나에 1초쯤 걸려서 12초쯤씩 끊어서 하고,
+ *  more가 true면 앱이 돌려받은 at(어디까지 했는지)·gone(지운 개수)을 그대로 넣어 다시 불러요.
+ *  다 끝나면 서버에 저장된 내 목록·설정·기록(사용자 속성 전부)을 지워요. 매일 새벽 예약 실행은 맨 먼저 지워요.
+ *  저장분이 깨져서 목록을 못 읽을 때도 되도록, 목록은 읽지 않아요. */
+function api_wipe(opt) {
+  opt = opt || {};
+  var up = PropertiesService.getUserProperties();
+  var sid = up.getProperty('sheet_id');
+  if (sid && sid !== VS_ID) return { ok: false, error: '구글 시트로 쓰는 계정은 여기서 지울 수 없어요. 내 구글 드라이브에서 시트를 직접 지워주세요.' };
+  var gone = Number(opt.gone) || 0;
+  var lock = null, got = false;
+  try { lock = LockService.getUserLock(); got = lock.tryLock(20000); } catch (err) { lock = null; }
+  if (lock && !got) return { ok: false, busy: true, error: BUSY_MSG_, gone: gone };
+  try {
+    // 1) 예약 실행부터 지움 (지우는 사이에 새벽 실행이 일정을 다시 만들지 않게)
+    ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
+    // 2) 캘린더 일정
+    if (opt.events) {
+      var r = wipeEvents_(String(opt.at || ''), 12000);
+      gone += r.gone;
+      if (r.at) return { ok: true, more: true, at: r.at, gone: gone };
+    }
+    // 3) 서버에 저장된 것 전부. 앱 주인 표시(서버 업데이트 버튼이 보이게 하는 표시)만 남김
+    var admin = up.getProperty('vs_admin');
+    up.deleteAllProperties();
+    if (admin) up.setProperty('vs_admin', admin);
+    try { CacheService.getUserCache().removeAll([CAL_BUSY_KEY, CAL_STEP_KEY, 'lastAdd', 'calEditStamp']); } catch (err2) {}
+    return { ok: true, wiped: true, gone: gone };
+  } catch (err3) {
+    return { ok: false, error: '지우다가 멈췄어요. 다시 눌러주세요. (' + (err3 && err3.message ? err3.message : err3) + ')', gone: gone };
+  } finally {
+    if (got) { try { lock.releaseLock(); } catch (err4) {} }
+  }
+}
+
+/** 이 앱이 만든 캘린더 일정(표시 fixedcost)을 지움. 2년 전부터 14개월 뒤까지 달 단위로 훑어요.
+ *  시간이 다 되면 어디까지 했는지(at, 'yyyy-MM')를 돌려주고, 다 했으면 at은 ''. 이 앱이 만들지 않은 일정은 건드리지 않아요. */
+function wipeEvents_(at, budgetMs) {
+  var cal = CalendarApp.getDefaultCalendar();
+  var deadline = Date.now() + budgetMs;
+  var now = new Date();
+  var y = now.getFullYear() - 2, m = now.getMonth();
+  var stop = new Date(now.getFullYear(), now.getMonth() + 14, 1).getTime();
+  var mm = /^(\d{4})-(\d{2})$/.exec(at);
+  if (mm) { y = Number(mm[1]); m = Number(mm[2]) - 1; }
+  var gone = 0;
+  for (;; m++) {
+    var from = new Date(y, m, 1), to = new Date(y, m + 1, 1);
+    if (from.getTime() >= stop) return { gone: gone, at: '' };
+    var here = from.getFullYear() + '-' + (from.getMonth() < 9 ? '0' : '') + (from.getMonth() + 1);
+    if (Date.now() > deadline) return { gone: gone, at: here };
+    var evs = cal.getEvents(from, to);
+    for (var i = 0; i < evs.length; i++) {
+      if (evs[i].getTag(CAL_TAG) !== '1') continue;
+      if (Date.now() > deadline) return { gone: gone, at: here };
+      (function (ev) { retry_(function () { ev.deleteEvent(); }); })(evs[i]);
+      gone++;
+      Utilities.sleep(300);
+    }
+  }
+}
+
 /** 시트 → 앱 저장 공간으로 옮기기. 시트 주인이 모두용 서버에서 부름 (내용은 주인 서버에서 불러온 화면 내용).
  *  data: { items: [{ f: { 머리글: 값 }, checked, paid, prev }], accounts: [{ name, memo }], sort, ack }
  *  force가 아니면, 이미 앱 저장 공간에 항목이 있을 때 멈춤. */
@@ -1725,11 +1789,33 @@ function appAccounts_(sh, c, items) {
 
 /* ---------- 내부 ---------- */
 
-/** fn을 실행하고 최신 화면 내용을 붙여서 돌려줌. 안내 메시지는 notes로. */
+/** fn을 실행하고 최신 화면 내용을 붙여서 돌려줌. 안내 메시지는 notes로.
+ *  읽기 → 고치기 → 저장을 사람별 잠금 하나 안에서 해요.
+ *  (예전엔 잠금 밖에서 읽고 저장해서, 두 기기가 겹치면 먼저 저장한 쪽이 말없이 사라졌어요) */
+var HELD_ = null;   // appCall_이 쥐고 있는 사람별 잠금 (그 안에서 도는 run_·calBegin_·vsSave_가 또 잡거나 풀지 않게)
+var BUSY_MSG_ = '앞 작업이 아직 안 끝났어요. 잠깐 뒤 다시 해주세요.';
 function appCall_(fn, forceMeta) {
+  var lock = null, got = false;
+  try { lock = LockService.getUserLock(); got = lock.tryLock(20000); } catch (err) { lock = null; }
+  if (lock && !got) {
+    // 앞 작업이 20초 넘게 안 끝남: 아무것도 안 바꾸고, 지금 저장돼 있는 내용만 읽어서 돌려줌 (앱이 잠깐 뒤 다시 보냄)
+    var busy = { ok: false, busy: true, error: BUSY_MSG_, notes: [] };
+    try { if (appBind_()) { var st0 = appState_(forceMeta); for (var k0 in st0) busy[k0] = st0[k0]; } } catch (err0) {}
+    return busy;
+  }
+  HELD_ = got ? lock : null;
+  try {
+    return appCallIn_(fn, forceMeta);
+  } finally {
+    HELD_ = null;
+    if (got) { try { lock.releaseLock(); } catch (err2) {} }
+  }
+}
+function appCallIn_(fn, forceMeta) {
   if (!appBind_()) return appSetupInfo_();
   NOTES_ = [];
   APP_BUSY_ = false;
+  if (VS_ && VS_.fromBak) NOTES_.push('저장된 목록이 깨져 있어서 바로 전에 저장한 내용으로 되돌렸어요. 마지막에 바꾼 게 빠졌는지 확인해주세요.');
   var res = { ok: true };
   try {
     var r = fn() || {};
@@ -1741,17 +1827,22 @@ function appCall_(fn, forceMeta) {
     res.ok = false;
     res.error = '오류가 났어요: ' + (err && err.message ? err.message : err);
   }
+  var st = null;
   try {
-    var st = appState_(forceMeta);
-    for (var k in st) res[k] = st[k];
+    st = appState_(forceMeta);
   } catch (err2) {
     res.ok = false;
     res.error = (res.error ? res.error + '\n' : '') + '시트를 못 읽었어요: ' + (err2 && err2.message ? err2.message : err2);
   }
   try { vsSave_(); } catch (err3) {
     res.ok = false;
+    res.saveFailed = true;
     res.error = (res.error ? res.error + '\n' : '') + '저장을 못 했어요: ' + (err3 && err3.message ? err3.message : err3);
+    // 화면이 '저장된 줄' 알면 안 되니까, 방금 고친 내용(메모리)이 아니라 저장소에 실제로 남아 있는 내용을 다시 읽어서 돌려줌
+    st = null;
+    try { VS_ = null; if (appBind_()) st = appState_(true); } catch (err4) { st = null; }
   }
+  if (st) for (var k in st) res[k] = st[k];
   res.notes = NOTES_ || [];
   NOTES_ = null;
   return res;
@@ -2197,8 +2288,12 @@ function appState_(forceMeta) {
  * (모양·수식 동작은 실제 시트와 같게 맞춰 둠 → 아래 VS_RECALC_) */
 
 var VS_ID = 'VIRTUAL';
-var VS_KEY = 'vs_data';          // 저장 키 (나눠서 vs_data_0, vs_data_1 …)
-var VS_CHUNK = 8000;
+var VS_KEY = 'vs_data';          // 저장 키 (나눠서 vs_data_0, vs_data_1 …, 조각 수는 vs_data_n)
+var VS_BAK = 'vs_bak';           // 바로 전 저장분 한 벌 (vs_bak_0 …). 저장하다 끊겨서 vs_data가 깨졌을 때 이걸로 되돌림
+var VS_REV = 'vs_rev';           // 저장할 때마다 1씩 오르는 번호 (잠금 밖에서 읽은 낡은 내용으로 덮어쓰지 않게)
+var VS_CHUNK = 2500;             // 한 칸에 넣는 글자 수. 구글 한도는 한 칸 9KB인데 한글은 글자당 3바이트 → 2500자 = 최대 7.5KB (예전 8000자는 한도를 넘었음)
+var CONTACT_ = 'liquidatedasalways@gmail.com';   // 문의 받는 곳
+var VS_BROKEN_MSG = '저장된 목록을 읽지 못했어요. 목록은 지우지 않고 그대로 뒀어요. 다시 해도 안 되면 문의해 주세요: ' + CONTACT_;
 var VS_TZ_OFF = 9 * 3600 * 1000;  // 한국 시간
 var VS_ = null;                   // 지금 불러온 가상 시트
 var APP_HOME_URL = 'https://liquidatedasalways-jpg.github.io/Gojeongbi-app/';
@@ -2624,21 +2719,69 @@ function vsBlank_() {
   };
 }
 
+/** 저장 칸들을 이어 붙여 읽음. 조각이 빠졌거나 해석이 안 되면 null. */
+function vsRead_(all, key) {
+  var n = Number(all[key + '_n'] || 0), json = '';
+  if (!(n > 0)) return null;
+  for (var i = 0; i < n; i++) {
+    var p = all[key + '_' + i];
+    if (typeof p !== 'string') return null;
+    json += p;
+  }
+  try {
+    var d = JSON.parse(json);
+    return d && d.sheets ? { data: d, json: json, n: n } : null;
+  } catch (err) { return null; }
+}
+/** 글자를 VS_CHUNK씩 잘라 저장 칸으로. (이모지처럼 두 칸짜리 글자는 가운데서 자르지 않음) */
+function vsChunks_(key, json) {
+  var parts = {}, k = 0, i = 0;
+  while (i < json.length) {
+    var j = Math.min(json.length, i + VS_CHUNK);
+    if (j < json.length) { var cc = json.charCodeAt(j); if (cc >= 0xDC00 && cc <= 0xDFFF) j++; }
+    parts[key + '_' + (k++)] = json.slice(i, j);
+    i = j;
+  }
+  parts[key + '_n'] = String(k);
+  return { parts: parts, n: k };
+}
+
 function vsLoad_() {
   if (VS_) return VS_.ss;
-  var up = PropertiesService.getUserProperties();
-  var n = Number(up.getProperty(VS_KEY + '_n') || 0), json = '';
-  for (var i = 0; i < n; i++) json += up.getProperty(VS_KEY + '_' + i) || '';
-  var data = null;
-  try { data = json ? JSON.parse(json) : null; } catch (err) { data = null; }
-  var fresh = !data;
-  VS_ = vsBook_(data || vsBlank_());
-  if (fresh) VS_.changed = true;
+  var all = PropertiesService.getUserProperties().getProperties() || {};
+  var had = all[VS_KEY + '_n'] !== undefined && all[VS_KEY + '_n'] !== null;
+  var got = vsRead_(all, VS_KEY), fromBak = false;
+  if (!got && had) {
+    // 저장분이 깨짐(조각이 빠졌거나 저장하다 끊김). 예전엔 말없이 빈 목록으로 덮어썼어요 → 바로 전 저장분으로, 그것도 없으면 덮어쓰지 않고 오류
+    got = vsRead_(all, VS_BAK);
+    if (!got) throw new Error(VS_BROKEN_MSG);
+    fromBak = true;
+  }
+  VS_ = vsBook_(got ? got.data : vsBlank_());
+  VS_.raw = got ? got.json : '';
+  VS_.rev = String(all[VS_REV] || '');
+  VS_.n = Number(all[VS_KEY + '_n'] || 0) || 0;
+  VS_.bn = Number(all[VS_BAK + '_n'] || 0) || 0;
+  VS_.fromBak = fromBak;
+  if (!got || fromBak) VS_.changed = true;
   return VS_.ss;
 }
 
 function vsSave_() {
   if (!VS_ || !VS_.changed) return;
+  if (HELD_) { vsWrite_(); return; }
+  // 잠금 밖에서 읽은 내용(캘린더 맞추기, 매일 새벽 예약 실행): 잠금을 잡고, 읽은 뒤로 다른 저장이 있었으면 덮어쓰지 않음
+  var lock = null, got = false;
+  try { lock = LockService.getUserLock(); got = lock.tryLock(10000); } catch (err) { lock = null; }
+  if (lock && !got) return;
+  try {
+    if (String(PropertiesService.getUserProperties().getProperty(VS_REV) || '') === VS_.rev) vsWrite_();
+  } finally {
+    if (got) { try { lock.releaseLock(); } catch (err2) {} }
+  }
+}
+
+function vsWrite_() {
   var book = VS_, out = { v: 1, sheets: {} };
   for (var n in book.sheets) {
     var sh = book.sheets[n];
@@ -2660,14 +2803,21 @@ function vsSave_() {
     });
   }
   var json = JSON.stringify(out);
+  if (json === book.raw && !book.fromBak) { book.changed = false; return; }   // 실제로 바뀐 게 없으면 안 씀
   var up = PropertiesService.getUserProperties();
-  var old = Number(up.getProperty(VS_KEY + '_n') || 0);
-  var parts = {};
-  var k = 0;
-  for (var i = 0; i < json.length; i += VS_CHUNK) parts[VS_KEY + '_' + (k++)] = json.slice(i, i + VS_CHUNK);
-  parts[VS_KEY + '_n'] = String(k);
-  up.setProperties(parts);
-  for (var j = k; j < old; j++) up.deleteProperty(VS_KEY + '_' + j);
+  // 1) 바로 전 저장분을 따로 한 벌 남김: 2)가 중간에 끊겨도 되돌릴 수 있게. (바로 전 저장분에서 불러온 경우엔 그대로 둠)
+  if (book.raw && !book.fromBak) {
+    var b = vsChunks_(VS_BAK, book.raw);
+    up.setProperties(b.parts);
+    for (var j = b.n; j < book.bn; j++) up.deleteProperty(VS_BAK + '_' + j);
+    book.bn = b.n;
+  }
+  // 2) 새 내용
+  var m = vsChunks_(VS_KEY, json);
+  m.parts[VS_REV] = String((Number(book.rev) || 0) + 1);
+  up.setProperties(m.parts);
+  for (var j2 = m.n; j2 < book.n; j2++) up.deleteProperty(VS_KEY + '_' + j2);
+  book.n = m.n; book.rev = m.parts[VS_REV]; book.raw = json; book.fromBak = false;
   book.changed = false;
 }
 
