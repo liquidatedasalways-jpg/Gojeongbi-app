@@ -11,39 +11,51 @@ if (window.top !== window.self) {
   try { window.top.location = window.self.location.href; } catch (e) {}
 }
 </script>
+<script>
+/* 설정에서 고른 화면 색(이 기기에만 저장)을 화면이 그려지기 전에 입힘. 없으면 기본(네이비). */
+try { var fcTone = localStorage.getItem('fc_tone'); if (fcTone === 'blue' || fcTone === 'violet') document.documentElement.setAttribute('data-tone', fcTone); } catch (e) {}
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css">
 <style>
 /* ===== 디자인 규칙 =====
- * 색 뜻: 주황 = 누를 것·오늘 / 초록 = 냈음 / 빨강 = 지남. 글자에 쓰는 색(-text)은 바탕과 대비 4.5:1 이상.
+ * 색 뜻: 강조색(기본 네이비) = 누를 것·오늘 / 초록 = 냈음 / 빨강 = 지남. 글자에 쓰는 색(-text)은 바탕과 대비 4.5:1 이상.
+ * 강조색은 설정에서 네이비·블루·바이올렛 중 고름(html의 data-tone). 색 묶음마다 밝은·다크 값을 같은 변수로 둘 다 적어야 함.
  * 글자 크기 7단계: 11 · 12 · 13 · 15 · 17 · 20 · 28. 누르는 곳은 44px 이상.
  * 모서리: 아래 창 24 / 카드 20 / 버튼·입력 14 / 알약. */
 :root {
   --bg: #f2f4f6; --card: #ffffff; --child: #f8f9fa;
   --ink: #191f28; --ink2: #333d4b; --sub: #4e5968; --muted: #626d7b; --ring: #8b95a1; --faint: #b0b8c1;
   --line: #eceef1; --fill: #f2f4f6; --fill2: #e5e8eb; --segon: #ffffff;
-  --accent: #f26b0f; --accent-ink: #ffffff; --accent-text: #c2410c; --sel: #fff3eb;
+  --accent: #1c2b6e; --accent-ink: #ffffff; --accent-text: #2b44b0; --sel: #eceffa;
   --ok: #049e63; --on-ok: #ffffff; --ok-text: #067d4f; --ok-soft: #e7f6ef;
   --red: #f04452; --red-text: #d02937; --red-soft: #feeef0; --danger: #d02937; --on-danger: #ffffff;
-  --sun: #d02937; --sat: #1b64da; --grape: #8b4ad8;
-  --bar: rgba(255,255,255,.94); --backdrop: rgba(0,0,0,.42); --shadow: none; --fab: 0 4px 14px rgba(242,107,15,.32);
+  --sun: #d02937; --sat: var(--ink); --sat-h: var(--muted); --grape: #8b4ad8;
+  --tone-navy: #1c2b6e; --tone-blue: #1f63f0; --tone-violet: #6a3de8;
+  --bar: rgba(255,255,255,.94); --backdrop: rgba(0,0,0,.42); --shadow: none; --fab: 0 4px 14px rgba(28,43,110,.32);
   --r-card: 20px; --r-ctl: 14px;
   /* 분류 9가지 색 (아이콘 바탕) */
   --c-home: #3b82f6; --c-util: #f2a20c; --c-tel: #e85f9e; --c-sub: #8b5cf6; --c-ins: #10b3a3; --c-loan: #5567d8; --c-save: #58b530; --c-edu: #f0685f; --c-etc: #8b95a1; --c-ink: #ffffff;
 }
+/* 강조색이 파랑 계열(네이비·블루)이면 토요일은 평일과 같은 색, 바이올렛이면 토요일 파랑을 살리고 '마지막 결제' 표시를 자주색으로. */
+:root[data-tone="blue"] { --accent: #1f63f0; --accent-ink: #ffffff; --accent-text: #1a55d1; --sel: #e9f1ff; --fab: 0 4px 14px rgba(31,99,240,.32); }
+:root[data-tone="violet"] { --accent: #6a3de8; --accent-ink: #ffffff; --accent-text: #5a2fd0; --sel: #f1ecff; --fab: 0 4px 14px rgba(106,61,232,.32); --sat: #1b64da; --sat-h: #1b64da; --grape: #b0308f; }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #101013; --card: #1c1c21; --child: #222227;
     --ink: #f2f3f5; --ink2: #dadde2; --sub: #b4bac3; --muted: #969ca6; --ring: #7a7f89; --faint: #4a4d55;
     --line: #2a2b31; --fill: #26272d; --fill2: #33343b; --segon: #3d3e46;
-    --accent: #ff8133; --accent-ink: #1b0d02; --accent-text: #ff9a5c; --sel: #3a2618;
+    --accent: #93a5ff; --accent-ink: #0b1230; --accent-text: #b3c0ff; --sel: #242b4d;
     --ok: #1fc47d; --on-ok: #04261a; --ok-text: #45d795; --ok-soft: #14332a;
     --red: #ff5c6c; --red-text: #ff7d8a; --red-soft: #3d1c20; --danger: #ff5c6c; --on-danger: #2a0508;
-    --sun: #ff7d8a; --sat: #74abff; --grape: #b98af5;
+    --sun: #ff7d8a; --grape: #b98af5;
+    --tone-navy: #93a5ff; --tone-blue: #5c96ff; --tone-violet: #a78bfa;
     --bar: rgba(22,22,26,.94); --backdrop: rgba(0,0,0,.6); --fab: 0 4px 14px rgba(0,0,0,.4);
     --c-home: #4f8ff7; --c-util: #f5ab1f; --c-tel: #ee6fa9; --c-sub: #9a70f8; --c-ins: #1fc0b0; --c-loan: #6b7be6; --c-save: #66c23c; --c-edu: #f4776e; --c-etc: #7f8894;
   }
+  :root[data-tone="blue"] { --accent: #5c96ff; --accent-ink: #04122e; --accent-text: #8db6ff; --sel: #172a4a; --fab: 0 4px 14px rgba(0,0,0,.4); }
+  :root[data-tone="violet"] { --accent: #a78bfa; --accent-ink: #170a3d; --accent-text: #bda7ff; --sel: #2b2350; --fab: 0 4px 14px rgba(0,0,0,.4); --sat: #74abff; --sat-h: #74abff; --grape: #f08ad0; }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); }
@@ -110,7 +122,7 @@ body.on-cal .calnav { display: flex; }
 .cal { padding: 10px 10px 4px; touch-action: pan-y; }
 .cg { display: grid; grid-template-columns: repeat(7, 1fr); }
 .wd { font-size: 12px; font-weight: 600; color: var(--muted); text-align: center; padding: 0 0 6px; }
-.wd.sun { color: var(--sun); } .wd.sat { color: var(--sat); }
+.wd.sun { color: var(--sun); } .wd.sat { color: var(--sat-h); }
 .cd { height: 44px; display: flex; flex-direction: column; align-items: center; padding-top: 2px; border-top: 1px solid var(--line); position: relative; }
 .cd .n { width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%; font-size: 13px; font-weight: 600; letter-spacing: -.02em; }
 .cd.sun .n, .cd.hol .n { color: var(--sun); }
@@ -280,6 +292,12 @@ body.on-cal .calnav { display: flex; }
 .set-acc .tx { flex: 1; min-width: 0; }
 .set-acc b { display: block; font-size: 15px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .set-acc small { display: block; font-size: 13px; color: var(--muted); }
+.tones { display: flex; gap: 8px; padding: 8px 0 10px; }
+.tones button { flex: 1; min-width: 0; min-height: 76px; padding: 12px 4px 10px; border-radius: var(--r-ctl); background: var(--fill); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--sub); text-align: center; }
+.tones button i { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: var(--card); }
+.tones button i svg { width: 16px; height: 16px; opacity: 0; }
+.tones button[aria-checked="true"] { background: var(--sel); color: var(--accent-text); font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--accent); }
+.tones button[aria-checked="true"] i svg { opacity: 1; }
 .glabel { font-size: 13px; font-weight: 700; color: var(--sub); padding: 14px 0 2px; letter-spacing: -.02em; }
 .tip { font-size: 13px; color: var(--muted); padding: 2px 0 12px; line-height: 1.5; }
 .tip.err { color: var(--red-text); font-weight: 600; }
@@ -371,7 +389,7 @@ body.on-cal .calnav { display: flex; }
 .dp .nav { width: 44px; height: 44px; border-radius: 22px; font-size: 20px; color: var(--sub); }
 .dp .dpw, .dp .dpg, .dg { display: grid; grid-template-columns: repeat(7, 1fr); justify-items: center; text-align: center; }
 .dp .dpw span { font-size: 12px; font-weight: 600; color: var(--muted); padding: 4px 0; }
-.dp .dpw span:first-child { color: var(--sun); } .dp .dpw span:last-child { color: var(--sat); }
+.dp .dpw span:first-child { color: var(--sun); } .dp .dpw span:last-child { color: var(--sat-h); }
 .dp .dpg button, .dg button { width: 44px; height: 44px; border-radius: 22px; font-size: 15px; font-weight: 600; color: var(--ink); }
 .dp .dpg button.sun { color: var(--sun); } .dp .dpg button.sat { color: var(--sat); }
 .dp .dpg button.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
@@ -538,7 +556,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 9, "contact": "liquidatedasalways@gmail.com", "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 10, "contact": "liquidatedasalways@gmail.com", "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -811,12 +829,12 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   if (/Line[/]/i.test(ua) && u.indexOf('openExternalBrowser') < 0) { location.replace(u + (u.indexOf('?') < 0 ? '?' : '&') + 'openExternalBrowser=1'); return; }
 })();
 </script>
-<title>승훈스 고정비앱 V1</title>
+<title>고정비 달력</title>
 <meta name="theme-color" content="#f2f4f6" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#101013" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="승훈스 고정비앱 V1">
+<meta name="apple-mobile-web-app-title" content="고정비 달력">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -850,7 +868,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 <body class="on-cal">
 <div class="fcl" id="fcLogin">
   <img class="logo" src="icons/icon-192.png" alt="">
-  <div class="app">승훈스 고정비앱 V1</div>
+  <div class="app">고정비 달력</div>
   <h1>매달 나가는 돈,<br>놓치지 않게</h1>
   <ul>
     <li><i><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></i>결제일을 달력으로 한눈에</li>
@@ -1560,7 +1578,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function joinDot(parts) { return parts.filter(Boolean).join(' · '); }
   function acctTxt(it) { var a = shortAcct(it.account); return a ? esc(a) : ''; }
-  /** 날짜 부분: 지났으면 빨강, 3일 안이면 주황, 아니면 날짜. */
+  /** 날짜 부분: 지났으면 빨강, 3일 안이면 강조색, 아니면 날짜. */
   function dueTxt(ds, unpaid) {
     if (!ds) return '';
     var d = ddays(ds);
@@ -1568,7 +1586,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (unpaid && d <= 3) return '<span class="soon">' + relDay(ds) + '</span>';
     return esc(fmtDate(ds));
   }
-  /** 첫 화면 줄의 오른쪽 아래 상태: '18일 지남'(빨강) / '모레 · 25일'(주황) / '30일 (월)' */
+  /** 첫 화면 줄의 오른쪽 아래 상태: '18일 지남'(빨강) / '모레 · 25일'(강조색) / '30일 (월)' */
   function stOf(ds, unpaid) {
     var p = parse(ds);
     if (!p) return { t: '', c: '' };
@@ -2357,7 +2375,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var it = findItem(name);
     if (!it) return;
     openName = name;
-    // 맨 위: 금액 크게 + 상태 알약(지남 빨강 / 곧 주황 / 냄 초록) + 언제
+    // 맨 위: 금액 크게 + 상태 알약(지남 빨강 / 곧 강조색 / 냄 초록) + 언제
     var pill = '', when = '';
     if (isMissing(it)) { pill = '<span class="pill soon">결제일 없음</span>'; when = '달력과 캘린더에 안 나와요'; }
     else if (it.checked) { pill = '<span class="pill ok">냈어요</span>'; when = it.next ? '다음 ' + esc(fmtDate(it.next)) : esc(it.nextText || ''); }
@@ -3381,7 +3399,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function legalHtml() {
     var ct = (window.FC_CONFIG && window.FC_CONFIG.contact) || '';
     return '<div class="legalrow"><a href="privacy.html" data-leave>개인정보 처리방침</a><a href="terms.html" data-leave>이용약관</a>' +
-      (ct ? '<a id="mAsk" href="mailto:' + esc(ct) + '?subject=' + encodeURIComponent('고정비앱 문의') + '">문의</a>' : '') + '</div>';
+      (ct ? '<a id="mAsk" href="mailto:' + esc(ct) + '?subject=' + encodeURIComponent('고정비 달력 문의') + '">문의</a>' : '') + '</div>';
   }
   /** 설정 맨 위: 지금 로그인한 계정 */
   function accHead(email, sub) {
@@ -3407,6 +3425,29 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function wireAccount(WEB) {
     if ($('mSwitch')) $('mSwitch').onclick = function () { leave(function () { WEB.switchAccount(); }); };
     if ($('mLogout')) $('mLogout').onclick = function () { leave(function () { WEB.logout(); }); };
+  }
+  /* 화면 색: 강조색 3가지 중 하나. 서버가 아니라 이 기기(브라우저 저장 공간)에만 저장하고, 로그아웃해도 남김.
+   * 실제 색 값은 맨 위 :root[data-tone] 묶음에 있고, 여기선 html의 data-tone만 바꿈. 홈 화면 아이콘 색은 안 바뀜. */
+  var TONES = [['navy', '네이비'], ['blue', '블루'], ['violet', '바이올렛']];
+  function curTone() { var t = document.documentElement.getAttribute('data-tone'); return t === 'blue' || t === 'violet' ? t : 'navy'; }
+  function setTone(t) {
+    if (t === 'navy') document.documentElement.removeAttribute('data-tone'); else document.documentElement.setAttribute('data-tone', t);
+    try { if (t === 'navy') localStorage.removeItem('fc_tone'); else localStorage.setItem('fc_tone', t); } catch (e) {}
+  }
+  function toneHtml() {
+    var cur = curTone();
+    return '<div class="glabel">화면 색</div><div class="tones" role="radiogroup" aria-label="화면 색">' + TONES.map(function (t) {
+      return '<button type="button" role="radio" data-tone="' + t[0] + '" aria-checked="' + (cur === t[0]) + '"><i style="background:var(--tone-' + t[0] + ')">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></i>' + t[1] + '</button>';
+    }).join('') + '</div><div class="tip">고른 색은 이 기기에만 저장돼요. 홈 화면 아이콘은 그대로예요.</div>';
+  }
+  function wireTone() {
+    Array.prototype.forEach.call($('sheetBody').querySelectorAll('.tones button'), function (b) {
+      b.onclick = function () {
+        setTone(b.getAttribute('data-tone'));
+        Array.prototype.forEach.call($('sheetBody').querySelectorAll('.tones button'), function (x) { x.setAttribute('aria-checked', String(x === b)); });
+      };
+    });
   }
   /** 아직 못 불러왔을 때(연결 실패 등)도 ⋯는 열림: 다시 불러오기와 계정만 있는 작은 메뉴 */
   function openMiniMenu() {
@@ -3447,7 +3488,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       '<button class="li" type="button" id="mReload"><span>다시 불러오기</span></button>' +
       '<button class="li" type="button" id="mRestore"><span>방금 지운 항목 되살리기</span></button>' +
       '<button class="li" type="button" id="mShare"><span>친구에게 알려주기</span>' + CV + '</button>' +
-      '</div>' +
+      '</div>' + toneHtml() +
       (WEB && WEB.hasOther && S.home && !WEB.onOther() ? '<div class="glabel">시트 없이 쓰기</div><div class="grp"><button class="li" type="button" id="mMove"><span>내 시트 내용을 앱으로 옮기기</span><span class="r">' + S.items.filter(function (i) { return !i.sep; }).length + '개</span></button></div>' +
         '<div class="tip">옮기면 앱 안에 저장되고 구글 시트는 더는 안 써요. 다 옮겨진 걸 확인한 뒤에 시트를 지우면 돼요.</div>' : '') +
       (isAdmin() ? '<div class="glabel">앱 관리</div><div class="grp"><button class="li" type="button" id="mUpd"><span>서버 업데이트</span><span class="r">' + (needUpdate() ? '새 버전 있음' : '최신') + '</span></button></div>' : '') +
@@ -3481,6 +3522,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var mv = $('mMove'); if (mv) mv.onclick = function () { moveToApp(mv); };
     var mu = $('mUpd'); if (mu) mu.onclick = function () { leave(runServerUpdate); };
     var mw = $('mWipe'); if (mw) mw.onclick = function () { openWipe(function () { openMenu(false); }); };
+    wireTone();
   }
 
   /* ---------- 내 자료 모두 지우기 (그만 쓸 때) ----------
@@ -3713,7 +3755,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     else openSheet('친구에게 알려주기', h, 'share', function () { openMenu(false); });
     var cp = $('shCopy'); if (cp) cp.onclick = function () { copyText(url); };
     var sd = $('shSend'); if (sd) sd.onclick = function () {
-      try { navigator.share({ title: '승훈스 고정비앱 V1', text: '매달 나가는 돈 달력 앱. 구글 계정으로 로그인하면 내 캘린더에 결제일이 들어가요.', url: url }).catch(function () {}); } catch (e) {}
+      try { navigator.share({ title: '고정비 달력', text: '매달 나가는 돈 달력 앱. 구글 계정으로 로그인하면 내 캘린더에 결제일이 들어가요.', url: url }).catch(function () {}); } catch (e) {}
     };
   }
 
@@ -3956,7 +3998,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   document.getElementById('instBtn').onclick = function () {
     evt = evt || window.__bip;
     if (evt) { var e = evt; evt = window.__bip = null; e.prompt(); e.userChoice.then(function (c) { if (c.outcome === 'accepted') { done = true; sync(); } }); return; }
-    if (installed) { say('<b>이미 설치돼 있어요</b>홈 화면(앱스 화면)의 ' + B('승훈스 고정비앱 V1') + ' 아이콘으로 여세요'); return; }
+    if (installed) { say('<b>이미 설치돼 있어요</b>홈 화면(앱스 화면)의 ' + B('고정비 달력') + ' 아이콘으로 여세요'); return; }
     var ua = navigator.userAgent, how;
     if (/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|Line[/]|DaumApps|everytimeApp/i.test(ua))
       how = '여기(앱 안 브라우저)에선 설치가 안 돼요. 메뉴 → ' + B('다른 브라우저로 열기') + ' → 크롬이나 삼성 인터넷에서 다시 눌러주세요';

@@ -560,7 +560,7 @@ t('auto-check-server', async () => {
   g.setNow('2026-09-02'); g.call(ME, 'api_setChecks', [{ '적금': true }]);
   g.setNow('2026-11-23T21:30');
   let r = g.call(ME, 'api_load', [false]);
-  ok(r.ver === 9 && r.opts && r.opts.auto === false && r.opts.remind === false, '서버 v9, 두 설정 모두 처음엔 꺼져 있음');
+  ok(r.ver === 10 && r.opts && r.opts.auto === false && r.opts.remind === false, '서버 v10, 두 설정 모두 처음엔 꺼져 있음');
   ok(sItem(g, '월세').paid === '2026-08-25' && !(r.notes || []).some((n) => /자동이체/.test(n)), '꺼져 있으면 아무것도 자동으로 체크 안 함');
 
   r = g.call(ME, 'api_opts', [{ auto: true }]);
@@ -744,7 +744,7 @@ t('opts-old-server', async () => {
   // 서버를 아직 안 올린 상태(v8): 새 화면이 그대로 동작하고, 서버에 없는 기능 줄은 안 보여줌
   const fs = require('fs'), os = require('os'), path = require('path');
   const v8 = fs.readFileSync(path.join(__dirname, '..', 'setup', 'Code.gs.txt'), 'utf8')
-    .replace('var SERVER_VER = 9;', 'var SERVER_VER = 8;').replace('res.opts = appOpts_();', '').replace('function api_opts(', 'function api_opts_gone_(');
+    .replace('var SERVER_VER = 10;', 'var SERVER_VER = 8;').replace('res.opts = appOpts_();', '').replace('function api_opts(', 'function api_opts_gone_(');
   const f = path.join(os.tmpdir(), 'fc-code-v8-' + process.pid + '.txt'); fs.writeFileSync(f, v8);
   const gas = GAS.create({ code: f });
   const h = await H.open(Object.assign({}, LIFE, { gas })); const p = h.page;
@@ -1223,6 +1223,80 @@ t('layout-heights', async () => {
   await p2.click('#wAdd'); await sleep(p2, 450);
   ok((await sheetInfo(p2)).grid, '"첫 고정비 넣기" → 분류 고르기');
   await h2.close();
+});
+
+/* ====================== 새 이름·아이콘·화면 색 (고정비 달력, 서버 v10) ====================== */
+t('tone-pick', async () => {
+  // 대비(밝기 차이) 계산: 글자와 바탕 색을 받아 비율로
+  const lum = (c) => { const m = c.match(/\d+(\.\d+)?/g).map(Number); const f = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); }; return 0.2126 * f(m[0]) + 0.7152 * f(m[1]) + 0.0722 * f(m[2]); };
+  const cr = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+  for (const dark of [false, true]) {
+    const tag = dark ? ' (다크)' : '';
+    const h = await H.open(Object.assign({}, LIFE, { dark })); const p = h.page;
+    await sleep(p, 1200);
+    const look = () => p.evaluate(() => {
+      const cs = (e) => getComputedStyle(e);
+      const today = document.querySelector('.cd.today .n'), go = document.querySelector('.ndb .go, .sec .act');
+      const card = cs(document.querySelector('.card, .grp') || document.body).backgroundColor;
+      return { tone: document.documentElement.getAttribute('data-tone'), saved: localStorage.getItem('fc_tone'), todayBg: cs(today).backgroundColor, todayFg: cs(today).color, link: go && cs(go).color, card: cs(document.body).backgroundColor, red: cs(document.documentElement).getPropertyValue('--red-text').trim() };
+    });
+    let v = await look();
+    ok(v.tone === null && v.saved === null, '처음엔 기본 색(네이비), 저장된 값 없음' + tag);
+    const seen = {};
+    for (const tone of ['navy', 'blue', 'violet']) {
+      await p.click('#menuBtn'); await sleep(p, 500);
+      ok(await p.evaluate(() => document.querySelectorAll('#sheetBody .tones button').length === 3), '설정에 화면 색 3개' + tag);
+      const tap = await p.evaluate(() => [...document.querySelectorAll('#sheetBody .tones button')].every((b) => { const r = b.getBoundingClientRect(); return r.width >= 44 && r.height >= 44; }));
+      ok(tap, '색 버튼이 44px 이상' + tag);
+      await p.click('#sheetBody .tones button[data-tone="' + tone + '"]'); await sleep(p, 250);
+      const one = await p.evaluate(() => [...document.querySelectorAll('#sheetBody .tones button')].filter((b) => b.getAttribute('aria-checked') === 'true').map((b) => b.dataset.tone).join());
+      ok(one === tone, tone + ': 고른 것 하나만 선택 표시' + tag);
+      await p.click('#sheetClose'); await sleep(p, 400);
+      v = await look();
+      ok(tone === 'navy' ? (v.tone === null && v.saved === null) : (v.tone === tone && v.saved === tone), tone + ': 바로 바뀌고 이 기기에 저장' + tag);
+      ok(cr(v.todayFg, v.todayBg) >= 4.5, tone + ': 오늘 동그라미 글자 대비 ' + cr(v.todayFg, v.todayBg).toFixed(2) + tag);
+      ok(v.link && cr(v.link, v.card) >= 4.5, tone + ': 누르는 글자 대비 ' + (v.link ? cr(v.link, v.card).toFixed(2) : '-') + tag);
+      seen[tone] = v.todayBg;
+    }
+    ok(new Set(Object.values(seen)).size === 3, '세 색이 서로 다름 ' + JSON.stringify(seen) + tag);
+    // 다시 열어도 남고, 로그아웃해도 남음(화면 색은 계정 자료가 아님)
+    await p.reload(); await sleep(p, 1500);
+    ok((await look()).tone === 'violet', '앱을 다시 열어도 고른 색 그대로' + tag);
+    await p.evaluate(() => { localStorage.setItem('fc_tone', 'zzz'); }); await p.reload(); await sleep(p, 1200);
+    ok((await look()).tone === null, '모르는 값이 저장돼 있으면 기본 색으로' + tag);
+    ok(realErrors(h).length === 0, '화면 오류 0건 ' + JSON.stringify(realErrors(h)) + tag);
+    await h.shot('t-tone' + (dark ? '-dark' : ''));
+    await h.close();
+  }
+});
+t('rename', async () => {
+  const fs = require('fs'), path = require('path');
+  const root = path.join(__dirname, '..');
+  const files = ['index.html', 'manifest.webmanifest', 'privacy.html', 'terms.html', 'README.md', 'sw.js', 'setup/Code.gs.txt'];
+  const left = files.filter((f) => /승훈스|고정비앱 V1/.test(fs.readFileSync(path.join(root, f), 'utf8')));
+  ok(left.length === 0, '옛 이름이 남은 파일 없음 ' + JSON.stringify(left));
+  const man = JSON.parse(fs.readFileSync(path.join(root, 'manifest.webmanifest'), 'utf8'));
+  ok(man.name === '고정비 달력' && man.short_name === '고정비 달력', '설치 정보 이름: ' + man.name);
+  const h = await H.open(Object.assign({}, LIFE, { loggedOut: true })); const p = h.page;
+  await p.waitForSelector('#fcLogin.on', { timeout: 8000 });
+  const v = await p.evaluate(() => ({ title: document.title, app: document.querySelector('.fcl .app').textContent, apple: document.querySelector('meta[name="apple-mobile-web-app-title"]').content,
+    logo: [...document.querySelectorAll('#fcLogin img')].every((i) => i.naturalWidth > 0) }));
+  ok(v.title === '고정비 달력' && v.app === '고정비 달력' && v.apple === '고정비 달력', '창 제목·로그인 화면·홈 화면 이름: ' + JSON.stringify(v));
+  ok(v.logo, '로그인 화면 아이콘 그림이 뜸');
+  await h.close();
+  // 캘린더 일정 설명에도 새 이름. 옛 이름으로 만들어진 일정은 서버를 올린 뒤 맞출 때 설명만 바뀌고, 새로 만들거나 지우지 않음
+  const g = GAS.create({}); g.setNow('2026-10-02'); g.call(ME, 'api_load', [false]);
+  for (const it of H.SEEDS.full.items) add(g, it);
+  g.setNow('2026-11-23T21:30'); g.call(ME, 'api_load', [false]);
+  let n = 0, last; do { last = g.call(ME, 'api_sync', [true]); n++; } while (last.more && n < 60);
+  const total = g.events(ME).length;
+  ok(total > 100 && g.events(ME).every((e) => e.desc.indexOf('고정비 달력 앱에서 만든 일정이에요') >= 0), '캘린더 일정 설명에 새 이름 (' + total + '개)');
+  const ids = g.events(ME).map((e) => e.id).sort().join();
+  g.events(ME).forEach((e) => { e.desc = e.desc.replace('고정비 달력 앱에서 만든', '승훈스 고정비앱에서 만든'); });
+  ok(g.events(ME).every((e) => /승훈스/.test(e.desc)), '(준비) 옛 이름으로 만들어진 일정 흉내');
+  n = 0; do { last = g.call(ME, 'api_sync', [true]); n++; } while (last.more && n < 60);
+  ok(!last.more && g.events(ME).length === total && g.events(ME).map((e) => e.id).sort().join() === ids, '옛 일정을 새로 만들거나 지우지 않음 (그대로 ' + total + '개, 서버 ' + n + '번 나눠 부름)');
+  ok(g.events(ME).every((e) => !/승훈스/.test(e.desc) && e.desc.indexOf('고정비 달력 앱에서 만든 일정이에요') >= 0), '설명의 옛 이름이 전부 새 이름으로 바뀜');
 });
 
 (async () => {
