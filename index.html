@@ -197,6 +197,8 @@ svg { display: block; }
 .f select { padding-right: 16px; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%); background-position: calc(100% - 7px) 50%, calc(100% - 2px) 50%; background-size: 5px 5px; background-repeat: no-repeat; }
 .f textarea { resize: none; padding: 4px 0; }
 .f input::placeholder, .f textarea::placeholder { color: var(--faint); }
+.f select:invalid { color: var(--faint); }
+.f select option { color: var(--ink); }
 .f.badf > label { color: var(--red); }
 .f .unit { color: var(--muted); font-size: 14.5px; }
 .mini { flex: none; font-size: 11.5px; font-weight: 500; color: var(--sub); padding: 5px 9px; border-radius: 8px; background: var(--fill); }
@@ -300,24 +302,13 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .qd input[type=date] { width: 150px; }
 .grp > .qd + .qd::after { content: ""; position: absolute; left: 18px; right: 18px; top: 0; height: 1px; background: var(--line); }
 
-/* + 버튼: 엑셀처럼 여러 줄 입력 */
-.qa { --qcols: 26px minmax(0, 1fr) 96px 54px; }
-.qa .qh, .qa .qr { display: grid; grid-template-columns: var(--qcols); position: relative; }
-.qa .qh { background: var(--fill); font-size: 11px; font-weight: 600; color: var(--muted); }
-.qa .qh span { padding: 7px 8px; border-left: 1px solid var(--fill2); }
-.qa .qh span:first-child { border-left: 0; }
-.qa .qh span:nth-child(3) { text-align: right; } .qa .qh span:nth-child(4) { text-align: center; }
-.qa .qr + .qr::after, .qa .qh + .qr::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--line); }
-.qa .qr .no { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--faint); }
-.qa .qr input { width: 100%; min-width: 0; height: 46px; border: 0; border-left: 1px solid var(--line); background: none; outline: none; font-size: 14.5px; padding: 0 8px; }
-.qa .qr input.qn { font-weight: 600; }
-.qa .qr input.qm { text-align: right; font-weight: 700; }
-.qa .qr input.qd { text-align: center; font-weight: 600; }
-.qa .qr input:focus { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--accent); }
-.qa .qr input::placeholder { color: var(--faint); font-weight: 500; }
-.qa .qr.bad input.qn { box-shadow: inset 0 0 0 1.5px var(--red); }
-.qmore { display: block; width: 100%; padding: 2px 4px 16px; font-size: 12.5px; font-weight: 600; color: var(--muted); text-align: center; }
-.qmore b { color: var(--accent); font-weight: 700; }
+/* 왼쪽으로 밀어서 삭제 */
+.row.tr { overflow: hidden; }
+.row.tr .tg { position: relative; z-index: 1; background: inherit; transition: transform .22s cubic-bezier(.2,.85,.25,1); touch-action: pan-y; }
+.row.tr.drag .tg { transition: none; }
+.row.tr.swiped .tg { transform: translateX(-76px); }
+.swdel { position: absolute; top: 0; right: 0; z-index: 0; width: 76px; height: 44px; background: var(--red); color: #fff; font-size: 13.5px; font-weight: 700; text-align: center; }
+.row.tr:not(.drag):not(.swiped) .swdel { visibility: hidden; }
 
 /* 목록 탭: 시트처럼 표 */
 .tbl { --cols: 40px minmax(0, 1fr) 92px 58px; }
@@ -1214,7 +1205,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       '<button class="chk" type="button" data-act="' + o.check + '"' + (o.ackKey ? ' data-key="' + esc(o.ackKey) + '"' : '') + ' aria-label="납부 체크"><i>' + CHECK_SVG + '</i></button>' +
       '<div class="tc nmc" data-act="expand"><span class="nm">' + esc(it.name) + '</span>' + tag + '</div>' +
       '<div class="tc amc" data-act="cell" data-f="amt">' + amt + '</div>' +
-      '<div class="tc dyc" data-act="cell" data-f="day">' + day + '</div></div>';
+      '<div class="tc dyc" data-act="cell" data-f="day">' + day + '</div></div>' +
+      (o.ackKey ? '' : '<button class="swdel" type="button" data-act="del" tabindex="-1">삭제</button>');
     if (openRow === it.name && !o.ackKey) {
       var acct = String(it.account || '').trim();
       var linked = acct ? accMemo(acct) : '';
@@ -1228,7 +1220,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
         kl('주기', esc(joinDot([it.cycle, it.amtType === '변동' ? '변동 금액' : '']))) +
         kl('분류', esc(it.cat)) + kl('결제처', esc(it.vendor)) + kl('상위 항목', esc(it.parent)) +
         kl('기간', period) + kl('메모', esc(it.memo)) +
-        '<div class="tb"><button type="button" data-act="edit">자세히 수정</button><button type="button" class="red" data-act="del">삭제</button></div></div>';
+        '<div class="tb"><button type="button" data-act="edit">수정</button></div></div>';
     }
     return h;
   }
@@ -1741,15 +1733,15 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var opts = (f.options || []).slice();
       var sv = String(v);
       if (sv && opts.indexOf(sv) < 0) opts.push(sv);
-      var h = '<option value="">선택 안 함</option>';
+      var h = '<option value="">선택</option>';
       opts.forEach(function (o) { h += '<option' + (o === sv ? ' selected' : '') + ' value="' + esc(o) + '">' + esc(o) + '</option>'; });
       if (!f.strict) h += '<option value="__custom">직접 입력…</option>';
-      return '<select id="' + id + '" data-kind="select">' + h + '</select>';
+      return '<select id="' + id + '" data-kind="select" required>' + h + '</select>';
     }
     if (f.kind === 'day') {
-      var dh = '<option value="">선택 안 함</option>';
+      var dh = '<option value="">선택</option>';
       for (var d = 1; d <= 31; d++) dh += '<option value="' + d + '"' + (Number(v) === d ? ' selected' : '') + '>' + (d === 31 ? '말일 (31일)' : '매월 ' + d + '일') + '</option>';
-      return '<select id="' + id + '">' + dh + '</select>';
+      return '<select id="' + id + '" required>' + dh + '</select>';
     }
     if (f.kind === 'date') return '<input type="hidden" id="' + id + '" value="' + esc(v) + '">' + dateBtn(id, v, false) + '<button class="mini" type="button" data-clear="' + id + '">지우기</button>';
     if (f.kind === 'dateOrForever') {
@@ -1771,7 +1763,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var l = f.label;
     if (f.col === S.meta.nameCol) return '예: 넷플릭스';
     if (/^결제처/.test(l)) return '예: (주)삼성카드';
-    if (/^메모/.test(l)) return '예: 계약번호 1234-5678 · 고객센터 1588-0000 · 해지는 앱에서';
+    if (/^메모/.test(l)) return '계약번호, 고객센터 번호 등';
     if (/순서/.test(l)) return '예: 1';
     if (isAmtField(f)) return '예: 13,500';
     return '';
@@ -1786,7 +1778,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function shortLabel(f) {
     var l = f.label.replace(/\s*\(.*\)\s*$/, '');
-    if (/^승훈 출금/.test(l)) l = '출금 계좌·카드';
+    if (/^승훈 출금/.test(l)) l = '결제 수단';
     if (isAmtField(f)) l = '금액';
     if (/^메모/.test(l)) l = '메모';
     return l;
@@ -1794,11 +1786,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function fieldHtml(f, it) {
     var val = it ? it.v[f.col] : defaultFor(f);
     var badge = '';
-    if (f.required) badge = '<em class="req">필수</em>';
-    else if (isDayField(f)) badge = '<em>캘린더에 필요</em>';
-    else badge = '<em class="opt">(선택)</em>';
     if (isAcctField(f)) {
-      return '<div class="f stack" data-f="' + f.col + '"><div class="lrow"><label>' + esc(shortLabel(f)) + '<em class="opt">(선택)</em></label>' +
+      return '<div class="f stack" data-f="' + f.col + '"><div class="lrow"><label>' + esc(shortLabel(f)) + '</label>' +
         '<button class="lnk" type="button" data-accmgr="1">관리</button></div>' + control(f, val, '') +
         ((S.accounts || []).length ? '' : '<div class="t2" style="padding-top:2px">한 번 저장하면 다음부터 눌러서 골라요</div>') + '</div>';
     }
@@ -1806,10 +1795,15 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     return '<div class="f' + (stack ? ' stack' : '') + '" data-f="' + f.col + '"><label for="f' + f.col + '">' + esc(shortLabel(f)) + badge + '</label>' +
       (stack ? control(f, val, it ? it.name : '') : '<span class="ctl">' + control(f, val, it ? it.name : '') + '</span>') + '</div>';
   }
+  function isMainField(f) {
+    return f.col === S.meta.nameCol || isAmtField(f) || isDayField(f) || /주기/.test(f.label) || isAcctField(f);
+  }
   function formHtml(it) {
-    var h = '<div class="ferr" id="formErr"></div><div class="grp">';
-    orderedFields(it).forEach(function (f) { h += fieldHtml(f, it); });
-    h += '</div><button class="btn primary" style="width:100%" type="button" id="saveBtn">' + (it ? '저장' : '추가') + '</button>';
+    var main = '', more = '';
+    orderedFields(it).forEach(function (f) { if (isMainField(f)) main += fieldHtml(f, it); else more += fieldHtml(f, it); });
+    var h = '<div class="ferr" id="formErr"></div><div class="grp">' + main + '</div>';
+    if (more) h += '<div class="glabel">안 적어도 돼요</div><div class="grp">' + more + '</div>';
+    h += '<button class="btn primary" style="width:100%" type="button" id="saveBtn">' + (it ? '저장' : '추가') + '</button>';
     return h;
   }
   /* 쓰던 내용: 실수로 닫혀도 다시 열면 그대로 (기기에 임시 저장) */
@@ -1836,106 +1830,6 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var body = $('sheetBody');
     var later = function () { clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 250); };
     body.addEventListener('input', later); body.addEventListener('change', later); body.addEventListener('click', later);
-  }
-  /* + 버튼: 엑셀처럼 여러 줄 한 번에 */
-  function qaRowHtml(i, r) {
-    r = r || {};
-    return '<div class="qr"><span class="no">' + (i + 1) + '</span>' +
-      '<input class="qn" placeholder="' + (i === 0 ? '예: 넷플릭스' : '') + '" maxlength="40" enterkeyhint="next" value="' + esc(r.n || '') + '">' +
-      '<input class="qm" inputmode="numeric" placeholder="' + (i === 0 ? '13,500' : '') + '" maxlength="13" enterkeyhint="next" value="' + esc(r.m || '') + '">' +
-      '<input class="qd" inputmode="numeric" placeholder="' + (i === 0 ? '5' : '') + '" maxlength="2" enterkeyhint="next" value="' + esc(r.d || '') + '"></div>';
-  }
-  function openQuickAdd() {
-    openName = null;
-    var saved = load('fc_qadd_' + (S.email || '')) || [];
-    var n = Math.max(3, saved.length + 1);
-    var h = '<div class="tip">엑셀처럼 한 줄에 하나씩 적어요. 결제일은 매월 며칠인지 숫자만. 모르는 칸은 비워도 돼요.</div>' +
-      '<div class="grp qa" id="qaBox"><div class="qh"><span></span><span>항목</span><span>금액</span><span>결제일</span></div>';
-    for (var i = 0; i < n; i++) h += qaRowHtml(i, saved[i]);
-    h += '</div><div class="btns"><button class="btn primary" type="button" id="qaSave">추가</button></div>' +
-      '<button class="qmore" type="button" id="qaMore">결제 수단·주기·기간까지 적으려면 <b>자세히 쓰기</b></button>';
-    openSheet('새 항목', h, 'quick');
-    var box = $('qaBox');
-    function rows() { return Array.prototype.slice.call(box.querySelectorAll('.qr')); }
-    function read() {
-      return rows().map(function (r) {
-        var q = r.querySelectorAll('input');
-        return { n: q[0].value.trim(), m: q[1].value.replace(/[^\d]/g, ''), d: q[2].value.replace(/[^\d]/g, '') };
-      });
-    }
-    function count() {
-      var k = read().filter(function (r) { return r.n; }).length;
-      $('qaSave').textContent = k > 1 ? k + '개 추가' : '추가';
-    }
-    function persist() {
-      var data = read();
-      while (data.length && !data[data.length - 1].n && !data[data.length - 1].m && !data[data.length - 1].d) data.pop();
-      try { if (data.length) store('fc_qadd_' + (S.email || ''), data.map(function (r, i) { var q = rows()[i].querySelectorAll('input'); return { n: q[0].value, m: q[1].value, d: q[2].value }; })); else localStorage.removeItem('fc_qadd_' + (S.email || '')); } catch (e) {}
-    }
-    function wire(r) {
-      var q = r.querySelectorAll('input');
-      q[1].addEventListener('input', function () { var dg = q[1].value.replace(/[^\d]/g, ''); q[1].value = dg ? Number(dg).toLocaleString('ko-KR') : ''; });
-      q[2].addEventListener('input', function () { q[2].value = q[2].value.replace(/[^\d]/g, ''); });
-      q[0].addEventListener('input', function () {
-        r.classList.remove('bad');
-        var all = rows();
-        if (all[all.length - 1] === r && q[0].value.trim()) {   // 마지막 줄에 쓰기 시작하면 빈 줄 하나 더
-          box.insertAdjacentHTML('beforeend', qaRowHtml(all.length));
-          wire(box.lastElementChild);
-        }
-      });
-      for (var j = 0; j < 3; j++) (function (j) {
-        q[j].addEventListener('input', function () { count(); persist(); });
-        q[j].addEventListener('keydown', function (e) {
-          if (e.key !== 'Enter') return;
-          e.preventDefault();
-          if (j < 2) { q[j + 1].focus(); return; }
-          var nx = r.nextElementSibling;
-          if (nx) nx.querySelector('input').focus();
-        });
-      })(j);
-    }
-    rows().forEach(wire);
-    count();
-    setTimeout(function () { var f = rows().filter(function (r) { return !r.querySelector('input').value; })[0]; if (f) f.querySelector('input').focus(); }, 320);
-    $('qaMore').onclick = function () {
-      var first = read().filter(function (r) { return r.n; })[0];
-      openAdd();
-      if (first) {
-        var af = amtFieldOf(), df = dayFieldOf(), set = function (f, v) { var el = f && $('f' + f.col); if (el && v) { el.value = f.money ? Number(v).toLocaleString('ko-KR') : v; el.dispatchEvent(new Event('input', { bubbles: true })); } };
-        set({ col: S.meta.nameCol }, first.n); set(af, first.m); set(df, first.d);
-      }
-    };
-    $('qaSave').onclick = function () {
-      var data = read(), seen = {}, bad = '', list = [];
-      var rs = rows();
-      data.forEach(function (r, i) {
-        if (!r.n) { if ((r.m || r.d) && !bad) { bad = (i + 1) + '번 줄에 항목 이름을 적어주세요'; rs[i].classList.add('bad'); } return; }
-        if (findItem(r.n) || seen[r.n]) { if (!bad) { bad = '"' + r.n + '"은(는) 이미 있어요. 이름을 조금 다르게 적어주세요.'; rs[i].classList.add('bad'); } return; }
-        if (r.d && (+r.d < 1 || +r.d > 31)) { if (!bad) bad = r.n + ': 결제일은 1~31 사이 숫자로 적어주세요'; return; }
-        seen[r.n] = 1;
-        list.push(r);
-      });
-      if (bad) { toast(bad, { error: true }); return; }
-      if (!list.length) { rs[0].querySelector('input').focus(); toast('항목 이름을 하나 이상 적어주세요', { error: true }); return; }
-      try { localStorage.removeItem('fc_qadd_' + (S.email || '')); } catch (e) {}
-      closeSheet();
-      var af = amtFieldOf(), df = dayFieldOf(), left = list.length, okN = 0, noDay = 0;
-      list.forEach(function (r) {
-        var vals = {};
-        S.meta.fields.forEach(function (f) { var dv = defaultFor(f); if (dv) vals[f.col] = dv; });
-        vals[S.meta.nameCol] = r.n;
-        if (af) vals[af.col] = r.m;
-        if (df) vals[df.col] = r.d;
-        if (!r.d) noDay++;
-        enqueue({ type: 'save', oldName: '', vals: vals, onDone: function (res) {
-          if (res.ok) okN++;
-          if (--left) return;
-          toast(okN === 1 ? res.name + ' 추가했어요' : okN + '개 추가했어요', { ms: 3000 });
-          if (okN === 1) setTimeout(function () { flash(res.name); }, 400);
-        } });
-      });
-    };
   }
   function openAdd() {
     openName = null;
@@ -2642,7 +2536,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var b = e.target.closest('[data-act]');
     if (!b || !S) return;
     var act = b.getAttribute('data-act');
-    if (act === 'onb-add') { openQuickAdd(); return; }
+    if (act === 'onb-add') { openAdd(); return; }
     if (act === 'onb-acc') { openAccounts(false, null); return; }
     if (act === 'ackall') { ack(reminders().map(function (r) { return r.key; })); return; }
     if (act === 'ack') { ack([b.getAttribute('data-key')]); return; }
@@ -2650,7 +2544,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!row) return;
     var name = row.getAttribute('data-name');
     if (act === 'toggle') toggle(name);
-    else if (act === 'del') { if (openRow === name) openRow = null; removeItem(name); }
+    else if (act === 'del') { if (openRow === name) openRow = null; swipeOpen = null; removeItem(name); }
     else if (act === 'expand') { openRow = openRow === name ? null : name; renderList(); }
     else if (act === 'cell') editCell(b, name, b.getAttribute('data-f'));
     else if (act === 'edit') openEdit(name);
@@ -2678,13 +2572,57 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) moveMonth(dx < 0 ? 1 : -1);
     });
   })();
+  /* 목록 줄을 왼쪽으로 밀면 삭제 버튼 (아이폰 방식) */
+  var swipeOpen = null, swipeJust = false;
+  function closeSwipe() { if (swipeOpen) { swipeOpen.classList.remove('swiped'); swipeOpen = null; } }
+  (function () {
+    var list = $('list'), row = null, x0 = 0, y0 = 0, dx = 0, mode = '', pid = null;
+    list.addEventListener('pointerdown', function (e) {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      var r = e.target.closest('.row.tr');
+      if (!r || r.classList.contains('newr') || r.classList.contains('grey') || e.target.closest('input, .swdel')) { row = null; return; }
+      if (swipeOpen && swipeOpen !== r) closeSwipe();
+      row = r; x0 = e.clientX; y0 = e.clientY; dx = 0; mode = ''; pid = e.pointerId;
+    });
+    list.addEventListener('pointermove', function (e) {
+      if (!row || e.pointerId !== pid) return;
+      var mx = e.clientX - x0, my = e.clientY - y0;
+      if (!mode) {
+        if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;
+        mode = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
+        if (mode === 'x') { row.classList.add('drag'); try { row.setPointerCapture(pid); } catch (er) {} }
+      }
+      if (mode !== 'x') return;
+      var base = row.classList.contains('swiped') ? -76 : 0;
+      dx = Math.max(-110, Math.min(0, base + mx));
+      row.querySelector('.tg').style.transform = 'translateX(' + dx + 'px)';
+    });
+    function end() {
+      if (!row) return;
+      var r = row; row = null;
+      if (mode !== 'x') return;
+      r.classList.remove('drag');
+      r.querySelector('.tg').style.transform = '';
+      swipeJust = true; setTimeout(function () { swipeJust = false; }, 350);
+      if (dx < -38) { r.classList.add('swiped'); swipeOpen = r; buzz(); }
+      else { r.classList.remove('swiped'); if (swipeOpen === r) swipeOpen = null; }
+    }
+    list.addEventListener('pointerup', end);
+    list.addEventListener('pointercancel', end);
+    // 밀고 난 직후 클릭은 무시, 열린 상태에서 다른 곳 누르면 닫기
+    document.addEventListener('click', function (e) {
+      if (swipeJust) { e.stopPropagation(); e.preventDefault(); return; }
+      if (swipeOpen && !e.target.closest('.swdel')) { e.stopPropagation(); e.preventDefault(); closeSwipe(); }
+    }, true);
+  })();
   (function () {   // 화면을 옆으로 밀어서 탭 넘기기 (달력 칸 안에서는 달 넘기기)
-    var x0 = null, y0 = 0;
+    var x0 = null, y0 = 0, onRow = false;
     document.addEventListener('touchstart', function (e) {
       x0 = null;
       if (sheetMode || document.body.classList.contains('setup-on') || e.touches.length !== 1) return;
       var t = e.target;
       if (t.closest && t.closest('#cal, .tabbar, .toast, input, textarea, select, .chips, .seg, #fcLogin')) return;
+      onRow = !!(t.closest && t.closest('#list .row.tr:not(.newr)'));
       x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
     }, { passive: true });
     document.addEventListener('touchend', function (e) {
@@ -2692,12 +2630,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
       x0 = null;
       if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
+      if (onRow || swipeOpen || swipeJust) return;   // 줄을 밀면 삭제 버튼만
       if (dx < 0 && tab === 'cal') setTab('list', 'l');
       else if (dx > 0 && tab === 'list') setTab('cal', 'r');
     }, { passive: true });
   })();
   document.querySelectorAll('.tabbar [data-tab]').forEach(function (b) { b.onclick = function () { setTab(b.getAttribute('data-tab')); }; });
-  $('addBtn').onclick = function () { if (S) openQuickAdd(); };
+  $('addBtn').onclick = function () { if (S) openAdd(); };
   $('menuBtn').onclick = function () { openMenu(false); };
   $('sync').onclick = function () {
     if (!S) return;
