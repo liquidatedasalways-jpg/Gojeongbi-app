@@ -107,32 +107,49 @@ async function open(opt) {
     route.fulfill({ status: 200, contentType: MIME[path.extname(f)] || 'application/octet-stream', body: fs.readFileSync(f), headers: { 'Access-Control-Allow-Origin': '*' } });
   });
   let failNext = 0, failFn = '';
+  let h = null;
+  const whoOf = (route) => { const tk = (route.request().headers()['authorization'] || '').replace(/^Bearer /, ''); return /^tok-/.test(tk) ? decodeURIComponent(tk.slice(4)) : email; };
   await ctx.route('https://script.googleapis.com/v1/scripts/**', async (route) => {
     const body = JSON.parse(route.request().postData() || '{}');
     const t0 = Date.now();
     if (lat) await new Promise((r) => setTimeout(r, typeof lat === 'function' ? lat(body.function) : lat));
     if (failNext > 0 && (!failFn || failFn === body.function)) { failNext--; return route.abort('internetdisconnected'); }
     let out;
-    try { out = { done: true, response: { result: gas.call(email, body.function, body.parameters) } }; }
+    const who = whoOf(route);   // 로그인 표가 'tok-이메일'이면 그 계정, 아니면 기본 계정
+    try { out = { done: true, response: { result: gas.call(who, body.function, body.parameters) } }; }
     catch (e) { out = { error: { code: 500, message: String(e && e.message || e), status: 'INTERNAL', details: [{ errorMessage: String(e && e.message || e) }] } }; }
-    calls.push({ fn: body.function, ms: Date.now() - t0, args: body.parameters });
+    calls.push({ fn: body.function, who, ms: Date.now() - t0, args: body.parameters });
     route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(out) });
   });
-  await ctx.route('https://www.googleapis.com/oauth2/v3/userinfo', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ email }) }));
-  // 구글 로그인 화면 흉내: 바로 새 로그인 표를 들고 앱으로 돌려보냄 (로그인 표가 만료돼 조용히 다녀오는 길을 검사할 때)
+  await ctx.route('https://www.googleapis.com/oauth2/v3/userinfo', async (route) => {
+    if (h.userinfoDelay) await new Promise((r) => setTimeout(r, h.userinfoDelay));
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ email: whoOf(route) }) });
+  });
+  /* 구글 로그인 화면 흉내: 바로 새 로그인 표를 들고 앱으로 돌려보냄.
+   *  - 기본: 기본 계정의 표(fake1, fake2 …)
+   *  - h.google.pick = '이메일': 계정 고르기 화면에서 그 계정을 고른 것처럼 (표는 'tok-이메일')
+   *  - h.google.silent = false (또는 opt.authFail): 조용히 새 표 받기(prompt=none)가 실패 → 앱이 로그인 화면을 보여줌 */
   let auths = 0;
   await ctx.route('https://accounts.google.com/o/oauth2/v2/auth**', (route) => {
-    const u = new URL(route.request().url());
+    const u = new URL(route.request().url()), sp = u.searchParams;
     auths++;
-    const q = opt.authFail ? 'error=interaction_required' : 'access_token=fake' + auths + '&token_type=Bearer&expires_in=3600&scope=' + encodeURIComponent(u.searchParams.get('scope') || '');
-    route.fulfill({ status: 302, headers: { location: u.searchParams.get('redirect_uri') + '#' + q + '&state=' + encodeURIComponent(u.searchParams.get('state') || '') } });
+    h.oauth.push({ prompt: sp.get('prompt'), hint: sp.get('login_hint') });
+    let q;
+    if (opt.authFail || (sp.get('prompt') === 'none' && !h.google.silent)) q = 'error=interaction_required';
+    else {
+      const tok = h.google.pick ? 'tok-' + encodeURIComponent(sp.get('prompt') === 'none' ? (sp.get('login_hint') || h.google.pick) : h.google.pick) : 'fake' + auths;
+      q = 'access_token=' + tok + '&token_type=Bearer&expires_in=3600&scope=' + encodeURIComponent(sp.get('scope') || '');
+    }
+    route.fulfill({ status: 302, headers: { location: sp.get('redirect_uri') + '#' + q + '&state=' + encodeURIComponent(sp.get('state') || '') } });
   });
   // 브라우저 시계도 서버와 같은 날로
   await ctx.clock.install({ time: gas.now() });
   if (!opt.loggedOut) {
     await ctx.addInitScript((em) => {
       try {
-        if (!localStorage.getItem('fc_auth')) localStorage.setItem('fc_auth', JSON.stringify({ token: 'fake', exp: Date.now() + 3600e3, email: em, srv: 'other', scope: '' }));
+        // 처음 한 번만 로그인해 둠 (로그아웃·자료 지우기 뒤엔 로그인 화면이 그대로 보이게)
+        if (!localStorage.getItem('fc_auth') && !sessionStorage.getItem('fc_seeded')) localStorage.setItem('fc_auth', JSON.stringify({ token: 'fake', exp: Date.now() + 3600e3, email: em, srv: 'other', scope: '' }));
+        sessionStorage.setItem('fc_seeded', '1');
         sessionStorage.setItem('fc_ext', '1');
       } catch (e) {}
     }, email);
@@ -142,8 +159,9 @@ async function open(opt) {
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
   page.on('console', (m) => { if (m.type() === 'error') errors.push('console: ' + m.text()); });
   fs.mkdirSync(OUT, { recursive: true });
-  const h = {
+  h = {
     page, ctx, browser, gas, email, calls, errors, base,
+    oauth: [], google: { pick: '', silent: true }, userinfoDelay: 0,
     /** 다음 서버 호출 n번을 연결 끊김으로. fn을 주면 그 기능을 부를 때만 */
     failNext(n, fn) { failNext = n; failFn = fn || ''; },
     auths: () => auths,
