@@ -647,6 +647,243 @@ t('opts-old-server', async () => {
 });
 
 
+/* ====================== 추가 검수: 꼭 13~16, 안전장치 13~15 (서버 v9) ====================== */
+const B_ACC = 'b@example.com';
+const CONTACT = 'liquidatedasalways@gmail.com';
+const names = (r) => r.items.filter((i) => !i.sep).map((i) => i.name);
+const bodyHas = (p, txt) => p.evaluate((x) => document.body.innerText.indexOf(x) >= 0, txt);
+function seeded(opt) {
+  const g = GAS.create(opt);
+  g.setNow('2026-11-02'); g.call(ME, 'api_load', [false]);
+  g.call(ME, 'api_accounts', [H.SEEDS.full.accounts]);
+  for (const it of H.SEEDS.full.items) add(g, it);
+  g.setNow('2026-11-23');
+  return g;
+}
+/** 서버의 저장(setProperties)이 다음 n번 실패하게 */
+function failSaves(g, n) {
+  const f = () => { if (--n > 0) g.state.hook.beforeSetProperties = f; throw new Error('Service error: Properties'); };
+  g.state.hook.beforeSetProperties = f;
+}
+
+/* ---------- 안전장치 13: 두 기기가 겹쳐 저장 ---------- */
+t('gap-overlap-save', async () => {
+  const g = seeded(); let rB;
+  // A(체크)가 저장하려는 바로 그 순간에 B(새 항목 추가)가 도착
+  g.state.hook.beforeSetProperties = () => { rB = g.call(ME, 'api_save', ['', H.item({ n: '디즈니플러스', cat: '구독', amt: 9900, day: 27 })]); };
+  const rA = g.call(ME, 'api_setChecks', [{ '넷플릭스': true }]);
+  ok(rA.ok === true, 'A(체크)는 저장됨');
+  ok(rB && rB.ok === false && rB.busy === true, 'B(추가)는 끼어들지 못하고 "앞 작업이 아직 안 끝났어요"로 돌아감 (앱이 잠깐 뒤 다시 보냄)');
+  ok(rB.items && names(rB).length === 15, 'B가 받은 화면 내용은 지금 저장돼 있는 15개');
+  const rB2 = g.call(ME, 'api_save', ['', H.item({ n: '디즈니플러스', cat: '구독', amt: 9900, day: 27 })]);
+  let after = g.call(ME, 'api_load', [false]);
+  ok(rB2.ok && names(after).includes('디즈니플러스') && sItem(g, '넷플릭스').checked === true && names(after).length === 16, '다시 보내면 둘 다 남음 (체크 + 새 항목, 16개)');
+  // A가 잠금을 잡기 직전에 B가 먼저 끝난 경우: A는 B가 저장한 내용 위에서 고침
+  const g2 = seeded(); let rB3;
+  g2.state.hook.tryLock = () => { rB3 = g2.call(ME, 'api_setChecks', [{ '월세': true, '실손보험': true }]); };
+  const v = {}; v[H.C.AMT] = '19000';
+  const rA2 = g2.call(ME, 'api_save', ['넷플릭스', v]);
+  ok(rA2.ok && rB3.ok && sItem(g2, '월세').checked && sItem(g2, '실손보험').checked && sItem(g2, '넷플릭스').amount === 19000, '차례로 지나가면 체크 2개와 금액 수정이 모두 남음');
+  // 캘린더 맞추기(오래 걸림) 도중의 체크
+  const g3 = seeded(); let rB4;
+  g3.call(ME, 'api_calendar', ['on']);
+  const v2 = {}; v2[H.C.AMT] = '660000'; g3.call(ME, 'api_save', ['월세', v2]);
+  g3.state.hook.sleep = () => { rB4 = g3.call(ME, 'api_setChecks', [{ '월세': true }]); };
+  g3.call(ME, 'api_sync', []);
+  ok(rB4 && rB4.ok && sItem(g3, '월세').checked === true, '캘린더를 맞추는 도중에 한 체크도 남음');
+});
+
+/* ---------- 안전장치 14·15: 깨진 저장분, 저장 칸 크기 ---------- */
+t('gap-broken-store', async () => {
+  const g = seeded(); const p = g.user(ME).props;
+  const big = Math.max(...Object.keys(p).map((k) => Buffer.byteLength(p[k], 'utf8')));
+  ok(big <= 9 * 1024 && Number(p.vs_data_n) >= 2, '저장 칸 하나가 9KB를 안 넘음 (가장 큰 칸 ' + big + '바이트, 조각 ' + p.vs_data_n + '개)');
+  ok(Number(p.vs_bak_n) >= 1, '바로 전 저장분이 한 벌 따로 있음');
+  delete p['vs_data_' + (Number(p.vs_data_n) - 1)];           // 조각 하나가 없어짐
+  const r = g.call(ME, 'api_load', [true]);
+  ok(r.ok && names(r).length >= 14, '조각이 없어져도 빈 목록이 되지 않고 바로 전 저장분으로 열림 (' + names(r).length + '개)');
+  ok((r.notes || []).some((x) => /바로 전에 저장한 내용으로 되돌렸어요/.test(x)), '되돌렸다고 알려 줌');
+  const r2 = g.call(ME, 'api_load', [true]);
+  ok(names(r2).length === names(r).length && !(r2.notes || []).length, '그 뒤로는 정상 (저장분이 다시 온전해짐)');
+  delete p.vs_data_0; delete p.vs_bak_0;                         // 둘 다 깨짐
+  const nBefore = p.vs_data_n;
+  let e = ''; try { g.call(ME, 'api_load', [true]); } catch (x) { e = x.message; }
+  ok(/저장된 목록을 읽지 못했어요/.test(e) && e.indexOf(CONTACT) >= 0, '둘 다 깨지면 오류로 알림 (문의 주소 포함): ' + e);
+  ok(p.vs_data_n === nBefore && p.vs_data_1 !== undefined, '남은 조각을 빈 목록으로 덮어쓰지 않음');
+  let e2 = ''; try { g.call(ME, 'calendarDaily', []); } catch (x) { e2 = x.message; }
+  ok(e2 === '' && p.vs_data_n === nBefore, '매일 새벽 예약 실행도 덮어쓰지 않고 조용히 끝남');
+  const w = g.call(ME, 'api_wipe', [{ events: false }]);
+  ok(w.ok && w.wiped && Object.keys(p).length === 0, '이 상태에서도 "내 자료 모두 지우기"는 됨');
+  ok(names(g.call(ME, 'api_load', [false])).length === 0, '지운 뒤엔 빈 목록으로 새로 시작');
+  // 구글이 한 칸 9KB 한도를 실제로 막는 경우 + 이모지
+  const gs = GAS.create({ strict: true }); gs.setNow('2026-11-02'); gs.call(ME, 'api_load', [false]);
+  for (const it of H.SEEDS.full.items) add(gs, it);
+  const memo = '가🏠'.repeat(3000);
+  const r3 = gs.call(ME, 'api_save', ['', H.item({ n: '긴메모🏠', amt: 1000, day: 5, memo })]);
+  ok(r3.ok && gs.state.log.length === 0, '한도를 막아도 저장됨 (한글·이모지 9천 자 메모 포함)');
+  ok((sItem(gs, '긴메모🏠') || {}).memo === memo, '이모지가 든 이름·메모가 깨지지 않고 그대로');
+  // 옛 서버(v8)가 8000자씩 저장한 것도 읽음
+  const g8 = seeded(); const p8 = g8.user(ME).props;
+  let j = ''; for (let i = 0; i < Number(p8.vs_data_n); i++) j += p8['vs_data_' + i];
+  Object.keys(p8).filter((k) => /^vs_(data|bak)_|^vs_rev$/.test(k)).forEach((k) => delete p8[k]);
+  let k = 0; for (let i = 0; i < j.length; i += 8000) p8['vs_data_' + (k++)] = j.slice(i, i + 8000); p8.vs_data_n = String(k);
+  ok(names(g8.call(ME, 'api_load', [true])).length === 15, '옛 방식(8000자 조각)으로 저장된 목록도 그대로 열림');
+  g8.call(ME, 'api_setChecks', [{ '넷플릭스': true }]);
+  ok(Math.max(...Object.keys(p8).map((x) => Buffer.byteLength(p8[x], 'utf8'))) <= 9 * 1024 && sItem(g8, '넷플릭스').checked, '한 번 저장하면 새 크기(9KB 이하)로 바뀜');
+});
+
+/* ---------- 꼭 14: 서버가 저장을 못 했을 때 ---------- */
+t('gap-save-fail', async () => {
+  const h = await H.open(LIFE); const p = h.page;
+  await sleep(p, 1500);
+  failSaves(h.gas, 1);                                         // 한 번만 실패 → 자동으로 다시 보내 저장
+  await p.click('#home .row[data-name="월세"] .chk');
+  await sleep(p, 3000); await h.idle();
+  ok(srvItem(h, '월세').checked === true && !(await homeHas(p, '월세')), '저장이 한 번 실패해도 자동으로 다시 보내서 저장됨');
+  failSaves(h.gas, 3);                                         // 처음 + 자동 재시도 2번 모두 실패
+  await p.click('#home .row[data-name="관리비"] .chk');
+  await sleep(p, 900);
+  ok(!(await homeHas(p, '관리비')), '누르면 화면에선 먼저 낸 걸로 바뀜');
+  await sleep(p, 6000); await h.idle();
+  ok(srvItem(h, '관리비').checked === false, '서버엔 저장 안 됨');
+  ok(await homeHas(p, '관리비'), '화면도 "안 냄"으로 되돌아옴 (예전엔 낸 걸로 남았음)');
+  ok(srvItem(h, '월세').checked === true && !(await homeHas(p, '월세')), '먼저 저장된 월세 체크는 그대로');
+  const ts = await toastState(p);
+  ok(ts.on && ts.sticky && /저장 못 했어요/.test(ts.txt) && ts.btn === '다시 시도', '저장 실패 알림 + 다시 시도: ' + JSON.stringify(ts.txt));
+  await h.shot('t-gap-save-fail');
+  await p.click('#toastBtn'); await h.idle(1500);
+  ok(srvItem(h, '관리비').checked === true && !(await homeHas(p, '관리비')), '"다시 시도"를 누르면 저장됨');
+  // 새 항목 추가가 저장 실패
+  failSaves(h.gas, 1);
+  await p.click('#addBtn'); await p.waitForSelector('#saveBtn');
+  await p.fill('#f3', '저장실패항목'); await p.click('#saveBtn');
+  await sleep(p, 2500); await h.idle();
+  ok(!srvItem(h, '저장실패항목') && !(await bodyHas(p, '저장실패항목')) || (await sheetOn(p)), '추가가 저장 안 되면 목록에 남지 않음');
+  ok(realErrors(h).length === 0, '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+});
+
+/* ---------- 꼭 15: 내 자료 모두 지우기 ---------- */
+t('gap-wipe', async () => {
+  const h = await H.open(LIFE); const p = h.page;
+  await sleep(p, 2500); await h.idle();
+  const u = h.gas.user(h.email);
+  u.events.push({ id: 99999, title: '내가 직접 만든 일정', start: new Date(h.gas.now().getTime()), desc: '', color: '', tags: {}, deleted: false, reminders: null });
+  const evBefore = h.gas.events(h.email).length;
+  ok(evBefore > 50 && u.triggers.length === 1, '지우기 전: 캘린더 일정 ' + evBefore + '개, 매일 새벽 예약 1개');
+  await p.click('#menuBtn'); await p.waitForSelector('#mWipe');
+  await p.evaluate(() => { document.getElementById('sheetBody').scrollTop = 1e6; });
+  await sleep(p, 200); await h.shot('t-gap-menu-bottom');
+  await p.click('#mWipe'); await p.waitForSelector('#wGo'); await sleep(p, 400);
+  await h.shot('t-gap-wipe-1');
+  await p.click('#wGo'); await sleep(p, 300);
+  ok((await p.textContent('#wGo')) === '한 번 더 누르면 모두 지워요' && Object.keys(u.props).length > 3, '한 번 누르면 아직 안 지우고 한 번 더 묻기');
+  await p.click('#wGo'); await sleep(p, 200);                 // 연달아 눌린 건 무시
+  ok(Object.keys(u.props).length > 3 && !h.calls.some((c) => c.fn === 'api_wipe'), '바로 이어 눌린 두 번째는 무시 (실수로 두 번 눌림 방지)');
+  await sleep(p, 800); await h.shot('t-gap-wipe-2');
+  await p.click('#wGo');
+  await p.waitForSelector('#fcLogin.on', { timeout: 20000 });
+  await sleep(p, 300);
+  ok(Object.keys(u.props).length === 0, '서버에 저장된 내 자료가 모두 지워짐 (남은 칸 ' + JSON.stringify(Object.keys(u.props)) + ')');
+  ok(u.triggers.length === 0, '매일 새벽 예약 실행도 지워짐');
+  const left = h.gas.events(h.email).map((e) => e.title);
+  ok(left.length === 1 && left[0] === '내가 직접 만든 일정', '이 앱이 만든 일정만 지움, 내가 만든 일정은 그대로: ' + JSON.stringify(left));
+  const note = await p.evaluate(() => { const e = document.getElementById('fcErr'); const a = e.querySelector('a'); return { t: e.innerText, href: a ? a.href : '' }; });
+  ok(/자료를 모두 지웠어요/.test(note.t) && /myaccount\.google\.com\/connections/.test(note.href), '로그인 화면에 지웠다는 안내와 구글 권한 끊는 링크');
+  const ls = await p.evaluate(() => Object.keys(localStorage).filter((k) => /^fc_(state|admin|draft|auth)/.test(k) && localStorage.getItem(k) !== '{}'));
+  ok(ls.length === 0, '이 기기에 남은 화면·로그인도 지워짐 ' + JSON.stringify(ls));
+  await h.shot('t-gap-wipe-done');
+  h.gas.setNow('2026-12-03T04:00');
+  ok(h.gas.events(h.email).length === 1, '그 뒤로 일정이 다시 생기지 않음');
+  ok(realErrors(h).length === 0, '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+  // 일정은 남기고 지우기 + 앱 주인 표시는 남김
+  const g = seeded(); g.call(ME, 'api_calendar', ['on']); g.call(ME, 'api_sync', []);
+  g.user(ME).props.vs_admin = '1';
+  const n = g.events(ME).length;
+  const r = g.call(ME, 'api_wipe', [{ events: false }]);
+  ok(r.wiped && g.events(ME).length === n && g.user(ME).triggers.length === 0, '"캘린더 일정도 지우기"를 끄면 일정은 그대로, 예약 실행은 지움');
+  ok(JSON.stringify(Object.keys(g.user(ME).props)) === '["vs_admin"]', '앱 주인 표시(서버 업데이트 버튼)만 남김');
+});
+
+/* ---------- 꼭 13: 로그인 화면에서 다른 계정으로 들어올 때 ---------- */
+t('gap-account-switch', async () => {
+  const mk = async () => {
+    const h = await H.open(Object.assign({}, LIFE, { latency: 1200 })); const p = h.page;
+    h.gas.call(B_ACC, 'api_load', [false]);
+    await sleep(p, 1500); await h.idle();
+    await p.click('#addBtn'); await p.waitForSelector('#saveBtn');
+    await p.fill('#f3', 'A의 비밀 항목'); await sleep(p, 600);
+    await p.click('#sheetClose'); await sleep(p, 300);
+    // A의 로그인 표가 만료됐고, 조용히 새로 받기도 실패 → 로그인 화면
+    await p.evaluate(() => { localStorage.setItem('fc_admin', 'a@example.com'); const a = JSON.parse(localStorage.getItem('fc_auth')); a.exp = Date.now() - 1000; localStorage.setItem('fc_auth', JSON.stringify(a)); });
+    h.google.silent = false; h.userinfoDelay = 500;
+    await p.reload();
+    await p.waitForSelector('#fcLogin.on', { timeout: 8000 });
+    return h;
+  };
+  let h = await mk(), p = h.page;
+  ok(!(await bodyHas(p, '정수기 렌탈')), '로그인 화면 뒤에 앞 계정 내용을 깔아 두지 않음');
+  h.google.pick = B_ACC;
+  await p.click('#fcGo');
+  await p.waitForFunction(() => !document.getElementById('fcLogin').classList.contains('on'), null, { timeout: 8000 });
+  await sleep(p, 250);
+  ok(!(await bodyHas(p, '정수기 렌탈')), '다른 계정(B)으로 들어온 직후에도 A 항목이 안 보임 (서버 답 오기 전)');
+  await h.shot('t-gap-acct-early');
+  await sleep(p, 1200);
+  ok(!(await bodyHas(p, '정수기 렌탈')), '1초 뒤에도 안 보임');
+  await h.idle(2500);
+  const who = [...new Set(h.calls.slice(-2).map((c) => c.who))].join(',');
+  ok(who === B_ACC && !(await bodyHas(p, '정수기 렌탈')), '서버는 B 계정으로 부르고, 화면은 B의 빈 목록 (' + who + ')');
+  await p.click('#menuBtn'); await sleep(p, 500);
+  ok(!(await bodyHas(p, '서버 업데이트')), 'B의 ⋯ 메뉴에 앱 주인 메뉴(서버 업데이트)가 안 보임');
+  ok(await bodyHas(p, B_ACC), '메뉴의 로그인 계정이 B로 나옴');
+  await p.click('#sheetClose'); await sleep(p, 300);
+  await p.click('#addBtn'); await p.waitForSelector('#saveBtn'); await sleep(p, 300);
+  ok((await p.inputValue('#f3')) === '', 'B가 + 를 열어도 A가 쓰던 내용이 안 나옴');
+  const ls = await p.evaluate(() => Object.keys(localStorage).filter((k) => /^fc_draft(?!_who)|^fc_admin/.test(k)));
+  ok(ls.length === 0, '이 기기에 남아 있던 A의 쓰던 내용·주인 표시가 지워짐 ' + JSON.stringify(ls));
+  ok(realErrors(h).length === 0, '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+  // 같은 계정으로 다시 로그인하면 쓰던 내용은 그대로
+  h = await mk(); p = h.page;
+  h.google.pick = h.email;
+  await p.click('#fcGo');
+  await p.waitForFunction(() => !document.getElementById('fcLogin').classList.contains('on'), null, { timeout: 8000 });
+  await h.idle(3000);
+  ok(await bodyHas(p, '정수기 렌탈'), '같은 계정(A)으로 다시 로그인하면 A 목록이 나옴');
+  await p.click('#addBtn'); await p.waitForSelector('#saveBtn'); await sleep(p, 300);
+  ok((await p.inputValue('#f3')) === 'A의 비밀 항목', '같은 계정이면 쓰던 내용을 그대로 불러옴');
+  await h.close();
+});
+
+/* ---------- 꼭 16: 문의할 곳 ---------- */
+t('gap-contact', async () => {
+  const fs = require('fs'), path = require('path');
+  const root = path.join(__dirname, '..');
+  for (const f of ['privacy.html', 'terms.html']) ok(fs.readFileSync(path.join(root, f), 'utf8').indexOf('mailto:' + CONTACT) >= 0, f + '에 문의 이메일 링크가 있음');
+  const h = await H.open(Object.assign({}, LIFE, { viewport: SMALL })); const p = h.page;
+  await sleep(p, 1500);
+  await p.click('#menuBtn'); await p.waitForSelector('#mAsk');
+  await p.evaluate(() => { document.getElementById('sheetBody').scrollTop = 1e6; }); await sleep(p, 200);
+  const a = await p.evaluate(() => { const e = document.getElementById('mAsk'), r = e.querySelector('.r'); return { href: e.getAttribute('href'), t: r.textContent, cut: r.scrollWidth > r.clientWidth }; });
+  ok(a.href.indexOf('mailto:' + CONTACT) === 0 && a.t === CONTACT && !a.cut, '⋯ 메뉴 아래에 문의 줄 (320 폭에서도 주소가 안 잘림): ' + a.t);
+  await h.shot('t-gap-menu-contact-320');
+  await h.close();
+  const h2 = await H.open(Object.assign({}, LIFE, { loggedOut: true })); const p2 = h2.page;
+  await p2.waitForSelector('#fcLogin.on', { timeout: 8000 });
+  ok(await p2.evaluate((c) => !!document.querySelector('#fcLogin .legal a[href="mailto:' + c + '"]'), CONTACT), '로그인 화면에도 문의 링크');
+  await h2.shot('t-gap-login');
+  await h2.close();
+  // 불러오기가 끝내 안 될 때의 화면
+  const h3 = await H.open(Object.assign({}, LIFE, { noGo: true })); const p3 = h3.page;
+  h3.failNext(3);
+  await h3.go(); await sleep(p3, 6500);
+  ok(await bodyHas(p3, '문의: ' + CONTACT), '불러오지 못한 화면에 문의 주소가 보임');
+  await h3.shot('t-gap-fatal');
+  await h3.close();
+});
+
 (async () => {
   const only = process.argv.slice(2);
   const t0 = Date.now();

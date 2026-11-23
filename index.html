@@ -183,6 +183,7 @@ svg { display: block; }
 .btn { flex: 1; height: 46px; border-radius: 13px; background: var(--card); font-size: 14.5px; font-weight: 600; text-align: center; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .btn.primary { background: var(--accent); color: var(--accent-ink); }
 .btn.ok { background: var(--ok); color: #fff; }
+.btn.danger { background: #d02937; color: #fff; }
 .btn[disabled] { opacity: .6; }
 .btn svg { width: 16px; height: 16px; }
 .kv { display: flex; align-items: baseline; gap: 12px; padding: 12px 18px; font-size: 14px; position: relative; }
@@ -385,7 +386,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .newr .din { text-align: center; font-weight: 600; border-left: 1px solid var(--line); padding: 0 4px; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 9, "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 9, "contact": "liquidatedasalways@gmail.com", "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -435,26 +436,54 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
     a.token = back.access_token;
     a.exp = Date.now() + (Number(back.expires_in) || 3600) * 1000;
     a.scope = back.scope || '';
+    // 로그인 화면·계정 고르기·권한 화면을 거쳐 받은 표는 누구 것인지 아직 몰라요(앞 계정과 다른 계정을 골랐을 수 있음).
+    // 구글에 물어 확인될 때까지(chk) 이 기기에 남은 앞 계정의 화면·쓰던 내용·서버 기억을 쓰지 않아요.
+    var mode = ''; try { mode = sessionStorage.getItem('fc_mode') || ''; } catch (e) {}
+    if (mode !== 'none') a.chk = 1;
     put(a);
   }
   var silentFailed = !!(back && back.error);
+  var bye = null; try { bye = sessionStorage.getItem('fc_bye'); sessionStorage.removeItem('fc_bye'); } catch (e) {}
 
   var waiting = [], fetchingEmail = null;
-  function email() { return get().email || ''; }
+  /** 지금 로그인 표의 주인으로 확인된 이메일 (확인 전이면 '') */
+  function email() { var x = get(); return x.chk ? '' : (x.email || ''); }
+  /** 로그인 표가 누구 것인지 구글에 물어봄. 앞 계정과 다르면 이 기기에 남은 앞 계정 것을 지움. */
   function loadEmail() {
     if (fetchingEmail) return fetchingEmail;
-    fetchingEmail = fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + get().token } })
-      .then(function (r) { return r.ok ? r.json() : {}; })
-      .then(function (u) { var x = get(); if (u && u.email) { x.email = u.email; put(x); } return x.email || ''; })
-      .catch(function () { return ''; });
+    var tok = get().token;
+    fetchingEmail = fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: 'Bearer ' + tok } })
+      .then(function (r) { return r.ok ? r.json().catch(function () { return {}; }) : {}; }, function () { return null; })
+      .then(function (u) {
+        var x = get();
+        if (u === null || x.token !== tok) { fetchingEmail = null; return email(); }   // 연결이 안 됨: 다음에 다시 물어봄
+        var was = String(x.email || '').toLowerCase(), now = String((u && u.email) || '').toLowerCase();
+        // 방금 로그인한 경우: 같은 계정으로 확인될 때만 남은 것을 그대로 씀. 조용히 새 표를 받은 경우: 다른 계정으로 확인되면 지움
+        var other = x.chk ? (!now || was !== now) : (!!now && !!was && was !== now);
+        var swapped = other && !x.chk;
+        if (other) { forget(); delete x.srv; }
+        if (now) x.email = u.email; else if (x.chk) delete x.email;
+        delete x.chk;
+        put(x);
+        if (swapped) { location.reload(); return new Promise(function () {}); }   // 앞 계정 화면이 이미 떠 있을 수 있어 새로 엶
+        return x.email || '';
+      });
     return fetchingEmail;
   }
 
   /** 쓸 수 있는 로그인 표를 돌려줌. 없으면 구글에서 조용히 새로 받아오거나(화면 깜빡임 정도), 로그인 화면을 보여줌. */
   function ensure() {
     var x = get();
-    if (valid(x)) return Promise.resolve(x.token);
-    if (x.email && !silentFailed) { go('none', x.email); return new Promise(function () {}); }
+    if (valid(x)) {
+      if (!x.chk) return Promise.resolve(x.token);
+      // 방금 로그인해서 받은 표: 누구 것인지 확인한 뒤에 서버를 부름
+      return loadEmail().then(function () {
+        var y = get();
+        if (y.chk) throw new Error('인터넷 연결을 확인해주세요.');
+        return y.token;
+      });
+    }
+    if (x.email && !x.chk && !silentFailed) { go('none', x.email); return new Promise(function () {}); }
     showLogin();
     return new Promise(function (res) { waiting.push(res); });
   }
@@ -467,14 +496,15 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
   }
   var NOT_OWNER = /permission to access the requested document|요청한 문서.*권한|문서에 액세스할 권한/i;
   /** 구글이 영어로 주는 오류를 알아듣게 바꿈. 처음 보는 건 원문을 괄호에. */
+  var ASK = C.contact ? '문의: ' + C.contact : '앱 만든 사람에게 알려주세요.';
   function errText(d, status) {
     var m = rawErr(d);
     if (!m) return '연결이 안 됐어요. 다시 해주세요. (' + status + ')';
-    if (/disabled|not been used/i.test(m)) return 'Apps Script API가 꺼져 있어요. 앱 만든 사람에게 알려주세요.';
-    if (status === 404 || /not found|Requested entity was not found/i.test(m) && !/function/i.test(m)) return '앱 서버를 못 찾았어요. 앱 만든 사람에게 알려주세요.';
-    if (/Script function not found/i.test(m)) return '앱 서버가 옛 버전이에요. 앱 만든 사람에게 알려주세요.';
-    if (NOT_OWNER.test(m)) return '이 계정으로는 아직 쓸 수 없어요. 앱 만든 사람에게 알려주세요.';
-    if (/caller does not have permission|PERMISSION_DENIED/i.test(m)) return '앱 서버에 들어갈 권한이 없어요. 앱 만든 사람에게 알려주세요.';
+    if (/disabled|not been used/i.test(m)) return 'Apps Script API가 꺼져 있어요. ' + ASK;
+    if (status === 404 || /not found|Requested entity was not found/i.test(m) && !/function/i.test(m)) return '앱 서버를 못 찾았어요. ' + ASK;
+    if (/Script function not found/i.test(m)) return '앱 서버가 옛 버전이에요. ' + ASK;
+    if (NOT_OWNER.test(m)) return '이 계정으로는 아직 쓸 수 없어요. ' + ASK;
+    if (/caller does not have permission|PERMISSION_DENIED/i.test(m)) return '앱 서버에 들어갈 권한이 없어요. ' + ASK;
     if (/insufficient authentication scopes|SCOPE_INSUFFICIENT|Authorization is required/i.test(m)) return '권한 허용이 덜 됐어요. 메뉴에서 로그아웃 후 다시 로그인해서 모두 허용해주세요.';
     if (/too many times|quota|Rate Limit|RESOURCE_EXHAUSTED/i.test(m)) return '구글 사용 한도에 잠깐 걸렸어요. 1분쯤 뒤에 다시 해주세요.';
     if (/maximum execution time|timed out|DEADLINE/i.test(m)) return '시간이 너무 오래 걸렸어요. 다시 해주세요.';
@@ -531,13 +561,19 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
     var el = document.getElementById('fcLogin');
     if (!el) return;
     el.classList.add('on');
+    if (bye) {   // '내 자료 모두 지우기'를 끝내고 온 경우
+      var er = document.getElementById('fcErr');
+      er.className = 'err bye';
+      er.innerHTML = '자료를 모두 지웠어요.<br>구글 계정에 남은 이 앱의 권한은 <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener">구글 계정 설정</a>에서 끊을 수 있어요.';
+      return;
+    }
     document.getElementById('fcErr').textContent = (back && back.error && back.error !== 'interaction_required' && back.error !== 'login_required' && back.error !== 'consent_required')
       ? '로그인이 안 됐어요 (' + back.error + '). 다시 눌러주세요.' : '';
   }
   document.addEventListener('DOMContentLoaded', function () {
     var b = document.getElementById('fcGo');
     if (b) b.onclick = function () { go('select_account'); };
-    if (valid(get()) && !get().email) loadEmail();
+    if (valid(get()) && (!get().email || get().chk)) loadEmail();
   });
   if (back && back.access_token) loadEmail();
 
@@ -587,7 +623,10 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
     appUrl: APP_URL,
     email: email,
     switchAccount: function () { var x = get(); delete x.token; delete x.email; delete x.srv; put(x); forget(); go('select_account'); },
-    logout: function () { put({}); forget(); location.reload(); },
+    logout: function (byeMark) { put({}); forget(); if (byeMark) { try { sessionStorage.setItem('fc_bye', '1'); } catch (e) {} } location.reload(); },
+    /** 이 기기에 남은 지난 화면을 먼저 보여줘도 되는지: 확인된 로그인 표가 있거나, 곧 조용히 새로 받을 때만 (로그인 화면이 뜰 땐 안 됨) */
+    trusted: function () { var x = get(); return !x.chk && (valid(x) || !!(x.email && !silentFailed)); },
+    contact: C.contact || '',
     /** 시트 → 앱 저장 공간 옮기기용: 모두용 서버(other) / 주인 서버(owner)를 골라서 부름 */
     hasOther: !!C.otherId,
     onOther: function () { return !!C.otherId && target() === C.otherId; },
@@ -637,6 +676,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 .fcl p { margin: 8px 0 0; font-size: 13.5px; color: var(--muted); line-height: 1.55; max-width: 300px; }
 .fcl .gbtn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; max-width: 320px; height: 50px; margin-top: 28px; border-radius: 14px; background: var(--card); color: var(--ink); font-size: 15px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 0 0 1px var(--line); }
 .fcl .err { color: var(--red); font-size: 12.5px; margin-top: 12px; min-height: 1em; }
+.fcl .err.bye { color: var(--sub); line-height: 1.55; max-width: 300px; word-break: keep-all; } .fcl .err.bye a { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .fcl small { display: block; margin-top: 18px; font-size: 11.5px; color: var(--muted); line-height: 1.5; max-width: 300px; }
 .fcl .legal { display: flex; gap: 4px; margin-top: 6px; }
 .fcl .legal a { padding: 8px 8px; font-size: 12px; font-weight: 600; color: var(--sub); text-decoration: underline; text-underline-offset: 3px; }
@@ -655,7 +695,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   <button class="gbtn" id="fcGo" type="button"><svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글 계정으로 로그인</button>
   <div class="err" id="fcErr"></div>
   <small>내 고정비 목록은 고른 구글 계정 몫으로만 저장되고, 결제일은 그 계정 구글 캘린더에 들어가요. 처음에 '확인되지 않은 앱' 화면이 나오면 고급 → 이동을 눌러주세요.</small>
-  <div class="legal"><a href="privacy.html">개인정보 처리방침</a><a href="terms.html">이용약관</a></div>
+  <div class="legal"><a href="privacy.html">개인정보 처리방침</a><a href="terms.html">이용약관</a><a href="mailto:liquidatedasalways@gmail.com">문의</a></div>
 </div>
 <div class="inst" id="inst">
   <img src="icons/icon-192.png" alt="">
@@ -940,7 +980,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     pump();
   }
   function pump() {
-    if (busy || !queue.length) return;
+    if (wiping || busy || !queue.length) return;
     var wait = holdUntil - Date.now();
     if (wait > 0) { clearTimeout(pump.t); pump.t = setTimeout(pump, wait + 20); return; }
     var op = queue.shift();
@@ -964,6 +1004,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       op.tries = (op.tries || 0) + 1;
       queue.unshift(op);
       setTimeout(pump, 1500);
+      return;
+    }
+    // 서버가 '저장을 못 했어요'라고 답함: 화면에 저장된 것처럼 남으면 안 됨 → 연결이 끊겼을 때와 같은 길(다시 보내기 → 되돌리기 → '다시 시도')
+    // 새 서버(v9)는 저장소에 실제로 남은 내용을 같이 줌. 옛 서버가 준 내용은 저장 안 된 것이라 안 씀.
+    if (op.type !== 'load' && (res.saveFailed || (res.ok === false && /저장을 못 했어요/.test(res.error || '')))) {
+      if (res.saveFailed && res.items) pendingState = res;
+      failed(op, new Error('구글 저장소가 잠깐 불안정해요.'));
       return;
     }
     if (op.type === 'load' || ((res.ok || res.name) && op.type !== 'sort')) dirty = true;
@@ -1029,8 +1076,10 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       (multi ? '이 브라우저에 구글 계정이 2개 이상 로그인돼 있으면 구글이 다른 계정으로 시트를 열려고 해서 생기는 문제예요.<br><br>' +
         '<span style="text-align:left;display:inline-block">① 이 브라우저에서 구글 계정을 모두 로그아웃<br>② 이 앱에 쓸 계정 하나로만 로그인<br>③ 다시 시도</span><br><br><small style="opacity:.6">' + esc(msg) + '</small>' : esc(msg)) +
       '<br><br><button class="btn primary" style="display:inline-flex;padding:0 22px" id="retry" type="button">다시 시도</button>' +
+      (W && W.contact && msg.indexOf(W.contact) < 0 ? '<div style="margin-top:14px;font-size:12.5px">계속 안 되면 문의: ' + esc(W.contact) + '</div>' : '') +
       (W ? '<div class="fatal-acc">' + (W.email() ? '<span>' + esc(W.email()) + '</span>' : '') +
-        '<button type="button" id="fSwitch">다른 계정으로 로그인</button><button type="button" id="fLogout">로그아웃</button></div>' : '') + '</div>';
+        '<button type="button" id="fSwitch">다른 계정으로 로그인</button><button type="button" id="fLogout">로그아웃</button>' +
+        (/저장된 목록을 읽지 못했/.test(msg) ? '<button type="button" id="fWipe">내 자료 모두 지우고 새로 시작</button>' : '') + '</div>' : '') + '</div>';
   }
   function failed(op, err) {
     var msg = (err && err.message) ? err.message : String(err);
@@ -1055,6 +1104,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       $('retry').onclick = function () { this.disabled = true; this.textContent = '불러오는 중…'; enqueue({ type: 'load' }); };
       if ($('fSwitch')) $('fSwitch').onclick = function () { leave(function () { window.FC_AUTH.switchAccount(); }); };
       if ($('fLogout')) $('fLogout').onclick = function () { leave(function () { window.FC_AUTH.logout(); }); };
+      if ($('fWipe')) $('fWipe').onclick = function () { openWipe(null); };
       return;
     }
     var st = pendingState || (lastGood ? JSON.parse(lastGood) : null);
@@ -1090,6 +1140,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function runSync() {
     cal.timer = null;
+    if (wiping) return;
     if (busy || queue.length) { cal.timer = setTimeout(runSync, 500); chip(); return; }
     if (cal.syncing) { cal.again = true; return; }
     cal.syncing = true;
@@ -1100,9 +1151,12 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   /** 캘린더 맞추기는 서버가 12초쯤씩 끊어서 함(일정 하나에 1초 넘게 걸림).
    *  끊긴 사이사이에 저장이 먼저 지나가고, 얼마나 됐는지(24/127)도 보여줌. 옛 서버는 한 번에 다 하고 끝남. */
   function syncStep(n) {
+    if (wiping) { cal.syncing = false; cal.prog = ''; return; }
     if (busy || queue.length) { setTimeout(function () { syncStep(n); }, 400); return; }
     cal.again = false;   // 이번 호출이 지금 내용을 새로 읽음
+    cal.flying = true;
     call('api_sync', true).then(function (r) {
+      cal.flying = false;
       r = r || {};
       cal.last = r.msg || '';
       cal.err = /못|실패/.test(cal.last);
@@ -1120,6 +1174,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (cal.again) { cal.again = false; runSync(); return; }
       chip();
     }, function (e) {
+      cal.flying = false;
       cal.syncing = false;
       cal.prog = '';
       cal.err = true;
@@ -1775,8 +1830,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function isAdmin() {
     var W = window.FC_AUTH;
     if (!W || !W.canUpdate || !W.onOther() || !S) return false;
-    if (S.admin) { try { localStorage.setItem('fc_admin', '1'); } catch (e) {} return true; }
-    try { return localStorage.getItem('fc_admin') === '1'; } catch (e) { return false; }
+    var me = String(S.email || '').toLowerCase();
+    if (S.admin) { try { localStorage.setItem('fc_admin', me || '1'); } catch (e) {} return true; }
+    try { return !!me && localStorage.getItem('fc_admin') === me; } catch (e) { return false; }
   }
   function needUpdate() { return isAdmin() && (Number(S.ver) || 0) < window.FC_AUTH.serverVer; }
   function checkServerUpdate() {
@@ -1919,6 +1975,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     $('sheet').className = 'sheet on';
   }
   function closeSheet() {
+    if (wiping) return;
     if ((sheetMode === 'add' || sheetMode === 'edit') && draftKey) { clearTimeout(draftTimer); saveDraft(); }
     draftKey = null;
     sheetMode = null;
@@ -2122,13 +2179,22 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function saveDraft() {
     if (!draftKey || !$('saveBtn')) return;
     var snap = snapForm(), j = JSON.stringify(snap);
-    try { if (j === draftBase) localStorage.removeItem(draftKey); else localStorage.setItem(draftKey, j); } catch (e) {}
+    try { if (j === draftBase) localStorage.removeItem(draftKey); else { localStorage.setItem(draftKey, j); localStorage.setItem('fc_draft_who', draftWho()); } } catch (e) {}
+  }
+  /** 쓰던 내용은 그걸 쓴 계정에게만 다시 보여줌 (누가 썼는지 모르는 것, 다른 계정이 쓴 것은 지움) */
+  function draftWho() { return String((S && S.email) || '').toLowerCase(); }
+  function draftsMine() {
+    try {
+      if (localStorage.getItem('fc_draft_who') === draftWho()) return;
+      Object.keys(localStorage).forEach(function (k) { if (k.indexOf('fc_draft') === 0) localStorage.removeItem(k); });
+    } catch (e) {}
   }
   function dropDraft(it) { try { localStorage.removeItem(draftKeyFor(it)); } catch (e) {} draftKey = null; }
   function startDraft(it) {
     draftKey = draftKeyFor(it);
     draftBase = JSON.stringify(snapForm());
     var saved = null;
+    draftsMine();
     try { saved = localStorage.getItem(draftKey); } catch (e) {}
     if (saved && saved !== draftBase) {
       try { applySnap(JSON.parse(saved)); } catch (e) {}
@@ -2643,7 +2709,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 
   /* ---------- 설정 ---------- */
   function legalHtml() {
-    return '<div class="grp"><a class="li" href="privacy.html" data-leave><span>개인정보 처리방침</span></a><a class="li" href="terms.html" data-leave><span>이용약관</span></a></div>';
+    var ct = (window.FC_CONFIG && window.FC_CONFIG.contact) || '';
+    return '<div class="grp"><a class="li" href="privacy.html" data-leave><span>개인정보 처리방침</span></a><a class="li" href="terms.html" data-leave><span>이용약관</span></a>' +
+      (ct ? '<a class="li" id="mAsk" href="mailto:' + esc(ct) + '?subject=' + encodeURIComponent('고정비앱 문의') + '"><span>문의</span><span class="r">' + esc(ct) + '</span></a>' : '') + '</div>';
   }
   /** 약관 페이지로 넘어갈 때도 창을 닫고 쌓아 둔 기록을 되돌린 뒤에 감 (돌아왔을 때 뒤로 가기 한 번이 헛돌지 않게) */
   function wireLegal() {
@@ -2716,6 +2784,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       '아이폰: Safari → 공유 → 홈 화면에 추가<br>갤럭시: 크롬 → ⋮ → 홈 화면에 추가<br>PC: 즐겨찾기에 추가' +
       (fullUrl ? '<div style="margin-top:8px;color:var(--muted);font-size:12.5px">주소창 없이 쓰고 싶으면 이 주소로 홈 화면에 추가해봐요 (구글 로그인이 한 번 더 나올 수 있어요).</div><div class="linkbox">' + esc(fullUrl) + '</div>' : '') +
       '</div></div>') + legalHtml() +
+      (canWipe() ? '<div class="grp"><button class="li red" type="button" id="mWipe"><span>내 자료 모두 지우기</span></button></div>' : '') +
       '<div class="tip" style="text-align:center">' + (S.email ? esc(S.email) + '<br>' : '') + '불러온 시각 ' + new Date(S.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + (S.virtual ? ' · 이 계정에만 저장돼요' : ' · 시트가 원본이에요') + '</div>';
     if (refresh) { if (sheetMode !== 'menu') return; $('sheetBody').innerHTML = h; }
     else openSheet('설정', h, 'menu');
@@ -2739,6 +2808,72 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var ms = $('mShare'); if (ms) ms.onclick = function () { openShare(false); };
     var mv = $('mMove'); if (mv) mv.onclick = function () { moveToApp(mv); };
     var mu = $('mUpd'); if (mu) mu.onclick = function () { leave(runServerUpdate); };
+    var mw = $('mWipe'); if (mw) mw.onclick = function () { openWipe(function () { openMenu(false); }); };
+  }
+
+  /* ---------- 내 자료 모두 지우기 (그만 쓸 때) ----------
+   * 서버에 저장된 내 목록·설정·기록과 매일 새벽 예약 실행을 지우고, 고르면 이 앱이 캘린더에 만든 일정도 지움. 되돌릴 수 없어서 두 번 눌러야 함.
+   * 앱 저장 공간을 쓰는 사람만 (구글 시트로 쓰는 사람의 시트는 앱이 지우지 않음). 서버 v9부터. */
+  var wiping = false;
+  function canWipe() { return !!(window.FC_AUTH && S && S.virtual && (Number(S.ver) || 0) >= 9); }
+  function openWipe(back) {
+    var evOn = true, armedAt = 0, o = null;
+    var h = '<div class="tip" style="padding-top:0;word-break:keep-all">서버에 저장된 내 고정비 목록, 결제 수단, 납부 기록, 설정이 모두 지워지고, 매일 새벽 캘린더 자동 맞추기도 멈춰요. <b style="color:var(--red)">되돌릴 수 없어요.</b></div>' +
+      '<div class="grp"><button class="li" type="button" id="wEv"><span>캘린더 일정도 지우기</span><span class="switch on"></span></button></div>' +
+      '<div class="tip" style="word-break:keep-all">이 앱이 구글 캘린더에 만든 일정만 지워요. 일정이 많으면 1~2분 걸려요. 끄면 일정은 캘린더에 그대로 남아요.</div>' +
+      '<div class="ferr" id="wErr"></div>' +
+      '<button class="btn danger" style="width:100%" type="button" id="wGo">모두 지우기</button>';
+    openSheet('내 자료 모두 지우기', h, 'wipe', back || null);
+    $('wEv').onclick = function () {
+      if (wiping) return;
+      evOn = !evOn; o = null;
+      this.querySelector('.switch').classList.toggle('on', evOn);
+    };
+    function say(t) { $('wGo').innerHTML = '<span class="spin"></span>' + esc(t); }
+    function stop(msg) {
+      wiping = false;
+      if (sheetMode !== 'wipe') return;
+      $('sheetClose').hidden = false;
+      $('sheetBack').hidden = !back;
+      sheetBackFn = back || null;
+      $('wGo').disabled = false;
+      $('wGo').textContent = '이어서 지우기';
+      $('wErr').textContent = msg;
+      $('wErr').className = 'ferr on';
+      if (S) enqueue({ type: 'load', light: true });   // 예약 실행은 이미 지워졌을 수 있어서 지금 상태를 다시 불러옴
+    }
+    function step(tries) {
+      if (busy || cal.flying) { setTimeout(function () { step(tries); }, 300); return; }
+      say(o.gone ? '지우는 중… 일정 ' + o.gone + '개 지움' : '지우는 중…');
+      call('api_wipe', o).then(function (r) {
+        r = r || {};
+        if (r.wiped) { window.FC_AUTH.logout(true); return; }   // 이 기기에 남은 것도 지우고 로그인 화면으로
+        if (r.gone) o.gone = r.gone;
+        if (r.more && (o.n = (o.n || 0) + 1) < 300) { o.at = r.at; step(0); return; }
+        if (r.busy && tries < 5) { setTimeout(function () { step(tries + 1); }, 2000); return; }
+        stop(r.error || '지우다가 멈췄어요. 다시 눌러주세요.');
+      }, function (e) {
+        var m = (e && e.message) ? e.message : String(e);
+        if (isNetErr(m) && tries < 2) { setTimeout(function () { step(tries + 1); }, 1500); return; }
+        stop('지우다가 멈췄어요. 다시 눌러주세요.\n(' + m + ')');
+      });
+    }
+    $('wGo').onclick = function () {
+      if (wiping) return;
+      // 두 번 눌러야 지움 (연달아 두 번 눌린 건 한 번으로 침)
+      if (!armedAt) { armedAt = Date.now(); this.textContent = '한 번 더 누르면 모두 지워요'; return; }
+      if (Date.now() - armedAt < 700) return;
+      wiping = true;
+      this.disabled = true;
+      $('wErr').className = 'ferr';
+      $('sheetClose').hidden = true;
+      $('sheetBack').hidden = true;
+      sheetBackFn = function () {};
+      clearTimeout(cal.timer); cal.timer = null;
+      queue = [];
+      if (!o) o = { events: evOn };
+      step(0);
+    };
   }
 
   /* ---------- 앱 설정: 결제 전날 알림(remind), 자동이체 자동 체크(auto) ----------
@@ -2814,7 +2949,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       return WEB.runOn('owner', 'api_calendar', ['off']).catch(function () {}).then(function () { return r; });
     }).then(function (r) {
       WEB.useOther();
-      try { localStorage.setItem('fc_admin', '1'); } catch (e) {}
+      try { localStorage.setItem('fc_admin', String((r && r.email) || '').toLowerCase() || '1'); } catch (e) {}
       closeSheet();
       moving = false;
       apply(r);
@@ -3086,7 +3221,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   renderHome();
   var cached = load('fc_state');
   // 이 기기에 남은 지난 화면은 같은 계정일 때만 먼저 보여줌 (다른 계정 내용이 잠깐이라도 보이면 안 됨)
-  var who = window.FC_AUTH ? window.FC_AUTH.email() : '';
+  var who = (window.FC_AUTH && window.FC_AUTH.trusted()) ? window.FC_AUTH.email() : '';
   if (cached && cached.items && cached.meta && (!window.FC_AUTH || (who && cached.email && cached.email.toLowerCase() === who.toLowerCase()))) { S = cached; lastGood = JSON.stringify(cached); renderAll(); chip(); }
   enqueue({ type: 'load' });
   (function () {   // 구글 권한 허용하고 돌아온 직후면 서버 업데이트 이어서
