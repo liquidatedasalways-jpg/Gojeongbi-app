@@ -143,9 +143,11 @@ body.on-cal .calnav { display: flex; }
 .hero .hr { display: flex; align-items: baseline; gap: 10px; }
 .hero .lb { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--sub); white-space: nowrap; }
 .hero .tot { flex: none; font-size: 13px; color: var(--muted); white-space: nowrap; }
-.hero .num { flex: 1; min-width: 0; font-size: 28px; font-weight: 800; letter-spacing: -.04em; line-height: 1.2; white-space: nowrap; overflow: hidden; }
+/* 큰 숫자와 '얼마 냈어요'는 한 줄. 좁은 화면·큰 금액이라 안 들어가면 숫자를 줄이지 않고 '냈어요'만 아랫줄로 내림 */
+.hero .hr + .hr { flex-wrap: wrap; }
+.hero .num { flex: 0 1 auto; max-width: 100%; min-width: 0; font-size: 28px; font-weight: 800; letter-spacing: -.04em; line-height: 1.2; white-space: nowrap; overflow: hidden; }
 .hero .num small { font-size: .715em; font-weight: 700; margin-left: 1px; }
-.hero .pd { flex: none; font-size: 13px; color: var(--sub); white-space: nowrap; }
+.hero .pd { flex: none; margin-left: auto; font-size: 13px; color: var(--sub); white-space: nowrap; }
 .hero .pd b { font-weight: 700; color: var(--ok-text); }
 .hero .bar { height: 6px; border-radius: 3px; background: var(--fill2); margin: 8px 0 0; overflow: hidden; }
 .hero .bar i { display: block; height: 100%; border-radius: 3px; background: var(--ok); transition: width .3s ease; }
@@ -201,13 +203,15 @@ body.on-cal .calnav { display: flex; }
 .bar2 { display: flex; align-items: center; min-height: 28px; padding: 0 8px 4px; font-size: 13px; color: var(--sub); }
 .bar2 #countTxt { flex: 1; min-width: 0; }
 .bar2 b { font-weight: 700; color: var(--ink); white-space: nowrap; }
-.fchips { display: flex; gap: 6px; margin: 0 -12px; padding: 0 12px 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.fchips { display: flex; gap: 6px; margin: -4px -12px 0; padding: 0 12px 4px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .fchips::-webkit-scrollbar { display: none; }
 .fchips:empty { display: none; }
-.fc { position: relative; flex: none; height: 36px; padding: 0 13px; border-radius: 18px; background: var(--card); display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--sub); white-space: nowrap; }
-.fc::after { content: ""; position: absolute; inset: -4px 0; }
+/* 누르는 곳은 44px, 보이는 알약은 그 안에 36px (::before) */
+.fc { position: relative; z-index: 0; flex: none; height: 44px; padding: 0 13px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--sub); white-space: nowrap; }
+.fc::before { content: ""; position: absolute; inset: 4px 0; z-index: -1; border-radius: 18px; background: var(--card); }
 .fc small { font-size: 12px; font-weight: 600; color: var(--muted); }
-.fc.on { background: var(--ink); color: var(--card); font-weight: 700; }
+.fc.on { color: var(--card); font-weight: 700; }
+.fc.on::before { background: var(--ink); }
 .fc.on small { color: inherit; opacity: .7; }
 
 .skel { height: 58px; background: var(--card); border-radius: var(--r-card); margin-bottom: 8px; opacity: .7; }
@@ -302,6 +306,7 @@ body.on-cal .calnav { display: flex; }
 .tip { font-size: 13px; color: var(--muted); padding: 2px 0 12px; line-height: 1.5; }
 .tip.err { color: var(--red-text); font-weight: 600; }
 .tip.foot { text-align: center; font-size: 12px; padding: 4px 0 0; }
+#mAskAddr { -webkit-user-select: all; user-select: all; }
 .tipline { font-size: 13px; color: var(--sub); background: var(--fill); border-radius: var(--r-ctl); padding: 10px 14px; margin: -6px 0 16px; }
 .linkbox { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--fill); font-size: 12px; word-break: break-all; -webkit-user-select: all; user-select: all; }
 .sheet .grp { background: none; border-radius: 0; overflow: visible; }
@@ -447,11 +452,11 @@ main.tab.in-r { animation: tabInR .22s ease-out; }
 .catb .emp { color: var(--muted); font-weight: 500; }
 .catb > svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
 /* 이름 칸 아래: 고른 분류에서 자주 쓰는 이름 (이름을 적기 시작하면 사라짐) */
-.sugg { display: flex; gap: 6px; margin: 4px -20px -6px; padding: 4px 20px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.sugg { display: flex; gap: 6px; margin: 4px -20px -6px; padding: 0 20px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .sugg::-webkit-scrollbar { display: none; }
 .sugg[hidden] { display: none; }
-.sugg button { position: relative; flex: none; height: 36px; padding: 0 12px; border-radius: 18px; background: var(--fill); font-size: 13px; font-weight: 600; color: var(--ink2); white-space: nowrap; }
-.sugg button::after { content: ""; position: absolute; inset: -4px 0; }
+.sugg button { position: relative; z-index: 0; flex: none; height: 44px; padding: 0 12px; font-size: 13px; font-weight: 600; color: var(--ink2); white-space: nowrap; }
+.sugg button::before { content: ""; position: absolute; inset: 4px 0; z-index: -1; border-radius: 18px; background: var(--fill); }
 /* 결제 수단 관리 */
 .accrow { min-height: 60px; }
 .accrow .an { flex: 1; min-width: 0; display: flex; flex-direction: column; white-space: nowrap; overflow: hidden; }
@@ -521,11 +526,10 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .tc .emp { color: var(--muted); font-weight: 500; font-size: 13px; }
 .tc input.ci { width: 100%; height: 44px; border: 0; border-radius: 10px; background: var(--fill); padding: 0 6px; font-size: 15px; font-weight: 700; text-align: right; outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
 .tc.dyc input.ci { text-align: center; }
-.th { position: sticky; top: calc(52px + env(safe-area-inset-top)); z-index: 5; display: grid; grid-template-columns: var(--cols); align-items: stretch; height: 40px; padding-right: 4px; background: var(--card); border-radius: var(--r-card) var(--r-card) 0 0; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--muted); }
+.th { position: sticky; top: calc(52px + env(safe-area-inset-top)); z-index: 5; display: grid; grid-template-columns: var(--cols); align-items: stretch; height: 45px; padding-right: 4px; background: var(--card); border-radius: var(--r-card) var(--r-card) 0 0; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--muted); }
 .th::before { content: ""; position: absolute; z-index: -1; left: 0; right: 0; top: -1px; height: 24px; background: var(--bg); }
 .th::after { content: ""; position: absolute; z-index: -1; inset: 0; background: var(--card); border-radius: inherit; }
 .th button { position: relative; display: flex; align-items: center; gap: 2px; min-width: 0; color: inherit; white-space: nowrap; }
-.th button::after { content: ""; position: absolute; inset: -2px 0; }
 .th button:nth-child(3) { justify-content: flex-end; } .th button:nth-child(4) { justify-content: center; padding-left: 6px; }
 .th button i { flex: none; width: 10px; height: 14px; opacity: .45; }
 .th button.on { color: var(--ink); font-weight: 700; }
@@ -1535,9 +1539,15 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     ['주거', /월세|전세|관리비|주차|임대료|집세|기숙사|고시원/]
   ];
   function catGuess(name) { name = String(name || ''); for (var i = 0; i < CAT_RE.length; i++) if (CAT_RE[i][1].test(name)) return CAT_RE[i][0]; return ''; }
+  /* 예전엔 대출·저축·공과금·교육 분류가 없어서 그런 항목이 '기타'에 들어가 있음 → 저장된 값이 '기타'면 이름부터 보고 가림.
+   * 그래서 이름은 다른 분류처럼 보이는데(예: 가스레인지 렌탈) 사람이 일부러 기타를 고른 경우엔 '그 외'로 저장해서 그 선택이 유지되게 함. 화면엔 둘 다 '기타'. */
+  var CAT_ETC = '그 외';
+  function catRaw(label, name) { return label === '기타' && catGuess(name) ? CAT_ETC : label; }
   /** 저장된 분류 글자(raw)와 이름으로 9가지 중 하나를 고름 */
   function catKeyOf(raw, name) {
     raw = String(raw || '').trim();
+    if (raw === CAT_ETC) return '기타';
+    if (raw === '기타') return catGuess(name) || '기타';
     if (catByK[raw]) return raw;
     if (CAT_OLD[raw]) return CAT_OLD[raw];
     return catGuess(name) || CAT_OLD2[raw] || '기타';
@@ -1546,7 +1556,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   /** 화면에 보일 분류 이름: 직접 적어 둔 분류(9가지도 예전 7가지도 아닌 글자)는 그 글자 그대로 */
   function catText(it) {
     var raw = String(it.cat || '').trim();
-    return raw && !catByK[raw] && !CAT_OLD[raw] && !CAT_OLD2[raw] ? raw : catKey(it);
+    return raw && raw !== CAT_ETC && !catByK[raw] && !CAT_OLD[raw] && !CAT_OLD2[raw] ? raw : catKey(it);
   }
   function catIc(k, cls) {
     var c = catByK[k] || catByK['기타'];
@@ -1948,7 +1958,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var vals = {};
       S.meta.fields.forEach(function (f) { var dv = defaultFor(f); if (dv) vals[f.col] = dv; });
       vals[S.meta.nameCol] = name;
-      if (catOn()) { var nc = lv.cat || catGuess(name); if (nc) vals[catFieldOf().col] = nc; }
+      if (catOn()) { var nc = lv.cat ? catRaw(lv.cat, name) : catGuess(name); if (nc) vals[catFieldOf().col] = nc; }
       var af = amtFieldOf(), df = dayFieldOf();
       if (af) vals[af.col] = am.value.replace(/[^\d]/g, '');
       if (df) vals[df.col] = d;
@@ -1957,7 +1967,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       nm.value = ''; am.value = ''; dy.value = '';
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       // 서버 답(몇 초)을 기다리지 않고 바로 목록에 흐리게 보여줌. 저장이 끝나면 진짜 줄로 바뀜
-      var ghost = { ghost: true, name: name, cat: lv.cat || catGuess(name), amount: af && vals[af.col] ? Number(vals[af.col]) : null, day: d ? Number(d) : 0 };
+      var ghost = { ghost: true, name: name, cat: lv.cat ? catRaw(lv.cat, name) : catGuess(name), amount: af && vals[af.col] ? Number(vals[af.col]) : null, day: d ? Number(d) : 0 };
       addGhost(ghost);
       enqueue({ type: 'save', oldName: '', vals: vals, ghost: ghost, onDone: function (res) {
         if (!res.ok) return;
@@ -2724,7 +2734,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var box = $('sugg'), nm = S && $('f' + S.meta.nameCol);
     if (!box || !nm) return;
     var ce = catOn() ? $('f' + catFieldOf().col) : null, c = ce && catByK[ce.value];
-    var list = c && !nm.value ? c.eg.filter(function (n) { return !findItem(n); }) : [];
+    var have = S.items.map(function (i) { return String(i.name || '').replace(/\s/g, ''); });
+    var list = c && !nm.value ? c.eg.filter(function (n) { var k = n.replace(/\s/g, ''); return !have.some(function (x) { return x && (x.indexOf(k) >= 0 || k.indexOf(x) >= 0); }); }) : [];
     var h = list.map(function (n) { return '<button type="button" data-n="' + esc(n) + '">' + esc(n) + '</button>'; }).join('');
     if (box._html !== h) { box.innerHTML = h; box._html = h; box.scrollLeft = 0; }
     box.hidden = !list.length;
@@ -2783,9 +2794,18 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     syncDay();
     if ($('catBtn') && id === 'f' + catFieldOf().col) { syncCat(); syncSugg(); }
   }
+  /** 한 줄로 흐르는 고르기 칩에서 고른 칩이 화면 밖이면 보이게 옆으로 밀어 줌 */
+  function showOnChip(box) {
+    var on = box && box.querySelector('.chip.on');
+    if (!on || box.scrollWidth <= box.clientWidth) return;
+    var l = on.offsetLeft - box.offsetLeft, pad = 20;
+    if (l - pad < box.scrollLeft) box.scrollLeft = Math.max(0, l - pad);
+    else if (l + on.offsetWidth + pad > box.scrollLeft + box.clientWidth) box.scrollLeft = l + on.offsetWidth + pad - box.clientWidth;
+  }
   function wireForm(it) {
     var body = $('sheetBody');
     FS = { it: it, picked: false, later: false, shown: '' };
+    body.querySelectorAll('.fld > .chips').forEach(showOnChip);
     body.querySelectorAll('[data-money]').forEach(function (inp) {
       var mir = inp.parentNode.querySelector('.mir');
       inp.addEventListener('input', function () {
@@ -3099,6 +3119,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
         var c = x.chips ? el.querySelector('.chip[data-v="' + x.chips.replace(/"/g, '\\"') + '"]') : null;
         el.querySelectorAll('.chip').forEach(function (b) { b.classList.toggle('on', b === c); });
         el.setAttribute('data-val', c ? x.chips : '');
+        showOnChip(el);
       } else if (x.tag === el.tagName) {
         if (el.tagName === 'SELECT' && !Array.prototype.some.call(el.options, function (o) { return o.value === x.v; })) continue;
         el.value = x.v;
@@ -3338,6 +3359,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
           markBad(el);
         }
       }
+      if (isCatField(f) && catOn()) { var nmv = $('f' + S.meta.nameCol); v = catRaw(v, nmv ? nmv.value : (it ? it.name : '')); }
       vals[f.col] = v;
     });
     var name = vals[S.meta.nameCol];
@@ -3396,8 +3418,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 
   /* ---------- 설정 ---------- */
   /** 설정 맨 아래 한 줄: 개인정보 처리방침 · 이용약관 · 문의 */
+  function CONTACT_ADDR() { return (window.FC_CONFIG && window.FC_CONFIG.contact) || ''; }
   function legalHtml() {
-    var ct = (window.FC_CONFIG && window.FC_CONFIG.contact) || '';
+    var ct = CONTACT_ADDR();
     return '<div class="legalrow"><a href="privacy.html" data-leave>개인정보 처리방침</a><a href="terms.html" data-leave>이용약관</a>' +
       (ct ? '<a id="mAsk" href="mailto:' + esc(ct) + '?subject=' + encodeURIComponent('고정비 달력 문의') + '">문의</a>' : '') + '</div>';
   }
@@ -3498,7 +3521,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       (fullUrl ? '<div style="margin-top:8px;color:var(--muted)">주소창 없이 쓰고 싶으면 이 주소로 홈 화면에 추가해봐요 (구글 로그인이 한 번 더 나올 수 있어요).</div><div class="linkbox">' + esc(fullUrl) + '</div>' : '') +
       '</div>' + accountHtml(null)) +
       (canWipe() ? '<button class="del" type="button" id="mWipe">내 자료 모두 지우기</button>' : '') + legalHtml() +
-      '<div class="tip foot">불러온 시각 ' + new Date(S.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + (S.virtual ? '' : ' · 시트가 원본이에요') + '</div>';
+      '<div class="tip foot">' + (CONTACT_ADDR() ? '문의 <span id="mAskAddr">' + esc(CONTACT_ADDR()) + '</span><br>' : '') + '불러온 시각 ' + new Date(S.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + (S.virtual ? '' : ' · 시트가 원본이에요') + '</div>';
     if (refresh) { if (sheetMode !== 'menu') return; $('sheetBody').innerHTML = h; }
     else openSheet('설정', h, 'menu');
     var offSure = false;
