@@ -29,6 +29,8 @@ if (window.top !== window.self) {
   --sun: #d02937; --sat: #1b64da; --grape: #8b4ad8;
   --bar: rgba(255,255,255,.94); --backdrop: rgba(0,0,0,.42); --shadow: none; --fab: 0 4px 14px rgba(242,107,15,.32);
   --r-card: 20px; --r-ctl: 14px;
+  /* 분류 9가지 색 (아이콘 바탕) */
+  --c-home: #3b82f6; --c-util: #f2a20c; --c-tel: #e85f9e; --c-sub: #8b5cf6; --c-ins: #10b3a3; --c-loan: #5567d8; --c-save: #58b530; --c-edu: #f0685f; --c-etc: #8b95a1; --c-ink: #ffffff;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -40,6 +42,7 @@ if (window.top !== window.self) {
     --red: #ff5c6c; --red-text: #ff7d8a; --red-soft: #3d1c20; --danger: #ff5c6c; --on-danger: #2a0508;
     --sun: #ff7d8a; --sat: #74abff; --grape: #b98af5;
     --bar: rgba(22,22,26,.94); --backdrop: rgba(0,0,0,.6); --fab: 0 4px 14px rgba(0,0,0,.4);
+    --c-home: #4f8ff7; --c-util: #f5ab1f; --c-tel: #ee6fa9; --c-sub: #9a70f8; --c-ins: #1fc0b0; --c-loan: #6b7be6; --c-save: #66c23c; --c-edu: #f4776e; --c-etc: #7f8894;
   }
 }
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -61,7 +64,17 @@ svg { display: block; }
 /* 위 막대 */
 .top { position: sticky; top: 0; z-index: 20; background: var(--bg); padding-top: env(safe-area-inset-top); }
 .top-in { max-width: 600px; margin: 0 auto; height: 52px; display: flex; align-items: center; gap: 2px; padding: 0 4px 0 20px; }
-.top h1 { flex: 1; margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top h1 { flex: 1; min-width: 0; margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.04em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.top h1 small { margin-left: 6px; font-size: 13px; font-weight: 600; letter-spacing: -.01em; color: var(--muted); }
+/* 달력 탭에서만: 위 막대가 곧 달 이름과 달 넘기기 */
+.calnav { flex: none; display: none; align-items: center; }
+body.on-cal .calnav { display: flex; }
+.calnav .today-btn { flex: none; height: 44px; padding: 0 4px; display: flex; align-items: center; }
+.calnav .today-btn[hidden] { display: none; }
+.calnav .today-btn span { height: 32px; padding: 0 12px; border-radius: 16px; background: var(--card); font-size: 13px; font-weight: 600; color: var(--sub); display: flex; align-items: center; }
+.calnav .nav { flex: none; width: 40px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: var(--sub); }
+.calnav .nav[disabled] { opacity: .3; }
+.calnav .nav svg { width: 18px; height: 18px; }
 .sync { font-size: 12px; font-weight: 600; color: var(--muted); display: none; align-items: center; gap: 5px; height: 44px; padding: 0 6px; white-space: nowrap; }
 .sync.on { display: inline-flex; }
 .sync.err { color: var(--red-text); }
@@ -74,7 +87,7 @@ svg { display: block; }
 @keyframes slide { 0% { left: -30%; } 100% { left: 100%; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.tab { display: none; max-width: 600px; margin: 0 auto; padding: 0 12px calc(104px + env(safe-area-inset-bottom)); }
+.tab { display: none; max-width: 600px; margin: 0 auto; padding: 0 12px calc(74px + env(safe-area-inset-bottom)); }
 .tab.on { display: block; }
 
 /* 첫 화면 맨 위: 결제일 없는 항목 알림 한 줄 */
@@ -86,62 +99,54 @@ svg { display: block; }
 .ndb .go svg { width: 14px; height: 14px; }
 
 /* 처음 쓰는 사람: 자주 쓰는 항목 바로 넣기 */
-.welcome { background: var(--card); border-radius: var(--r-card); padding: 20px 20px 18px; margin-bottom: 8px; }
+.welcome { background: var(--card); border-radius: var(--r-card); padding: 20px; margin-bottom: 8px; }
 .welcome h2 { margin: 0; font-size: 20px; font-weight: 800; letter-spacing: -.04em; line-height: 1.35; }
-.welcome p { margin: 6px 0 14px; font-size: 13px; color: var(--sub); }
-.welcome .chip svg { flex: none; width: 14px; height: 14px; color: var(--accent-text); }
+.welcome p { margin: 6px 0 16px; font-size: 13px; color: var(--sub); }
+.welcome .btn { width: 100%; }
 
 /* 달력 */
-.cal { background: var(--card); border-radius: var(--r-card); padding: 8px 10px 4px; touch-action: pan-y; }
-.ch { display: flex; align-items: center; padding: 0 0 2px 10px; }
-.ch .mt { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 6px; }
-.ch .mt b { font-size: 20px; font-weight: 800; letter-spacing: -.04em; }
-.ch .mt span { font-size: 13px; font-weight: 600; color: var(--muted); }
-.ch .today-btn { flex: none; height: 44px; padding: 0 4px; display: flex; align-items: center; }
-.ch .today-btn span { height: 32px; padding: 0 12px; border-radius: 16px; background: var(--fill); font-size: 13px; font-weight: 600; color: var(--sub); display: flex; align-items: center; }
-.ch .nav { flex: none; width: 44px; height: 44px; border-radius: 22px; display: flex; align-items: center; justify-content: center; color: var(--sub); }
-.ch .nav[disabled] { opacity: .3; }
-.ch .nav svg { width: 18px; height: 18px; }
+/* 이 달 한 장: 위에 요약(더 낼 돈), 아래에 달력 */
+.mo { background: var(--card); border-radius: var(--r-card); margin-bottom: 4px; overflow: hidden; }
+.cal { padding: 10px 10px 4px; touch-action: pan-y; }
 .cg { display: grid; grid-template-columns: repeat(7, 1fr); }
 .wd { font-size: 12px; font-weight: 600; color: var(--muted); text-align: center; padding: 0 0 6px; }
 .wd.sun { color: var(--sun); } .wd.sat { color: var(--sat); }
-.cd { height: 48px; display: flex; flex-direction: column; align-items: center; padding-top: 3px; border-top: 1px solid var(--line); position: relative; }
-.cd .n { width: 26px; height: 26px; line-height: 26px; text-align: center; border-radius: 50%; font-size: 13px; font-weight: 600; letter-spacing: -.02em; }
+.cd { height: 44px; display: flex; flex-direction: column; align-items: center; padding-top: 2px; border-top: 1px solid var(--line); position: relative; }
+.cd .n { width: 24px; height: 24px; line-height: 24px; text-align: center; border-radius: 50%; font-size: 13px; font-weight: 600; letter-spacing: -.02em; }
 .cd.sun .n, .cd.hol .n { color: var(--sun); }
 .cd.sat .n { color: var(--sat); }
 .cd.past .n { color: var(--muted); font-weight: 500; }
 .cd.today .n { background: var(--accent); color: var(--accent-ink); font-weight: 800; }
 .cd.sel::before { content: ""; position: absolute; inset: 2px 3px; border-radius: 12px; background: var(--sel); z-index: 0; }
 .cd > * { position: relative; z-index: 1; }
-.cd .a { display: flex; align-items: center; gap: 1px; font-size: 11px; font-weight: 600; line-height: 14px; margin-top: 1px; color: var(--ink2); letter-spacing: -.03em; white-space: nowrap; }
+.cd .a { display: flex; align-items: center; gap: 1px; font-size: 11px; font-weight: 600; line-height: 14px; margin-top: 0; color: var(--ink2); letter-spacing: -.03em; white-space: nowrap; }
 .cd .a.paid { color: var(--muted); font-weight: 500; }
 .cd .a.paid svg { width: 8px; height: 8px; color: var(--ok); }
 .cd .a.over { color: var(--red-text); font-weight: 700; }
 .cd.has { cursor: pointer; }
 
 /* 맨 위 요약: 이 달에 더 낼 돈(큰 숫자) + 낸 만큼 차는 막대 */
-.hero { background: var(--card); border-radius: 20px; padding: 16px 20px; margin: 0 0 8px; }
+.hero { padding: 14px 20px 4px; }
 .hero:empty { display: none; }
-.hero .lb { font-size: 13px; font-weight: 600; color: var(--sub); }
-.hero .num { font-size: 28px; font-weight: 800; letter-spacing: -.04em; line-height: 1.25; white-space: nowrap; overflow: hidden; }
+.hero .hr { display: flex; align-items: baseline; gap: 10px; }
+.hero .lb { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; color: var(--sub); white-space: nowrap; }
+.hero .tot { flex: none; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.hero .num { flex: 1; min-width: 0; font-size: 28px; font-weight: 800; letter-spacing: -.04em; line-height: 1.2; white-space: nowrap; overflow: hidden; }
 .hero .num small { font-size: .715em; font-weight: 700; margin-left: 1px; }
-.hero .bar { height: 8px; border-radius: 4px; background: var(--fill2); margin: 10px 0 8px; overflow: hidden; }
-.hero .bar i { display: block; height: 100%; border-radius: 4px; background: var(--ok); transition: width .3s ease; }
-.hero .cp { display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; font-size: 13px; color: var(--sub); }
-.hero .cp span { white-space: nowrap; }
-.hero .cp b { font-weight: 700; color: var(--ok-text); }
-@media (prefers-color-scheme: dark) { .hero .cp b { color: #45d795; } }
-#cal { margin-bottom: 4px; }
+.hero .pd { flex: none; font-size: 13px; color: var(--sub); white-space: nowrap; }
+.hero .pd b { font-weight: 700; color: var(--ok-text); }
+.hero .bar { height: 6px; border-radius: 3px; background: var(--fill2); margin: 8px 0 0; overflow: hidden; }
+.hero .bar i { display: block; height: 100%; border-radius: 3px; background: var(--ok); transition: width .3s ease; }
 
 /* 묶음 제목 (첫 화면) */
-.sec { display: flex; align-items: center; gap: 6px; padding: 18px 8px 8px; }
+.sec { display: flex; align-items: center; gap: 6px; padding: 14px 8px 6px; }
 .sec h3 { flex: none; margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.03em; white-space: nowrap; }
 .sec .c { flex: 1; min-width: 0; font-size: 13px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sec .act { flex: none; margin: -14px -8px -14px 0; height: 44px; padding: 0 8px; display: flex; align-items: center; font-size: 13px; font-weight: 700; color: var(--accent-text); white-space: nowrap; }
 
 /* 결제 줄 (첫 화면) */
 .grp { background: var(--card); border-radius: var(--r-card); overflow: hidden; }
-.row { position: relative; display: flex; align-items: stretch; min-height: 58px; background: var(--card); }
+.row { position: relative; display: flex; align-items: stretch; min-height: 54px; background: var(--card); }
 .grp > * + *::after { content: ""; position: absolute; left: 52px; right: 18px; top: 0; height: 1px; background: var(--line); }
 .chk { flex: none; width: 52px; display: flex; align-items: center; justify-content: center; }
 .chk i { width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--ring); display: flex; align-items: center; justify-content: center; color: transparent; transition: background .15s, border-color .15s; }
@@ -150,7 +155,7 @@ svg { display: block; }
 .checked .chk i { background: var(--ok); border-color: var(--ok); color: var(--on-ok); }
 .chk.pop i { animation: pop .34s cubic-bezier(.3,1.5,.5,1); }
 @keyframes pop { 0% { transform: scale(.72); } 55% { transform: scale(1.16); } 100% { transform: scale(1); } }
-.rb { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 9px 18px 9px 0; }
+.rb { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 7px 18px 7px 0; }
 .rl { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .nm { font-size: 15px; font-weight: 600; letter-spacing: -.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .t2 { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -171,7 +176,7 @@ svg { display: block; }
 @keyframes enter { from { opacity: 0; } }
 .empty { padding: 22px 16px; font-size: 13px; color: var(--muted); text-align: center; }
 /* 낸 결제: 한 줄로 접어 둠 */
-.fold { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 52px; margin-top: 8px; padding: 0 14px; background: var(--card); border-radius: var(--r-card); font-size: 15px; font-weight: 600; }
+.fold { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; margin-top: 8px; padding: 0 14px; background: var(--card); border-radius: var(--r-card); font-size: 15px; font-weight: 600; }
 .fold .ci { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--ok); color: var(--on-ok); display: flex; align-items: center; justify-content: center; }
 .fold .ci svg { width: 13px; height: 13px; }
 .fold .r { margin-left: auto; display: flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 500; color: var(--sub); white-space: nowrap; }
@@ -180,20 +185,18 @@ svg { display: block; }
 .fold.open .r svg { transform: rotate(180deg); }
 .fold.open + .grp { border-radius: 0 0 var(--r-card) var(--r-card); border-top: 1px solid var(--line); }
 
-/* 목록 탭 머리 */
-.bar2 { display: flex; align-items: center; gap: 8px; padding: 0 0 2px 8px; font-size: 13px; color: var(--sub); }
+/* 목록 탭 머리: 몇 개·한 달 평균, 분류 알약 */
+.bar2 { display: flex; align-items: center; min-height: 28px; padding: 0 8px 4px; font-size: 13px; color: var(--sub); }
 .bar2 #countTxt { flex: 1; min-width: 0; }
 .bar2 b { font-weight: 700; color: var(--ink); white-space: nowrap; }
-.sortsel { position: relative; flex: none; height: 44px; display: inline-flex; align-items: center; }
-.sortsel .pl { height: 32px; padding: 0 10px 0 12px; border-radius: 16px; background: var(--card); display: flex; align-items: center; gap: 3px; font-size: 13px; font-weight: 600; color: var(--ink2); white-space: nowrap; }
-.sortsel select { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; }
-.sortsel svg { width: 14px; height: 14px; }
-.gh { display: flex; align-items: baseline; gap: 6px; padding: 14px 8px 8px; }
-.bar2 + #list > .gh:first-child { padding-top: 4px; }
-.gh .t { flex: none; font-size: 15px; font-weight: 700; color: var(--ink); letter-spacing: -.02em; white-space: nowrap; }
-.gh .s { flex: 1; min-width: 0; font-size: 13px; color: var(--sub); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.gh .tt { flex: none; font-size: 13px; font-weight: 700; color: var(--ink2); white-space: nowrap; }
-.gh button { flex: none; align-self: center; height: 44px; margin: -14px -8px -14px 0; padding: 0 8px; font-size: 13px; font-weight: 700; color: var(--accent-text); white-space: nowrap; }
+.fchips { display: flex; gap: 6px; margin: 0 -12px; padding: 0 12px 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.fchips::-webkit-scrollbar { display: none; }
+.fchips:empty { display: none; }
+.fc { position: relative; flex: none; height: 36px; padding: 0 13px; border-radius: 18px; background: var(--card); display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--sub); white-space: nowrap; }
+.fc::after { content: ""; position: absolute; inset: -4px 0; }
+.fc small { font-size: 12px; font-weight: 600; color: var(--muted); }
+.fc.on { background: var(--ink); color: var(--card); font-weight: 700; }
+.fc.on small { color: inherit; opacity: .7; }
 
 .skel { height: 58px; background: var(--card); border-radius: var(--r-card); margin-bottom: 8px; opacity: .7; }
 .fatal { padding: 30px 16px; text-align: center; color: var(--sub); font-size: 13px; }
@@ -215,8 +218,10 @@ svg { display: block; }
 /* 아래에서 올라오는 창: 흰 바탕에 줄로만 나눔. 맨 아래 큰 버튼은 창 아래에 붙어 있음 */
 .backdrop { position: fixed; inset: 0; z-index: 40; background: var(--backdrop); opacity: 0; pointer-events: none; transition: opacity .25s; }
 .backdrop.on { opacity: 1; pointer-events: auto; }
-.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-width: 600px; margin: 0 auto; background: var(--card); border-radius: 24px 24px 0 0; max-height: 92vh; display: flex; flex-direction: column; transform: translateY(105%); visibility: hidden; transition: transform .3s cubic-bezier(.2,.85,.25,1), visibility 0s .3s; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-width: 600px; margin: 0 auto; background: var(--card); border-radius: 24px 24px 0 0; max-height: 92vh; max-height: 92dvh; display: flex; flex-direction: column; transform: translateY(105%); visibility: hidden; transition: transform .3s cubic-bezier(.2,.85,.25,1), visibility 0s .3s; }
 .sheet.on { transform: translateY(0); visibility: visible; transition: transform .3s cubic-bezier(.2,.85,.25,1), visibility 0s; }
+/* 키가 작은 화면에선 창을 조금 더 높이까지 (입력 칸이 한 번에 보이게) */
+@media (max-height: 700px) { .sheet { max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); } }
 /* 화면 키보드가 올라오면 창을 키보드 위로 올림 (--kb, --vvh 는 아래 스크립트가 넣음) */
 .sheet.on.kb { bottom: var(--kb, 0px); max-height: calc(var(--vvh, 100vh) - 8px); }
 .grab { width: 36px; height: 5px; border-radius: 3px; background: var(--fill2); margin: 8px auto 0; flex: none; }
@@ -224,7 +229,7 @@ svg { display: block; }
 .sh h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.03em; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sb { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 4px 20px calc(20px + env(safe-area-inset-bottom)); }
 .cta { flex: none; display: none; padding: 10px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--card); box-shadow: 0 -1px 0 var(--line); border-radius: 0; }
-.sheet.hasfoot .sb { padding-bottom: 12px; }
+.sheet.hasfoot .sb { padding-bottom: 8px; }
 .sheet.hasfoot .cta { display: block; }
 .sheet.kb .cta { padding-bottom: 10px; }
 .cta .btn { width: 100%; }
@@ -245,7 +250,7 @@ svg { display: block; }
 .pill.soon { background: var(--sel); color: var(--accent-text); }
 .pill.ok { background: var(--ok-soft); color: var(--ok-text); }
 .kvs { margin-top: 14px; border-top: 1px solid var(--line); }
-.kv { display: flex; align-items: baseline; gap: 12px; padding: 12px 18px; font-size: 15px; position: relative; }
+.kv { display: flex; align-items: baseline; gap: 12px; padding: 10px 18px; font-size: 15px; position: relative; }
 .kv .k { flex: none; width: 92px; color: var(--muted); }
 .kv .v { flex: 1; min-width: 0; text-align: right; font-weight: 600; }
 .kv .v small { display: block; color: var(--muted); font-size: 13px; font-weight: 500; }
@@ -261,6 +266,11 @@ svg { display: block; }
 .li .cv { flex: none; width: 16px; height: 16px; margin-left: auto; color: var(--muted); }
 .li .r + .cv { margin-left: -6px; }
 .li.addl { color: var(--accent-text); font-weight: 600; }
+.li .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 8px 0; white-space: normal; }
+.li .tx b { font-weight: 500; }
+.li .tx small { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.legalrow { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 4px; padding-top: 8px; border-top: 1px solid var(--line); }
+.legalrow a { min-height: 44px; padding: 0 10px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 600; color: var(--sub); text-decoration: none; }
 .switch { margin-left: auto; width: 48px; height: 28px; border-radius: 14px; background: var(--faint); position: relative; transition: background .2s; flex: none; }
 .switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
 .switch.on { background: var(--ok); }
@@ -273,7 +283,7 @@ svg { display: block; }
 .glabel { font-size: 13px; font-weight: 700; color: var(--sub); padding: 14px 0 2px; letter-spacing: -.02em; }
 .tip { font-size: 13px; color: var(--muted); padding: 2px 0 12px; line-height: 1.5; }
 .tip.err { color: var(--red-text); font-weight: 600; }
-.tip.foot { text-align: center; font-size: 12px; padding: 16px 0 0; }
+.tip.foot { text-align: center; font-size: 12px; padding: 4px 0 0; }
 .tipline { font-size: 13px; color: var(--sub); background: var(--fill); border-radius: var(--r-ctl); padding: 10px 14px; margin: -6px 0 16px; }
 .linkbox { margin-top: 8px; padding: 10px 12px; border-radius: 12px; background: var(--fill); font-size: 12px; word-break: break-all; -webkit-user-select: all; user-select: all; }
 .sheet .grp { background: none; border-radius: 0; overflow: visible; }
@@ -282,8 +292,8 @@ svg { display: block; }
 .sheet .grp + .grp { border-top: 1px solid var(--line); }
 
 /* 입력: 꼭 적는 칸은 크게 */
-.fld { padding: 8px 0 12px; position: relative; }
-.fld > label, .fld > .lrow > label { display: block; font-size: 13px; font-weight: 600; color: var(--sub); margin-bottom: 4px; }
+.fld { padding: 4px 0 8px; position: relative; }
+.fld > label, .fld > .lrow > label { display: block; font-size: 13px; font-weight: 600; color: var(--sub); margin-bottom: 3px; }
 .lrow { display: flex; align-items: center; }
 .lrow > label { flex: 1; }
 .lnk { flex: none; height: 44px; min-width: 44px; margin: -14px -6px -10px 0; padding: 0 6px; display: flex; align-items: center; justify-content: flex-end; font-size: 13px; font-weight: 600; color: var(--sub); }
@@ -313,10 +323,10 @@ svg { display: block; }
 .fld.badf .inp { border-color: var(--red); }
 .fld.badf .selb { box-shadow: inset 0 0 0 1.5px var(--red); }
 /* '더 적기' 안: 안 적어도 되는 칸은 이름 옆에 작게 */
-.more { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 56px; margin-top: 6px; padding: 8px 0; border-top: 1px solid var(--line); text-align: left; }
-.more .l { flex: 1; min-width: 0; }
-.more .l b { display: block; font-size: 15px; font-weight: 600; }
-.more .l small { display: block; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.more { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 48px; margin-top: 0; padding: 0; border-top: 1px solid var(--line); text-align: left; }
+.more .l { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.more .l b { flex: none; font-size: 15px; font-weight: 600; }
+.more .l small { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .more svg { flex: none; width: 20px; height: 20px; color: var(--muted); transition: transform .2s; }
 .more.open svg { transform: rotate(180deg); }
 .morebox { display: none; border-top: 1px solid var(--line); }
@@ -394,10 +404,36 @@ main.tab.in-r { animation: tabInR .22s ease-out; }
 .chip.on small { color: var(--accent-text); }
 .chip.add { background: transparent; color: var(--accent-text); box-shadow: inset 0 0 0 1px var(--fill2); }
 .chip.pend { opacity: .55; }
+.fld > .chips { flex-wrap: nowrap; margin: 0 -20px; padding: 2px 20px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.fld > .chips::-webkit-scrollbar { display: none; }
+.fld > .chips .chip { flex: none; overflow: visible; }
+.fld > .chipin { padding-top: 6px; }
 .chipin { display: flex; gap: 6px; width: 100%; padding-top: 2px; }
 .chipin input { flex: 1; min-width: 0; height: 44px; padding: 0 12px; border: 0; border-radius: 12px; background: var(--fill); font-size: 15px; outline: none; }
 .chipin button { flex: none; height: 44px; padding: 0 14px; border-radius: 12px; background: var(--accent); color: var(--accent-ink); font-size: 13px; font-weight: 700; }
 .chipin button.c { background: var(--fill); color: var(--sub); }
+/* 분류 9가지: 색 둥근 네모에 흰 아이콘 */
+.cic { flex: none; width: 44px; height: 44px; border-radius: 15px; background: var(--cc); color: var(--c-ink); display: inline-flex; align-items: center; justify-content: center; }
+.cic svg { width: 24px; height: 24px; }
+.cic.s { width: 30px; height: 30px; border-radius: 10px; }
+.cic.s svg { width: 17px; height: 17px; }
+.cgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 4px 0; }
+.ct { min-width: 0; display: flex; flex-direction: column; align-items: center; padding: 14px 2px 12px; border-radius: 18px; background: var(--fill); text-align: center; transition: transform .12s, background .15s; }
+.ct:active { transform: scale(.96); background: var(--fill2); }
+.ct b { margin-top: 8px; font-size: 15px; font-weight: 700; letter-spacing: -.02em; line-height: 1.3; }
+.ct small { max-width: 100%; font-size: 11px; color: var(--muted); letter-spacing: -.03em; white-space: nowrap; overflow: hidden; }
+.ct.on { background: var(--sel); box-shadow: inset 0 0 0 2px var(--accent); }
+.sh h2.wic { display: flex; align-items: center; gap: 8px; }
+.catb { flex: 1; min-width: 0; min-height: 44px; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 600; text-align: left; }
+.catb span:not(.cic) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.catb .emp { color: var(--muted); font-weight: 500; }
+.catb > svg { flex: none; width: 16px; height: 16px; color: var(--muted); }
+/* 이름 칸 아래: 고른 분류에서 자주 쓰는 이름 (이름을 적기 시작하면 사라짐) */
+.sugg { display: flex; gap: 6px; margin: 4px -20px -6px; padding: 4px 20px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.sugg::-webkit-scrollbar { display: none; }
+.sugg[hidden] { display: none; }
+.sugg button { position: relative; flex: none; height: 36px; padding: 0 12px; border-radius: 18px; background: var(--fill); font-size: 13px; font-weight: 600; color: var(--ink2); white-space: nowrap; }
+.sugg button::after { content: ""; position: absolute; inset: -4px 0; }
 /* 결제 수단 관리 */
 .accrow { min-height: 60px; }
 .accrow .an { flex: 1; min-width: 0; display: flex; flex-direction: column; white-space: nowrap; overflow: hidden; }
@@ -419,7 +455,7 @@ main.tab.in-r { animation: tabInR .22s ease-out; }
 .steps .kv { font-size: 13px; line-height: 1.5; align-items: flex-start; }
 .steps .kv .k { width: 22px; color: var(--accent-text); font-weight: 700; }
 .steps .kv .v { text-align: left; color: var(--ink2); font-weight: 500; }
-body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: none !important; }
+body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-on #calNav { display: none !important; }
 
 /* 결제일 한꺼번에 넣기 */
 .qd { position: relative; display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 8px 0; }
@@ -441,16 +477,17 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .row.tr:not(.open) .swdel { height: 100%; }
 .row.tr:not(.drag):not(.swiped) .swdel { visibility: hidden; }
 
-/* 목록 탭: 표 (세로선 없이, 칸 머리는 맨 위 묶음에 한 번만) */
-.tbl { --cols: 46px minmax(0, 1fr) 88px 66px; }
-@media (max-width: 340px) { .tbl { --cols: 42px minmax(0, 1fr) 84px 60px; } }
+/* 목록 탭: 표 한 장 (세로선 없이). 칸 제목은 화면을 내려도 위에 붙어 있고, 누르면 그 칸 기준으로 줄 세움 */
+.lcard { --cols: 48px minmax(0, 1fr) 86px 66px; position: relative; }
+@media (max-width: 340px) { .lcard { --cols: 44px minmax(0, 1fr) 80px 60px; } }
+.lcard > .grp { border-radius: 0 0 var(--r-card) var(--r-card); }
 .tbl > .row.tr { display: block; min-height: 0; }
-.tbl > * + *::after { left: 46px; right: 0; }
-.tbl > .th + *::after { display: none; }
-.tg { display: grid; grid-template-columns: var(--cols); align-items: stretch; min-height: 48px; }
+.tbl > * + *::after { left: 48px; right: 0; }
+.tg { display: grid; grid-template-columns: var(--cols); align-items: stretch; min-height: 48px; padding-right: 4px; }
 .tg > * { min-width: 0; }
 .tg .chk { width: auto; }
 .tg .chk i { width: 22px; height: 22px; }
+.tc.icc { justify-content: center; }
 .tc { display: flex; align-items: center; min-height: 48px; font-size: 15px; cursor: pointer; }
 .tc.nmc { gap: 4px; }
 .tc.nmc .nw { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 5px 0; }
@@ -462,21 +499,26 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .tc.amc .av { min-width: 0; overflow: hidden; }
 .tc.dyc { justify-content: center; flex-direction: column; gap: 0; font-weight: 600; white-space: nowrap; line-height: 1.2; }
 .tc.dyc .dv { max-width: 100%; overflow: hidden; }
-.tc.dyc small { font-size: 11px; font-weight: 600; color: var(--muted); }
-.tc.dyc small.over { color: var(--red-text); } .tc.dyc small.soon { color: var(--accent-text); }
 .tc .nod { color: var(--accent-text); font-weight: 700; font-size: 13px; }
 .tc .emp { color: var(--muted); font-weight: 500; font-size: 13px; }
 .tc input.ci { width: 100%; height: 44px; border: 0; border-radius: 10px; background: var(--fill); padding: 0 6px; font-size: 15px; font-weight: 700; text-align: right; outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
 .tc.dyc input.ci { text-align: center; }
-.th { display: grid; grid-template-columns: var(--cols); align-items: center; height: 30px; background: var(--child); border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--sub); position: relative; }
-.th span:nth-child(3) { text-align: right; padding-right: 8px; } .th span:nth-child(4) { text-align: center; }
+.th { position: sticky; top: calc(52px + env(safe-area-inset-top)); z-index: 5; display: grid; grid-template-columns: var(--cols); align-items: stretch; height: 40px; padding-right: 4px; background: var(--card); border-radius: var(--r-card) var(--r-card) 0 0; border-bottom: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--muted); }
+.th::before { content: ""; position: absolute; z-index: -1; left: 0; right: 0; top: -1px; height: 24px; background: var(--bg); }
+.th::after { content: ""; position: absolute; z-index: -1; inset: 0; background: var(--card); border-radius: inherit; }
+.th button { position: relative; display: flex; align-items: center; gap: 2px; min-width: 0; color: inherit; white-space: nowrap; }
+.th button::after { content: ""; position: absolute; inset: -2px 0; }
+.th button:nth-child(3) { justify-content: flex-end; } .th button:nth-child(4) { justify-content: center; padding-left: 6px; }
+.th button i { flex: none; width: 10px; height: 14px; opacity: .45; }
+.th button.on { color: var(--ink); font-weight: 700; }
+.th button.on i { opacity: 1; color: var(--accent-text); }
 .row.tr.child .tc.nmc { padding-left: 4px; }
 .row.tr.child .tc.nmc::before { content: "└"; color: var(--ring); font-size: 12px; margin-right: 2px; }
 .row.tr.child .tc.nmc .nm { font-weight: 500; }
 .row.tr.child .tc.amc { font-weight: 600; }
 .row.tr.open { background: var(--sel); }
 .row.tr.open .tc.nmc .nm { white-space: normal; }
-.tp { padding: 0 14px 12px 46px; }
+.tp { padding: 0 14px 12px 48px; }
 .tp .kl { display: flex; gap: 10px; font-size: 13px; line-height: 1.5; padding: 2px 0; }
 .tp .kl span { flex: none; width: 70px; color: var(--muted); }
 .tp .kl b { flex: 1; min-width: 0; font-weight: 500; color: var(--ink2); }
@@ -484,7 +526,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .tp .tb button { height: 44px; padding: 0 16px; border-radius: 12px; background: var(--card); font-size: 13px; font-weight: 600; color: var(--ink2); }
 .row.tr.ghost { pointer-events: none; }
 .row.tr.ghost .tc { opacity: .55; }
-.row.tr.ghost .chk .spin { width: 14px; height: 14px; color: var(--muted); }
+.row.tr.ghost .icc .spin { width: 14px; height: 14px; color: var(--muted); }
 .row.tr.newr .tg { background: var(--card); }
 .newr .chk i { border-style: dashed; color: var(--muted); }
 .newr .chk.go i { border: 0; background: var(--accent); color: var(--accent-ink); }
@@ -805,7 +847,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 .inst .go { flex: none; height: 44px; padding: 0 16px; border-radius: 12px; background: var(--fill); color: var(--ink2); font-size: 13px; font-weight: 700; }
 </style>
 </head>
-<body>
+<body class="on-cal">
 <div class="fcl" id="fcLogin">
   <img class="logo" src="icons/icon-192.png" alt="">
   <div class="app">승훈스 고정비앱 V1</div>
@@ -831,6 +873,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   <div class="top-in">
     <h1 id="title">결제 달력</h1>
     <button class="sync" id="sync" type="button"><span class="sp"></span><span id="syncTxt"></span></button>
+    <div class="calnav" id="calNav">
+      <button class="today-btn" type="button" id="calToday" hidden><span>오늘</span></button>
+      <button class="nav" type="button" id="calPrev" aria-label="이전 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="nav" type="button" id="calNext" aria-label="다음 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
     <button class="ibtn" id="menuBtn" type="button" aria-label="설정"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.9"/><circle cx="12" cy="12" r="1.9"/><circle cx="19" cy="12" r="1.9"/></svg></button>
   </div>
   <div class="loadbar" id="loadbar"><i></i></div>
@@ -839,14 +886,17 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 <main class="tab on" id="tab-cal">
   <div id="welcome"></div>
   <div id="nodate"></div>
-  <div id="sumline" class="hero"></div>
-  <div class="cal" id="cal"></div>
+  <div class="mo"><div id="sumline" class="hero"></div><div class="cal" id="cal"></div></div>
   <div id="home"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
 </main>
 <main class="tab" id="tab-setup"></main>
 <main class="tab" id="tab-list">
-  <div class="bar2"><span id="countTxt"></span><span class="sortsel" id="sortWrap"></span></div>
-  <div id="list"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+  <div class="bar2"><span id="countTxt"></span></div>
+  <div class="fchips" id="catFilter"></div>
+  <div class="lcard">
+    <div class="th" id="lhead"><span></span><button type="button" data-sort="name">항목<i></i></button><button type="button" data-sort="amt">금액<i></i></button><button type="button" data-sort="day">결제일<i></i></button></div>
+    <div class="grp tbl" id="list"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
+  </div>
 </main>
 
 <nav class="tabbar"><div class="tabbar-in">
@@ -1430,6 +1480,70 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     return { y: y, m: m };
   }
 
+  /* ================= 분류 9가지 =================
+   * 서버는 분류를 글자 그대로 저장함(정해 둔 목록에 없는 글자도 받음). 예전 7가지(월세·관리비·통신비·보험·서비스·구독·기타)로
+   * 저장된 항목은 여기서 새 9가지로 읽어서 보여주고, 고쳐서 저장할 때 새 이름으로 바뀜. 색은 맨 위 --c-* 변수. */
+  var CAT_SVG = {
+    home: '<path d="M11.2 3.3a1.25 1.25 0 0 1 1.6 0l7.6 6.4c.38.32.6.79.6 1.29V19a2 2 0 0 1-2 2h-3.4a.6.6 0 0 1-.6-.6v-4.2a1.7 1.7 0 0 0-1.7-1.7h-2.6a1.7 1.7 0 0 0-1.7 1.7v4.2a.6.6 0 0 1-.6.6H5a2 2 0 0 1-2-2v-8.01c0-.5.22-.97.6-1.29z"/>',
+    util: '<path d="M13.9 2.6c.5-.64 1.52-.2 1.4.6l-.86 5.9h4.3c.84 0 1.3.97.78 1.62l-9.42 10.7c-.5.63-1.52.19-1.4-.61l.86-5.91h-4.3c-.84 0-1.3-.97-.78-1.62z"/>',
+    tel: '<path fill-rule="evenodd" d="M8.6 2.25h6.8A2.6 2.6 0 0 1 18 4.85v14.3a2.6 2.6 0 0 1-2.6 2.6H8.6A2.6 2.6 0 0 1 6 19.15V4.85a2.6 2.6 0 0 1 2.6-2.6zm2 15.35a.9.9 0 0 0 0 1.8h2.8a.9.9 0 0 0 0-1.8z"/>',
+    sub: '<path fill-rule="evenodd" d="M6 3.75h12A3.25 3.25 0 0 1 21.25 7v10A3.25 3.25 0 0 1 18 20.25H6A3.25 3.25 0 0 1 2.75 17V7A3.25 3.25 0 0 1 6 3.75zm4.1 5.03v6.44c0 .6.66.96 1.16.63l4.95-3.22a.75.75 0 0 0 0-1.26l-4.95-3.22a.75.75 0 0 0-1.16.63z"/>',
+    ins: '<path fill-rule="evenodd" d="M11.57 2.37a1.25 1.25 0 0 1 .86 0l6.75 2.45c.5.18.82.65.82 1.17v5.26c0 4.75-3.02 8.36-7.57 10.1a1.2 1.2 0 0 1-.86 0C7.02 19.61 4 16 4 11.25V5.99c0-.52.33-.99.82-1.17zm4.4 7.6a.95.95 0 0 0-1.34-1.34l-3.63 3.63-1.63-1.63a.95.95 0 0 0-1.34 1.34l2.3 2.3c.37.37.97.37 1.34 0z"/>',
+    loan: '<path d="M11.45 2.4a1.2 1.2 0 0 1 1.1 0l7.8 4.02c.4.2.65.62.65 1.07v.71a.8.8 0 0 1-.8.8H3.8a.8.8 0 0 1-.8-.8v-.71c0-.45.25-.86.65-1.07zM5.2 10.6h2.3a.5.5 0 0 1 .5.5v5.3a.5.5 0 0 1-.5.5H5.2a.5.5 0 0 1-.5-.5v-5.3a.5.5 0 0 1 .5-.5zm5.65 0h2.3a.5.5 0 0 1 .5.5v5.3a.5.5 0 0 1-.5.5h-2.3a.5.5 0 0 1-.5-.5v-5.3a.5.5 0 0 1 .5-.5zm5.65 0h2.3a.5.5 0 0 1 .5.5v5.3a.5.5 0 0 1-.5.5h-2.3a.5.5 0 0 1-.5-.5v-5.3a.5.5 0 0 1 .5-.5zM4 18.5h16a1.25 1.25 0 0 1 1.25 1.25v.5A1.25 1.25 0 0 1 20 21.5H4a1.25 1.25 0 0 1-1.25-1.25v-.5A1.25 1.25 0 0 1 4 18.5z"/>',
+    save: '<ellipse cx="11.3" cy="12.7" rx="7.8" ry="6.2"/><path d="M15.8 9.6h3.6c.88 0 1.6.72 1.6 1.6v2.6c0 .88-.72 1.6-1.6 1.6h-3.6z"/><path d="M12.9 7.6l.62-3.2c.1-.5.7-.68 1.05-.32l2.63 2.72z"/><rect x="5.9" y="16.4" width="3" height="4.6" rx="1.2"/><rect x="13" y="16.4" width="3" height="4.6" rx="1.2"/><circle cx="15.3" cy="11.2" r="1" fill="var(--cc)"/><rect x="7.6" y="8.3" width="4.2" height="1.3" rx=".65" fill="var(--cc)"/>',
+    edu: '<path d="M11.38 3.5a1.4 1.4 0 0 1 1.24 0l9.02 4.42c.75.37.75 1.44 0 1.8l-.84.42v4.36a.9.9 0 0 1-1.8 0v-3.48l-6.38 3.13a1.4 1.4 0 0 1-1.24 0L2.36 9.73a1 1 0 0 1 0-1.8zM5.6 13.3l5.1 2.5c.82.4 1.78.4 2.6 0l5.1-2.5v2.9c0 .4-.2.78-.54 1-1.7 1.13-3.7 1.8-5.86 1.8s-4.16-.67-5.86-1.8a1.2 1.2 0 0 1-.54-1z"/>',
+    etc: '<circle cx="5.5" cy="12" r="2.1"/><circle cx="12" cy="12" r="2.1"/><circle cx="18.5" cy="12" r="2.1"/>'
+  };
+  var CATS = [
+    { k: '주거', c: 'home', hint: '월세·관리비', eg: ['월세', '관리비', '주차비'] },
+    { k: '공과금', c: 'util', hint: '전기·가스·수도', eg: ['전기요금', '도시가스', '수도요금', 'TV 수신료'] },
+    { k: '통신', c: 'tel', hint: '휴대폰·인터넷', eg: ['휴대폰 요금', '인터넷', 'IPTV'] },
+    { k: '구독', c: 'sub', hint: 'OTT·멤버십', eg: ['넷플릭스', '유튜브 프리미엄', '쿠팡 와우', '네이버플러스', '헬스장', '정수기 렌탈'] },
+    { k: '보험', c: 'ins', hint: '실손·자동차', eg: ['실손보험', '자동차보험', '암보험', '운전자보험'] },
+    { k: '대출', c: 'loan', hint: '이자·할부', eg: ['전세대출 이자', '주택담보대출', '신용대출', '학자금 대출', '자동차 할부'] },
+    { k: '저축', c: 'save', hint: '적금·청약', eg: ['적금', '주택청약', '연금저축', 'IRP'] },
+    { k: '교육', c: 'edu', hint: '학원·수강료', eg: ['학원비', '인터넷 강의', '학습지', '레슨비'] },
+    { k: '기타', c: 'etc', hint: '그 밖의 것', eg: ['모임 회비', '후원금', '용돈'] }
+  ];
+  var catByK = {};
+  CATS.forEach(function (c) { catByK[c.k] = c; });
+  var CAT_OLD = { '월세': '주거', '통신비': '통신', '보험': '보험', '구독': '구독' };   // 예전 분류 중 뜻이 분명한 것
+  var CAT_OLD2 = { '관리비': '주거', '서비스': '구독' };                              // 뜻이 넓어서 이름부터 보고 가리는 것 (분류가 비어 있을 때도 이름부터 봄)
+  var CAT_RE = [
+    ['보험', /보험|실손|실비/], ['대출', /대출|이자|할부|원리금|상환/], ['저축', /적금|저축|청약|연금|펀드|투자|예금|ISA|IRP/i],
+    ['통신', /통신|휴대폰|핸드폰|인터넷|와이파이|IPTV|알뜰폰|요금제/i],
+    ['구독', /넷플릭스|유튜브|디즈니|티빙|웨이브|왓챠|쿠팡|네이버|멜론|스포티파이|아이클라우드|icloud|chatgpt|구독|멤버십|렌탈|정수기|헬스|필라테스/i],
+    ['공과금', /전기|가스|수도|난방|수신료|세금|자동차세|재산세|주민세|공과금/], ['교육', /학원|교육|수강|과외|등록금|학습지|레슨|강의|학비|유치원|어린이집/],
+    ['주거', /월세|전세|관리비|주차|임대료|집세|기숙사|고시원/]
+  ];
+  function catGuess(name) { name = String(name || ''); for (var i = 0; i < CAT_RE.length; i++) if (CAT_RE[i][1].test(name)) return CAT_RE[i][0]; return ''; }
+  /** 저장된 분류 글자(raw)와 이름으로 9가지 중 하나를 고름 */
+  function catKeyOf(raw, name) {
+    raw = String(raw || '').trim();
+    if (catByK[raw]) return raw;
+    if (CAT_OLD[raw]) return CAT_OLD[raw];
+    return catGuess(name) || CAT_OLD2[raw] || '기타';
+  }
+  function catKey(it) { return catKeyOf(it.cat, it.name); }
+  /** 화면에 보일 분류 이름: 직접 적어 둔 분류(9가지도 예전 7가지도 아닌 글자)는 그 글자 그대로 */
+  function catText(it) {
+    var raw = String(it.cat || '').trim();
+    return raw && !catByK[raw] && !CAT_OLD[raw] && !CAT_OLD2[raw] ? raw : catKey(it);
+  }
+  function catIc(k, cls) {
+    var c = catByK[k] || catByK['기타'];
+    return '<span class="cic' + (cls ? ' ' + cls : '') + '" style="--cc:var(--c-' + c.c + ')"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">' + CAT_SVG[c.c] + '</svg></span>';
+  }
+  function catGridHtml(cur) {
+    return '<div class="cgrid">' + CATS.map(function (c) {
+      return '<button class="ct' + (c.k === cur ? ' on' : '') + '" type="button" data-cat="' + c.k + '">' + catIc(c.k) + '<b>' + c.k + '</b><small>' + c.hint + '</small></button>';
+    }).join('') + '</div>';
+  }
+  function isCatField(f) { return /^분류/.test(f.label); }
+  function catFieldOf() { return S.meta.fields.filter(isCatField)[0]; }
+  /** 분류를 9가지 그림으로 고르는지 (구글 시트에서 분류 목록을 잠가 둔 경우엔 예전처럼 목록에서 고름) */
+  function catOn() { var f = S && S.meta && catFieldOf(); return !!f && !f.strict && (f.kind === 'select' || f.kind === 'text'); }
+
   /* ================= 줄 하나 ================= */
   // o: { it, cls, line2, st, stc, check: 'toggle'|'ack'|'open'|'none', key, ackKey }
   //  왼쪽: 이름 + 결제 수단 / 오른쪽: 금액 + 상태(며칠 지남·언제)
@@ -1494,10 +1608,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     occ.forEach(function (o) { (byDay[o.due] = byDay[o.due] || []).push(o); });
 
     var hol = (S && S.holidays) || {};
-    var h = '<div class="ch"><div class="mt"><b>' + m + '월</b><span>' + y + '</span></div>' +
-      (view.off ? '<button class="today-btn" type="button" id="calToday"><span>오늘</span></button>' : '') +
-      '<button class="nav" type="button" id="calPrev"' + (view.off <= -12 ? ' disabled' : '') + ' aria-label="이전 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>' +
-      '<button class="nav" type="button" id="calNext"' + (view.off >= 11 ? ' disabled' : '') + ' aria-label="다음 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button></div><div class="cg">';
+    setTitle();
+    var h = '<div class="cg">';
     for (var w = 0; w < 7; w++) h += '<div class="wd' + (w === 0 ? ' sun' : w === 6 ? ' sat' : '') + '">' + WD.charAt(w) + '</div>';
     var first = new Date(y, m - 1, 1).getDay();
     for (var b = 0; b < first; b++) h += '<div class="cd"></div>';
@@ -1525,10 +1637,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     occ.forEach(function (o) { if (o.amt != null) { total += o.amt; if (o.st === 'paid') paidSum += o.amt; } });
     var left = total - paidSum;
     $('sumline').innerHTML = total > 0
-      ? '<div class="lb">' + m + '월에 더 낼 돈</div>' +
-        '<div class="num" data-fit="hero" data-short="' + esc(wonShort(left)) + '">' + num(left) + '<small>원</small></div>' +
-        '<div class="bar" role="img" aria-label="' + Math.round(paidSum / total * 100) + '% 냈어요"><i style="width:' + (paidSum / total * 100).toFixed(1) + '%"></i></div>' +
-        '<div class="cp"><span><b>' + won(paidSum) + '</b> 냈어요</span><span>전체 ' + won(total) + '</span></div>'
+      ? '<div class="hr"><span class="lb">' + m + '월에 더 낼 돈</span><span class="tot">전체 ' + won(total) + '</span></div>' +
+        '<div class="hr"><div class="num" data-fit="hero" data-short="' + esc(wonShort(left)) + '">' + num(left) + '<small>원</small></div><span class="pd"><b>' + won(paidSum) + '</b> 냈어요</span></div>' +
+        '<div class="bar" role="img" aria-label="' + Math.round(paidSum / total * 100) + '% 냈어요"><i style="width:' + (paidSum / total * 100).toFixed(1) + '%"></i></div>'
       : '';
     fitAll($('sumline'));
     rollNum($('sumline').querySelector('.num'), total > 0 ? left : null, y + '-' + m);
@@ -1589,13 +1700,20 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!items().length && !view.sel) lh = '';   // 아직 아무것도 없으면 맨 위 안내(자주 쓰는 항목)만
     $('home').innerHTML = lh;
 
-    var pv = $('calPrev'), nx2 = $('calNext'), td = $('calToday'), sc = $('selClear'), pa = $('payAll'), pf = $('paidFold');
-    pv.onclick = function () { moveMonth(-1); };
-    nx2.onclick = function () { moveMonth(1); };
-    if (td) td.onclick = function () { view.off = 0; view.sel = ''; renderHome(); };
+    var sc = $('selClear'), pa = $('payAll'), pf = $('paidFold');
     if (sc) sc.onclick = function () { view.sel = ''; renderHome(); };
     if (pa) pa.onclick = payAll;
     if (pf) pf.onclick = function () { view.paidOpen = !view.paidOpen; renderHome(); };
+  }
+  /** 위 막대 제목: 달력 탭이면 보고 있는 달(+ 달 넘기기 단추 상태), 목록 탭이면 '고정비 목록' */
+  function setTitle() {
+    var t = $('title');
+    if (tab !== 'cal') { if (t._html !== 'L') { t.textContent = '고정비 목록'; t._html = 'L'; } return; }
+    var vm = viewYM(), th = vm.m + '월<small>' + vm.y + '</small>';
+    if (t._html !== th) { t.innerHTML = th; t._html = th; }
+    $('calToday').hidden = !view.off;
+    $('calPrev').disabled = view.off <= -12;
+    $('calNext').disabled = view.off >= 11;
   }
   function occRow(o) {
     var it = o.it;
@@ -1629,70 +1747,39 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     parts.push(acctTxt(it));
     return joinDot(parts);
   }
-  function buildSections() {
-    var secs = [];
-    var all = S.items;
-    var sepAt = -1;
-    for (var i = 0; i < all.length; i++) if (all[i].sep) { sepAt = i; break; }
-    var top = all.filter(function (x, i) { return !x.sep && !x.ghost && (sepAt < 0 || i < sepAt); });
-    var bottom = all.filter(function (x, i) { return !x.sep && !x.ghost && sepAt >= 0 && i > sepAt; });
-    var ghosts = all.filter(function (x) { return x.ghost; });
-    var m = parse(today()).m;
-    var pm = prevMonth();
-
-    var rem = reminders();
-    var over = top.filter(isOverduePrev);
-    if (rem.length || over.length) {
-      secs.push({ id: 'miss', title: pm.m + '월에 놓친 것', sub: (over.length + rem.length) + '건',
-        act: rem.length ? '모두 확인' : '',
-        rows: over.map(function (it) { return { it: it, cls: 'grey' }; }).concat(rem.map(function (r) { return { remind: r }; })) });
-    }
-    var cur = top.filter(function (it) { return !isOverduePrev(it) && !isMissing(it); });
-    var remain = 0, cnt = 0;
-    cur.forEach(function (it) { if (it.section === 1 && !it.checked) { cnt++; if (typeof it.thisMonth === 'number') remain += it.thisMonth; } });
-    secs.push({ id: 'cur', title: m + '월에 낼 것', sub: cnt + '건', tot: cnt ? won(remain) : '',
-      rows: cur.map(function (it) { return { it: it }; }).concat(ghosts.map(function (g) { return { ghost: g }; })),
-      empty: items().length ? '이번 달 낼 건 다 냈어요' : '아직 넣은 고정비가 없어요. 아래 줄에 이름부터 적어보세요.' });
-    var miss = top.filter(isMissing);
-    if (miss.length) {
-      secs.push({ id: 'nodate', title: '결제일 없음', sub: miss.length + '건 · 달력에 안 나와요',
-        rows: miss.map(function (it) { return { it: it }; }) });
-    }
-    var later = bottom.filter(function (it) { return it.section !== 5; });
-    var ended = bottom.filter(function (it) { return it.section === 5; });
-    if (later.length) secs.push({ id: 'later', title: '냈거나 다음 달 이후', sub: later.length + '건', rows: later.map(function (it) { return { it: it }; }) });
-    if (ended.length) secs.push({ id: 'ended', title: '끝난 항목', sub: ended.length + '건', rows: ended.map(function (it) { return { it: it, cls: 'muted' }; }) });
-
-    secs.forEach(function (sec) {
-      var anchor = null;   // 바로 위에 있는 상위 항목 이름 (하위 항목 들여쓰기 기준)
-      sec.rows.forEach(function (r) {
-        if (r.remind) {
-          var it = r.remind.it;
-          r.key = 'r:' + r.remind.key;
-          r.name = it.name;
-          r.cls = 'row tr grey';
-          r.html = trHtml(it, { check: 'ack', ackKey: r.remind.key, dayHtml: '<span class="dv">' + pm.m + '월</span><small class="over">기록 없음</small>' });
-          anchor = null;
-          return;
-        }
-        if (r.ghost) {   // 방금 적은 새 항목: 서버 답을 기다리는 동안 흐리게 먼저 보여줌
-          r.key = 'g:' + r.ghost.name;
-          r.name = r.ghost.name;
-          r.cls = 'row tr ghost';
-          r.html = ghostHtml(r.ghost);
-          anchor = null;
-          return;
-        }
-        var it2 = r.it;
-        var under = !!(it2.parent && anchor === it2.parent);
-        if (!it2.parent) anchor = it2.name; else if (!under) anchor = null;
-        r.key = 'i:' + it2.name;
-        r.name = it2.name;
-        r.cls = 'row tr' + (under ? ' child' : '') + (it2.checked ? ' checked' : '') + (it2.pending ? ' pending' : '') + (openRow === it2.name ? ' open' : '') + (r.cls ? ' ' + r.cls : '');
-        r.html = trHtml(it2, { check: 'toggle' });
-      });
+  /* 묶음 없이 한 장. 칸 제목(항목·금액·결제일)을 누르면 그 기준으로 줄 세우고, 한 번 더 누르면 거꾸로. 위 알약으로 분류만 골라 봄.
+   * 줄 순서와 고른 분류는 이 기기에만 기억 (서버의 정렬 값은 안 건드림). 냈는지 체크는 첫 화면에서 함. */
+  var lv = (function () {
+    var o = load('fc_list') || {};
+    return { sort: /^(day|amt|name)$/.test(o.sort) ? o.sort : 'day', dir: o.dir === -1 ? -1 : 1, cat: '' };
+  })();
+  function listRows() {
+    var all = items(), byName = {};
+    all.forEach(function (it) { byName[it.name] = it; });
+    var shown = lv.cat ? all.filter(function (it) { return catKey(it) === lv.cat; }) : all;
+    var inShown = {};
+    shown.forEach(function (it) { inShown[it.name] = 1; });
+    var key = function (it) { return lv.sort === 'amt' ? it.amount : lv.sort === 'name' ? it.name : (it.day || null); };
+    var cmp = function (a, b) {
+      var ea = a.section === 5 ? 1 : 0, eb = b.section === 5 ? 1 : 0;
+      if (ea !== eb) return ea - eb;                                   // 끝난 항목은 늘 맨 아래
+      var x = key(a), y = key(b);
+      if (x == null || y == null) { if (x != null) return -1; if (y != null) return 1; }   // 값이 없는 것(결제일 없음·금액 없음)도 늘 아래
+      else if (x !== y) return (typeof x === 'string' ? x.localeCompare(y, 'ko') : x - y) * lv.dir;
+      if (lv.sort !== 'amt' && (a.amount || 0) !== (b.amount || 0)) return (b.amount || 0) - (a.amount || 0);
+      return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+    };
+    // 하위 항목은 상위 항목 바로 아래에 (상위가 같이 보일 때만. 상위의 상위는 없음)
+    var isKid = function (it) { var p = it.parent && it.parent !== it.name && inShown[it.parent] ? byName[it.parent] : null; return !!p && !(p.parent && inShown[p.parent] && p.parent !== p.name); };
+    var kids = {}, tops = [];
+    shown.forEach(function (it) { if (isKid(it)) (kids[it.parent] = kids[it.parent] || []).push(it); else tops.push(it); });
+    tops.sort(cmp);
+    var rows = [];
+    tops.forEach(function (it) {
+      rows.push({ it: it });
+      (kids[it.name] || []).sort(cmp).forEach(function (k) { rows.push({ it: k, child: true }); });
     });
-    return secs;
+    return rows;
   }
 
   /* ---------- 표 한 줄 ---------- */
@@ -1738,34 +1825,23 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }
     return '<span class="dv">' + (it.day >= 31 ? '말일' : it.day + '일') + '</span>';
   }
-  function trHtml(it, o) {
-    // 이름 아래 작은 줄: 주기(3개월마다·매년), 마지막 결제. 지남·임박은 결제일 아래에.
+  function trHtml(it) {
+    // 이름 아래 작은 줄: 주기(3개월마다·매년), 마지막 결제, 끝남
     var tags = '';
     var cs = cycleShort(it);
     if (cs) tags += '<span class="tag">' + esc(cs) + '</span>';
-    if (it.last && it.section !== 5) tags += '<span class="tag lastp">마지막 결제</span>';
+    if (it.section === 5) tags += '<span class="tag">' + (it.status === '종료' ? '종료' : '끝남') + '</span>';
+    else if (it.last) tags += '<span class="tag lastp">마지막 결제</span>';
     var nameHtml = '<span class="nw"><span class="nm">' + esc(it.name) + '</span>' + (tags ? '<span class="tgs">' + tags + '</span>' : '') + '</span>';
     var amt = it.amount != null ? '<span class="av" data-fit data-short="' + esc(man(it.amount)) + '">' + esc(num(it.amount)) + '</span>' : '<span class="emp">금액 없음</span>';
-    var day = o.dayHtml;
-    if (!day) {
-      if (needsDate(it)) day = '<span class="nod">넣기</span>';
-      else if (!it.day) day = '<span class="emp">-</span>';
-      else {
-        day = dayCell(it);
-        if (it.section === 1 && !it.checked && it.next) {
-          var d = ddays(it.next);
-          if (d < 0) day += '<small class="over">' + (-d) + '일 지남</small>';
-          else if (d <= 3) day += '<small class="soon">' + esc(relDay(it.next)) + '</small>';
-        }
-      }
-    }
+    var day = needsDate(it) ? '<span class="nod">넣기</span>' : !it.day ? '<span class="emp">-</span>' : dayCell(it);
     var h = '<div class="tg">' +
-      '<button class="chk" type="button" data-act="' + o.check + '"' + (o.ackKey ? ' data-key="' + esc(o.ackKey) + '"' : '') + ' aria-label="' + (o.ackKey ? '확인했어요' : '냈어요 체크') + '"><i>' + CHECK_SVG + '</i></button>' +
+      '<div class="tc icc" data-act="expand">' + catIc(catKey(it), 's') + '</div>' +
       '<div class="tc nmc" data-act="expand">' + nameHtml + '</div>' +
       '<div class="tc amc" data-act="cell" data-f="amt">' + amt + '</div>' +
       '<div class="tc dyc" data-act="cell" data-f="day">' + day + '</div></div>' +
-      (o.ackKey ? '' : '<button class="swdel" type="button" data-act="del" tabindex="-1">삭제</button>');
-    if (openRow === it.name && !o.ackKey) {
+      '<button class="swdel" type="button" data-act="del" tabindex="-1">삭제</button>';
+    if (openRow === it.name) {
       var acct = String(it.account || '').trim();
       var linked = acct ? accMemo(acct) : '';
       var nextS = it.checked ? (it.next ? '이번 결제 냄 · 다음 ' + esc(fmtDate(it.next)) : '이번 결제 냄')
@@ -1776,14 +1852,14 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
         kl('다음 결제', nextS) +
         kl('결제 수단', acct ? esc(acct === '?' ? '? (확인 필요)' : acct) + (linked ? ' · ' + esc(linked) : '') : '없음') +
         kl('얼마나 자주', esc(joinDot([it.cycle, it.amtType === '변동' ? '변동 금액' : '']))) +
-        kl('분류', esc(it.cat)) + kl('결제처', esc(it.vendor)) + kl('상위 항목', esc(it.parent)) +
+        kl('분류', esc(catText(it))) + kl('결제처', esc(it.vendor)) + kl('상위 항목', esc(it.parent)) +
         kl('기간', period) + kl('메모', esc(it.memo)) +
         '<div class="tb"><button type="button" data-act="edit">수정</button></div></div>';
     }
     return h;
   }
   function ghostHtml(g) {
-    return '<div class="tg"><span class="chk"><span class="spin"></span></span>' +
+    return '<div class="tg"><span class="tc icc"><span class="spin"></span></span>' +
       '<div class="tc nmc"><span class="nw"><span class="nm">' + esc(g.name) + '</span><span class="tgs"><span class="tag">저장하는 중…</span></span></span></div>' +
       '<div class="tc amc">' + (g.amount != null ? '<span class="av" data-fit data-short="' + esc(man(g.amount)) + '">' + esc(num(g.amount)) + '</span>' : '<span class="emp">금액 없음</span>') + '</div>' +
       '<div class="tc dyc">' + (g.day ? '<span class="dv">' + (g.day >= 31 ? '말일' : g.day + '일') + '</span>' : '<span class="nod">넣기</span>') + '</div></div>';
@@ -1854,6 +1930,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var vals = {};
       S.meta.fields.forEach(function (f) { var dv = defaultFor(f); if (dv) vals[f.col] = dv; });
       vals[S.meta.nameCol] = name;
+      if (catOn()) { var nc = lv.cat || catGuess(name); if (nc) vals[catFieldOf().col] = nc; }
       var af = amtFieldOf(), df = dayFieldOf();
       if (af) vals[af.col] = am.value.replace(/[^\d]/g, '');
       if (df) vals[df.col] = d;
@@ -1862,7 +1939,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       nm.value = ''; am.value = ''; dy.value = '';
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       // 서버 답(몇 초)을 기다리지 않고 바로 목록에 흐리게 보여줌. 저장이 끝나면 진짜 줄로 바뀜
-      var ghost = { ghost: true, name: name, amount: af && vals[af.col] ? Number(vals[af.col]) : null, day: d ? Number(d) : 0 };
+      var ghost = { ghost: true, name: name, cat: lv.cat || catGuess(name), amount: af && vals[af.col] ? Number(vals[af.col]) : null, day: d ? Number(d) : 0 };
       addGhost(ghost);
       enqueue({ type: 'save', oldName: '', vals: vals, ghost: ghost, onDone: function (res) {
         if (!res.ok) return;
@@ -1887,17 +1964,15 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       '<span class="nms">' + esc(names) + '</span><span class="go">넣기' + R_SVG + '</span></button>';
     $('ndBtn').onclick = function () { openNoDate(); };
   }
-  /* 아직 아무것도 안 넣은 사람: 자주 쓰는 항목을 누르면 이름(과 분류)이 채워진 새 항목 창이 열림 */
-  var PRESETS = [['월세', '월세'], ['관리비', '관리비'], ['통신비', '통신비'], ['인터넷', '통신비'], ['넷플릭스', '구독'], ['유튜브 프리미엄', '구독'], ['보험', '보험'], ['적금', '기타']];
+  /* 아직 아무것도 안 넣은 사람: 큰 버튼 하나. 누르면 분류 고르기부터 */
   function renderWelcome() {
     var box = $('welcome');
     var show = !!S && !S.items.some(function (x) { return !x.sep; });
     if (!show) { if (box._on) { box.innerHTML = ''; box._on = false; } return; }
     if (box._on) return;
     box._on = true;
-    box.innerHTML = '<div class="welcome"><h2>매달 나가는 돈,<br>한 번만 적어두세요</h2><p>자주 쓰는 것부터 눌러보세요. 금액과 결제일만 적으면 끝나요.</p><div class="chips">' +
-      PRESETS.map(function (p, i) { return '<button class="chip" type="button" data-preset="' + i + '">' + PLUS_SVG + esc(p[0]) + '</button>'; }).join('') +
-      '<button class="chip add" type="button" data-preset="-1">직접 입력</button></div></div>';
+    box.innerHTML = '<div class="welcome"><h2>매달 나가는 돈,<br>한 번만 적어두세요</h2><p>종류를 고르고 금액과 결제일만 적으면 달력에 나와요.</p>' +
+      '<button class="btn primary" type="button" id="wAdd">' + PLUS_SVG + '첫 고정비 넣기</button></div>';
   }
   function openNoDate(only) {
     var list = items().filter(function (it) { return only ? only.indexOf(it.name) >= 0 : needsDate(it); });
@@ -1949,12 +2024,19 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     };
   }
 
+  var UD_SVG = '<svg viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><path d="M5 1.2 8.2 5H1.8zM5 12.8 1.8 9h6.4z"/></svg>';
+  var UP_SVG = '<svg viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><path d="M5 3 9 9H1z"/></svg>';
+  var DN_SVG = '<svg viewBox="0 0 10 14" fill="currentColor" aria-hidden="true"><path d="M5 11 1 5h8z"/></svg>';
   function renderList() {
     var list = $('list');
     if (firstRender) list.innerHTML = '';
     var before = {};
     for (var k in els) if (els[k].isConnected) before[k] = els[k].getBoundingClientRect().top;
-    var secs = buildSections();
+    var all = items(), counts = {};
+    all.forEach(function (it) { var c = catKey(it); counts[c] = (counts[c] || 0) + 1; });
+    if (lv.cat && !counts[lv.cat]) lv.cat = '';   // 골라 보던 분류에 항목이 안 남았으면 전체로
+    var rows = listRows();
+    var ghosts = S.items.filter(function (x) { return x.ghost; });
     var keep = {};
     function get(key) {
       var el = els[key];
@@ -1962,51 +2044,39 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       keep[key] = 1;
       return el;
     }
-    secs.forEach(function (sec, si) {
-      var h = get('h:' + sec.id);
-      var hh = '<span class="t">' + esc(sec.title) + '</span><span class="s">' + esc(sec.sub || '') + '</span>' + (sec.tot ? '<span class="tt">' + esc(sec.tot) + '</span>' : '') +
-        (sec.act ? '<button type="button" data-act="ackall">' + esc(sec.act) + '</button>' : '');
-      if (h._html !== hh) { h.innerHTML = hh; h._html = hh; }
-      h.className = 'gh';
-      list.appendChild(h);
-      var g = get('g:' + sec.id);
-      g.className = 'grp tbl';
-      list.appendChild(g);
-      if (si === 0) {   // 칸 머리(항목·금액·결제일)는 맨 위 묶음에 한 번만
-        var th = get('t:' + sec.id);
-        if (!th._html) { th._html = 1; th.innerHTML = '<span></span><span>항목</span><span>금액</span><span>결제일</span>'; }
-        th.className = 'th';
-        g.appendChild(th);
-      }
-      if (!sec.rows.length && sec.empty) {
-        var e = get('e:' + sec.id);
-        e.className = 'empty';
-        if (e._html !== sec.empty) { e.textContent = sec.empty; e._html = sec.empty; }
-        g.appendChild(e);
-      }
-      sec.rows.forEach(function (r) {
-        var el = get(r.key);
-        el.setAttribute('data-name', r.name);
-        if (el._html !== r.html && !el.querySelector('input.ci')) { el.innerHTML = r.html; el._html = r.html; }
-        var fl = el.classList.contains('flash') ? ' flash' : '';
-        var gone = el.classList.contains('gone') ? ' gone' : '';
-        el.className = r.cls + fl + gone + (el._new && !firstRender ? ' enter' : '');
-        g.appendChild(el);
-      });
-      if (sec.id === 'cur') {
-        var nr = get('new');
-        if (!nr._html) { nr._html = 1; nr.innerHTML = newRowHtml(); wireNewRow(nr); }
-        nr.className = 'row tr newr';
-        g.appendChild(nr);
-      }
+    if (!rows.length && !ghosts.length) {
+      var e = get('empty');
+      e.className = 'empty';
+      e.textContent = '아직 넣은 고정비가 없어요. 아래 줄에 이름부터 적어보세요.';
+      list.appendChild(e);
+    }
+    rows.forEach(function (r) {
+      var it = r.it, el = get('i:' + it.name), html = trHtml(it);
+      el.setAttribute('data-name', it.name);
+      if (el._html !== html && !el.querySelector('input.ci')) { el.innerHTML = html; el._html = html; }
+      var fl = el.classList.contains('flash') ? ' flash' : '';
+      var gone = el.classList.contains('gone') ? ' gone' : '';
+      el.className = 'row tr' + (r.child ? ' child' : '') + (it.section === 5 ? ' muted' : '') + (openRow === it.name ? ' open' : '') + fl + gone + (el._new && !firstRender ? ' enter' : '');
+      list.appendChild(el);
     });
+    ghosts.forEach(function (g) {   // 방금 적은 새 항목: 서버 답을 기다리는 동안 흐리게 먼저 보여줌
+      var el = get('g:' + g.name), html = ghostHtml(g);
+      el.setAttribute('data-name', g.name);
+      if (el._html !== html) { el.innerHTML = html; el._html = html; }
+      el.className = 'row tr ghost';
+      list.appendChild(el);
+    });
+    var nr = get('new');
+    if (!nr._html) { nr._html = 1; nr.innerHTML = newRowHtml(); wireNewRow(nr); }
+    nr.className = 'row tr newr';
+    list.appendChild(nr);
     for (var k2 in els) if (!keep[k2]) { els[k2].remove(); delete els[k2]; }
     for (var k3 in els) els[k3]._new = false;
     if (!firstRender) {
       var moved = [];
       Object.keys(keep).forEach(function (key) {
         var el = els[key];
-        if (before[key] === undefined || key.charAt(0) === 'g') return;
+        if (before[key] === undefined) return;
         var dy = before[key] - el.getBoundingClientRect().top;
         if (Math.abs(dy) < 1) return;
         el.style.transition = 'none';
@@ -2027,17 +2097,38 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }
     firstRender = false;
     fitAll(list);
-    // 맨 위 한 줄: 몇 개인지 + 한 달 평균(진행 중인 항목의 '한 달로 치면' 금액을 더한 값. 서버 요약과 같은 규칙)
-    var n2 = items().length, avg = 0;
-    items().forEach(function (it) { if (typeof it.monthly === 'number' && (!it.status || it.status === '진행중')) avg += it.monthly; });
-    var ct = n2 + '개' + (avg > 0 ? ' · 한 달 평균 <b>' + won(avg) + '</b>' : '');
+    // 맨 위 한 줄: 몇 개인지 + 한 달 평균(진행 중인 항목의 '한 달로 치면' 금액을 더한 값. 전체일 땐 서버 요약과 같은 규칙)
+    var n2 = 0, avg = 0;
+    all.forEach(function (it) {
+      if (lv.cat && catKey(it) !== lv.cat) return;
+      n2++;
+      if (typeof it.monthly === 'number' && (!it.status || it.status === '진행중')) avg += it.monthly;
+    });
+    var ct = (lv.cat ? esc(lv.cat) + ' ' : '') + n2 + '개' + (avg > 0 ? ' · 한 달 평균 <b>' + won(avg) + '</b>' : '');
     var cEl = $('countTxt');
     if (cEl._html !== ct) { cEl.innerHTML = ct; cEl._html = ct; }
-    var sh = '<span class="pl"><span id="sortLbl">' + esc(S.sort || '정렬') + '</span>' + DOWN_SVG + '</span><select id="sortSel" aria-label="정렬">';
-    (S.meta.sorts || []).forEach(function (mo) { sh += '<option' + (mo === S.sort ? ' selected' : '') + ' value="' + esc(mo) + '">' + esc(mo) + '</option>'; });
-    sh += '</select>';
-    var sw = $('sortWrap');
-    if (sw._html !== sh) { sw.innerHTML = sh; sw._html = sh; $('sortSel').onchange = function () { changeSort(this.value); }; }
+    // 분류 알약: 두 가지 넘게 있을 때만
+    var used = CATS.filter(function (c) { return counts[c.k]; });
+    var fh = used.length > 1 ? '<button type="button" class="fc' + (lv.cat ? '' : ' on') + '" data-cat="">전체<small>' + all.length + '</small></button>' +
+      used.map(function (c) { return '<button type="button" class="fc' + (lv.cat === c.k ? ' on' : '') + '" data-cat="' + c.k + '">' + c.k + '<small>' + counts[c.k] + '</small></button>'; }).join('') : '';
+    var fEl = $('catFilter');
+    if (fEl._html !== fh) { fEl.innerHTML = fh; fEl._html = fh; }
+    // 칸 제목: 지금 줄 세운 칸에 화살표
+    Array.prototype.forEach.call($('lhead').querySelectorAll('[data-sort]'), function (b) {
+      var on = b.getAttribute('data-sort') === lv.sort, st = on ? (lv.dir > 0 ? 'u' : 'd') : '';
+      if (b._st === st) return;
+      b._st = st;
+      b.classList.toggle('on', on);
+      b.querySelector('i').innerHTML = on ? (lv.dir > 0 ? UP_SVG : DN_SVG) : UD_SVG;
+      b.setAttribute('aria-sort', on ? (lv.dir > 0 ? 'ascending' : 'descending') : 'none');
+    });
+  }
+  /** 칸 제목을 눌렀을 때: 다른 칸이면 그 칸 기준(금액은 큰 것부터, 나머지는 작은 것·가나다부터), 같은 칸이면 거꾸로 */
+  function sortBy(kind) {
+    if (lv.sort === kind) lv.dir = -lv.dir; else { lv.sort = kind; lv.dir = kind === 'amt' ? -1 : 1; }
+    store('fc_list', { sort: lv.sort, dir: lv.dir });
+    openRow = null;
+    renderList();
   }
 
   function renderAll() {
@@ -2226,6 +2317,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     sheetBackFn = back || null;
     $('sheetBack').hidden = !back;
     $('sheetTitle').textContent = title;
+    $('sheetTitle').className = '';
     $('sheetBody').innerHTML = html;
     $('sheetBody').scrollTop = 0;
     $('sheetFoot').innerHTML = foot || '';
@@ -2238,6 +2330,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (wiping) return;
     if ((sheetMode === 'add' || sheetMode === 'edit') && draftKey) { clearTimeout(draftTimer); saveDraft(); }
     draftKey = null;
+    addKeep = null; addFresh = false;
     sheetMode = null;
     openName = null;
     sheetBackFn = null;
@@ -2298,7 +2391,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       it.method ? kv('결제 방식', esc(it.method)) : '',
       it.auto ? kv('자동이체', esc(it.auto === 'O' ? '예' : it.auto === 'X' ? '아니요' : it.auto)) : '',
       it.vendor ? kv('결제처', esc(it.vendor)) : '',
-      it.cat ? kv('분류', esc(it.cat)) : '',
+      kv('분류', esc(catText(it))),
       it.parent ? kv('상위 항목', esc(it.parent)) : '',
       period ? kv('기간', period) : '',
       (it.every || 1) > 1
@@ -2434,7 +2527,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function fbox(el) { return el && el.closest ? el.closest('.f, .fld') : null; }
   function fire(el) { try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {} }
   /* '더 적기' 안의 칸: 이름 옆에 작게 */
-  function fieldHtml(f, it) {
+  function fieldHtml(f, it, cat) {
+    if (isCatField(f) && catOn()) {   // 분류: 숨은 값 + 누르면 9가지 그림에서 고르는 단추
+      return '<div class="f" data-f="' + f.col + '"><label>분류</label><span class="ctl"><input type="hidden" id="f' + f.col + '" value="' + esc(it ? catText(it) : (cat || '')) + '">' +
+        '<button type="button" class="catb" id="catBtn"></button></span></div>';
+    }
     var val = it ? it.v[f.col] : defaultFor(f);
     var stack = f.kind === 'memo';
     return '<div class="f' + (stack ? ' stack' : '') + '" data-f="' + f.col + '"><label for="f' + f.col + '">' + esc(shortLabel(f)) + '</label>' +
@@ -2445,12 +2542,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   /* 꼭 적는 칸 다섯 개: 이름·금액은 크게, 주기는 5칸 버튼, 결제일은 숫자판, 결제 수단은 알약 */
   var CYC = [['매월', '매월'], ['2개월', '2개월'], ['분기(3개월)', '3개월'], ['반기(6개월)', '6개월'], ['매년', '매년']];
-  function mainFieldHtml(f, it) {
+  function mainFieldHtml(f, it, cat) {
     var val = it ? it.v[f.col] : defaultFor(f);
     var v = val == null ? '' : String(val), id = 'f' + f.col;
     var open = '<div class="fld" data-f="' + f.col + '">';
     if (f.col === S.meta.nameCol) {
-      return open + '<label for="' + id + '">이름</label><div class="inp"><input type="text" id="' + id + '" value="' + esc(v) + '" placeholder="예: 넷플릭스" autocomplete="off" enterkeyhint="next"></div></div>';
+      return open + '<label for="' + id + '">이름</label><div class="inp"><input type="text" id="' + id + '" value="' + esc(v) + '" placeholder="예: ' + esc(catByK[cat] ? catByK[cat].eg[0] : '넷플릭스') + '" autocomplete="off" enterkeyhint="next"></div>' +
+        (it ? '' : '<div class="sugg" id="sugg" hidden></div>') + '</div>';
     }
     if (isAmtField(f)) {
       var mv = v === '' ? '' : Number(v).toLocaleString('ko-KR');
@@ -2472,18 +2570,22 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     return open + '<div class="lrow"><label>결제 수단</label><button class="lnk" type="button" data-accmgr="1">관리</button></div>' + control(f, v, '') +
       ((S.accounts || []).length ? '' : '<div class="hint">한 번 저장하면 다음부터 눌러서 골라요</div>') + '</div>';
   }
-  function formHtml(it) {
-    var main = '', more = '', names = [];
+  function formHtml(it, cat) {
+    var main = '', more = '', names = [], filled = [];
     orderedFields(it).forEach(function (f) {
-      if (isMainField(f)) main += mainFieldHtml(f, it);
-      else { more += fieldHtml(f, it); names.push(shortLabel(f)); }
+      if (isMainField(f)) { main += mainFieldHtml(f, it, cat); return; }
+      more += fieldHtml(f, it, cat);
+      names.push(shortLabel(f));
+      var v = it ? it.v[f.col] : '';
+      if (it && v != null && String(v) !== '' && String(v) !== defaultFor(f)) filled.push(shortLabel(f));
     });
     var h = '<div class="ferr" id="formErr"></div>' + main;
     if (more) {
-      var open = !!it;   // 고칠 땐 펼쳐서, 새로 넣을 땐 접어서
-      h += '<button class="more' + (open ? ' open' : '') + '" type="button" id="moreBtn" aria-expanded="' + (open ? 'true' : 'false') + '"><span class="l"><b>더 적기</b><small>' +
-        esc(names.slice(0, 4).join(', ')) + (names.length > 4 ? ' 등 ' + names.length + '가지' : '') + '</small></span>' + DOWN_SVG + '</button>' +
-        '<div class="morebox' + (open ? ' on' : '') + '" id="moreBox">' + more + '</div>';
+      // 늘 접어 둠 (창이 한 화면에 들어오게). 고칠 땐 뭐가 적혀 있는지 옆에 알려줌
+      var list = filled.length ? filled : names;
+      h += '<button class="more" type="button" id="moreBtn" aria-expanded="false"><span class="l"><b>더 적기</b><small>' +
+        esc(list.slice(0, 3).join(', ')) + (list.length > 3 ? ' 등 ' + list.length + '가지' : '') + (filled.length ? ' 적어둠' : '') + '</small></span>' + DOWN_SVG + '</button>' +
+        '<div class="morebox" id="moreBox">' + more + '</div>';
     }
     return h;
   }
@@ -2517,17 +2619,20 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     try { base = JSON.parse(draftBase) || {}; } catch (e) {}
     return Array.prototype.some.call(x.querySelectorAll('[id^="f"]'), function (el) { return JSON.stringify(cur[el.id]) !== JSON.stringify(base[el.id]); });
   }
-  function startDraft(it) {
+  // quiet: 분류·결제 수단을 고르고 돌아온 경우 (들고 있던 내용을 바로 다시 넣으니 저장분은 안 불러옴)
+  function startDraft(it, quiet) {
     draftKey = draftKeyFor(it);
     draftBase = JSON.stringify(snapForm());
     var saved = null;
     draftsMine();
     try { saved = localStorage.getItem(draftKey); } catch (e) {}
-    if (saved && saved !== draftBase) {
+    if (!quiet && saved && saved !== draftBase) {
       try { applySnap(JSON.parse(saved)); if (moreTouched()) showMore(true); } catch (e) {}
       toast('쓰던 내용을 불러왔어요.', { action: '지우기', ms: 5000, onAction: function () {
         dropDraft(it);
-        if (it) openEdit(it.name); else openAdd();
+        if (it) openEdit(it.name);
+        else if (sheetMode === 'add' && sheetBackFn) { addFresh = true; sheetUp(); }   // 분류 고르기부터 다시
+        else openAdd();
       } });
     }
     var body = $('sheetBody');
@@ -2537,31 +2642,83 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       body.addEventListener('input', later); body.addEventListener('change', later); body.addEventListener('click', later);
     }
   }
-  // pre: { name, cat } 첫 화면의 '자주 쓰는 항목'을 눌러서 들어온 경우
-  function openAdd(pre) {
+  /* 새 항목은 두 단계: ① 분류 9가지 중 하나 고르기 → ② 입력 칸. ②에서 ←(또는 폰 뒤로 가기)를 누르면 적던 내용을 든 채 ①로 */
+  var addKeep = null;      // 분류를 다시 고르러 간 동안 들고 있는 입력 내용 { snap, cat }
+  var addFresh = false;    // 쓰던 내용을 지우고 분류 고르기로 돌아가는 중
+  function openAdd() {
     openName = null;
-    if (pre) { try { localStorage.removeItem(draftKeyFor(null)); } catch (e) {} }
-    openSheet('새 항목', formHtml(null), 'add', null, saveFoot(null));
-    wireForm(null);
-    if (pre) {
-      var nm = $('f' + S.meta.nameCol);
-      if (nm) nm.value = pre.name;
-      var cf = S.meta.fields.filter(function (f) { return /^분류/.test(f.label); })[0], ce = cf && $('f' + cf.col);
-      if (ce && ce.tagName === 'SELECT' && Array.prototype.some.call(ce.options, function (o) { return o.value === pre.cat; })) ce.value = pre.cat;
-    }
-    startDraft(null);
-    if (pre) {
-      var af = amtFieldOf(), ae = af && $('f' + af.col);
-      if (ae) setTimeout(function () { if (sheetMode === 'add' && $('f' + af.col) === ae) ae.focus(); }, 320);
-    }
+    addKeep = null;
+    if (!catOn()) { openAddForm(''); return; }
+    var has = false;
+    draftsMine();
+    try { has = !!localStorage.getItem(draftKeyFor(null)); } catch (e) {}
+    openCatStep();
+    if (has) openAddForm('');   // 쓰던 내용이 있으면 바로 입력 칸으로 (분류도 쓰던 대로)
   }
-  function openEdit(name) {
+  function openCatStep() {
+    openSheet('어떤 고정비인가요?', catGridHtml(addKeep ? addKeep.cat : ''), 'addcat', null);
+    $('sheetBody').querySelector('.cgrid').onclick = function (e) {
+      var b = e.target.closest('[data-cat]');
+      if (!b) return;
+      buzz();
+      openAddForm(b.getAttribute('data-cat'));
+    };
+  }
+  function backToCats() {
+    if (addFresh) { addFresh = false; addKeep = null; }
+    else {
+      clearTimeout(draftTimer); saveDraft();
+      var ce = $('f' + catFieldOf().col);
+      addKeep = { snap: snapForm(), cat: ce ? ce.value : '' };
+    }
+    draftKey = null;
+    openCatStep();
+  }
+  function openAddForm(cat) {
+    var keep = addKeep, on = catOn();
+    addKeep = null;
+    openName = null;
+    openSheet('새 항목', formHtml(null, cat), 'add', on ? backToCats : null, saveFoot(null));
+    wireForm(null);
+    startDraft(null, !!keep);
+    if (keep) {
+      applySnap(keep.snap);
+      var ce = on && $('f' + catFieldOf().col);
+      if (ce) ce.value = cat;
+      if (moreTouched()) showMore(true);
+      saveDraft();
+    }
+    syncCat();
+    syncSugg();
+  }
+  /** 분류 단추·창 제목을 숨은 값에 맞춤 */
+  function syncCat() {
+    var b = $('catBtn'), f = b && catFieldOf(), el = f && $('f' + f.col);
+    if (!el) return;
+    var v = el.value, k = catByK[v] ? v : '기타';
+    b.innerHTML = (v ? catIc(k, 's') + '<span>' + esc(v) + '</span>' : '<span class="emp">고르기</span>') + R_SVG;
+    if (sheetMode === 'add') { $('sheetTitle').innerHTML = v ? catIc(k, 's') + '<span>' + esc(v) + ' 추가</span>' : '새 항목'; $('sheetTitle').className = v ? 'wic' : ''; }
+    var nm = $('f' + S.meta.nameCol);
+    if (nm && sheetMode === 'add') nm.placeholder = '예: ' + (catByK[v] ? catByK[v].eg[0] : '넷플릭스');
+  }
+  /** 이름 칸 아래 '자주 쓰는 이름': 고른 분류에서 아직 안 넣은 것만, 이름이 비어 있을 때만 */
+  function syncSugg() {
+    var box = $('sugg'), nm = S && $('f' + S.meta.nameCol);
+    if (!box || !nm) return;
+    var ce = catOn() ? $('f' + catFieldOf().col) : null, c = ce && catByK[ce.value];
+    var list = c && !nm.value ? c.eg.filter(function (n) { return !findItem(n); }) : [];
+    var h = list.map(function (n) { return '<button type="button" data-n="' + esc(n) + '">' + esc(n) + '</button>'; }).join('');
+    if (box._html !== h) { box.innerHTML = h; box._html = h; box.scrollLeft = 0; }
+    box.hidden = !list.length;
+  }
+  function openEdit(name, quiet) {
     var it = findItem(name);
     if (!it) return;
     openName = name;
     openSheet(it.name + ' 수정', formHtml(it), 'edit', null, saveFoot(it));
     wireForm(it);
-    startDraft(it);
+    startDraft(it, quiet);
+    syncCat();
     if (needsDate(it)) setTimeout(function () {
       var el = $('dayBtn');
       if (!el || sheetMode !== 'edit') return;
@@ -2606,6 +2763,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (el.hasAttribute('data-money')) { var mir = el.parentNode.querySelector('.mir'); if (mir) mir.textContent = el.value || '0'; }
     if (el.type === 'hidden') syncDateBtn(id);
     syncDay();
+    if ($('catBtn') && id === 'f' + catFieldOf().col) { syncCat(); syncSugg(); }
   }
   function wireForm(it) {
     var body = $('sheetBody');
@@ -2685,6 +2843,34 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     });
     var mb = $('moreBtn');
     if (mb) mb.onclick = function () { showMore(!mb.classList.contains('open')); };
+    // 분류 단추: 새 항목이면 한 단계 앞(분류 고르기)으로, 고치는 중이면 분류 고르기를 한 단계 더 열었다가 돌아옴
+    var cb = $('catBtn');
+    if (cb) cb.onclick = function () {
+      if (!it) { sheetUp(); return; }
+      var snap = snapForm(), nm0 = it.name, cid = 'f' + catFieldOf().col;
+      openSheet('분류 바꾸기', catGridHtml(snap[cid] ? snap[cid].v : ''), 'catpick', function () { reopenForm('edit', nm0, snap); });
+      $('sheetBody').querySelector('.cgrid').onclick = function (e) {
+        var b = e.target.closest('[data-cat]');
+        if (!b) return;
+        if (snap[cid]) snap[cid].v = b.getAttribute('data-cat');
+        buzz();
+        sheetUp();
+      };
+    };
+    // 자주 쓰는 이름: 누르면 이름에 넣고 금액 칸으로
+    var sg = $('sugg');
+    if (sg && nmEl) {
+      nmEl.addEventListener('input', syncSugg);
+      sg.onclick = function (e) {
+        var b = e.target.closest('[data-n]');
+        if (!b) return;
+        nmEl.value = b.getAttribute('data-n');
+        try { nmEl.dispatchEvent(new Event('input', { bubbles: true })); } catch (er) {}
+        syncSugg();
+        var af = amtFieldOf(), ae = af && $('f' + af.col);
+        if (ae) ae.focus();
+      };
+    }
     var warned = false;
     $('saveBtn').onclick = function () { warned = submit(it, warned); };
     var dayF0 = dayFieldOf(), dayEl = dayF0 && $('f' + dayF0.col);
@@ -2736,7 +2922,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     wrap.className = 'chipin';
     wrap.innerHTML = '<input type="text" placeholder="예: 국민 월급통장, 신한카드" autocomplete="off" enterkeyhint="done"><button type="button" class="c">취소</button><button type="button" class="ok">저장</button>';
     addBtn.style.display = 'none';
-    box.appendChild(wrap);
+    box.parentNode.insertBefore(wrap, box.nextSibling);
     var inp = wrap.querySelector('input');
     inp.focus();
     var close = function () { wrap.remove(); addBtn.style.display = ''; };
@@ -2882,8 +3068,10 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     return o;
   }
   function reopenForm(mode, name, snap) {
-    if (mode === 'edit' && name && findItem(name)) openEdit(name); else openAdd();
-    applySnap(snap);
+    if (mode === 'edit' && name && findItem(name)) { openEdit(name, true); applySnap(snap); saveDraft(); return; }
+    var cid = catOn() ? 'f' + catFieldOf().col : '', cv = cid && snap[cid] ? snap[cid].v : '';
+    addKeep = { snap: snap, cat: cv };
+    openAddForm(cv);
   }
   function applySnap(snap) {
     for (var id in snap) {
@@ -3189,10 +3377,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
 
   /* ---------- 설정 ---------- */
+  /** 설정 맨 아래 한 줄: 개인정보 처리방침 · 이용약관 · 문의 */
   function legalHtml() {
     var ct = (window.FC_CONFIG && window.FC_CONFIG.contact) || '';
-    return '<a class="li" href="privacy.html" data-leave><span>개인정보 처리방침</span>' + CV + '</a><a class="li" href="terms.html" data-leave><span>이용약관</span>' + CV + '</a>' +
-      (ct ? '<a class="li" id="mAsk" href="mailto:' + esc(ct) + '?subject=' + encodeURIComponent('고정비앱 문의') + '"><span>문의</span><span class="r">' + esc(ct) + '</span>' + CV + '</a>' : '');
+    return '<div class="legalrow"><a href="privacy.html" data-leave>개인정보 처리방침</a><a href="terms.html" data-leave>이용약관</a>' +
+      (ct ? '<a id="mAsk" href="mailto:' + esc(ct) + '?subject=' + encodeURIComponent('고정비앱 문의') + '">문의</a>' : '') + '</div>';
   }
   /** 설정 맨 위: 지금 로그인한 계정 */
   function accHead(email, sub) {
@@ -3211,9 +3400,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     });
   }
   function accountHtml(WEB) {
-    return '<div class="glabel">계정</div><div class="grp">' +
-      (WEB ? '<button class="li" type="button" id="mSwitch"><span>다른 구글 계정으로 바꾸기</span>' + CV + '</button>' +
-        '<button class="li" type="button" id="mLogout"><span>로그아웃</span></button>' : '') + legalHtml() + '</div>';
+    return WEB ? '<div class="glabel">계정</div><div class="grp">' +
+      '<button class="li" type="button" id="mSwitch"><span>다른 구글 계정으로 바꾸기</span>' + CV + '</button>' +
+      '<button class="li" type="button" id="mLogout"><span>로그아웃</span></button></div>' : '';
   }
   function wireAccount(WEB) {
     if ($('mSwitch')) $('mSwitch').onclick = function () { leave(function () { WEB.switchAccount(); }); };
@@ -3226,7 +3415,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var loading = busy || queue.length > 0;
     var h = (WEB ? accHead(WEB.email(), '이 구글 계정으로 로그인했어요') : '') +
       '<div class="tip">' + (loading ? '내용을 불러오는 중이에요.' : '아직 내용을 못 불러왔어요. 다시 불러오거나, 다른 계정으로 바꿔볼 수 있어요.') + '</div>' +
-      '<div class="grp"><button class="li" type="button" id="mReload"><span>다시 불러오기</span></button></div>' + accountHtml(WEB);
+      '<div class="grp"><button class="li" type="button" id="mReload"><span>다시 불러오기</span></button></div>' + accountHtml(WEB) + legalHtml();
     openSheet('설정', h, 'menu0');
     wireAccount(WEB);
     wireLegal();
@@ -3243,16 +3432,15 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var fullUrl = (!WEB && S.appUrl) ? S.appUrl + '?app=1' : '';
     var h = accHead((WEB && WEB.email()) || S.email || '', S.virtual ? '이 구글 계정에만 저장돼요' : '내 구글 시트에 저장돼요') +
       '<div class="glabel">구글 캘린더</div><div class="grp">' +
-      '<button class="li" type="button" id="mCal"><span>결제일 자동으로 넣기</span><span class="switch' + (S.calOn ? ' on' : '') + '"></span></button>' +
+      '<button class="li" type="button" id="mCal"><span class="tx"><b>결제일 자동으로 넣기</b><small>내 구글 캘린더에 하루 종일 일정으로 들어가요</small></span><span class="switch' + (S.calOn ? ' on' : '') + '"></span></button>' +
       (S.calOn ? '<button class="li" type="button" id="mCalNow"><span>지금 다시 맞추기</span><span class="r">' + esc(syncShort()) + '</span>' + CV + '</button>' : '') +
-      (S.calOn && optsReady() ? '<button class="li" type="button" id="mRemind"><span>결제 전날 알림</span><span class="switch' + (opt('remind') ? ' on' : '') + '"></span></button>' : '') +
+      (S.calOn && optsReady() ? '<button class="li" type="button" id="mRemind"><span class="tx"><b>결제 전날 알림</b><small>전날 오전 9시에 캘린더 알림 · 이미 낸 건 안 울려요</small></span><span class="switch' + (opt('remind') ? ' on' : '') + '"></span></button>' : '') +
       '</div>' + (S.calOn && cal.err && cal.last && !cal.syncing ? '<div class="tip err">' + esc(cal.last) + '</div>' : '') +
-      '<div class="tip">결제일은 내 구글 캘린더에 하루 종일 일정으로 들어가요. 캘린더에서 직접 지운 날짜는 다시 안 만들어요.' +
-      (S.calOn && optsReady() ? '<br>알림을 켜면 결제 전날 오전 9시에 구글 캘린더 알림이 와요. 이미 낸 결제는 안 울려요.' : '') + '</div>' +
+      (S.calOn ? '<div class="tip">캘린더에서 직접 지운 날짜는 다시 안 만들어요.</div>' : '') +
       (optsReady() && S.virtual ? '<div class="glabel">자동이체</div><div class="grp">' +
-        '<button class="li" type="button" id="mAuto"><span>자동이체 자동 체크</span><span class="switch' + (opt('auto') ? ' on' : '') + '"></span></button>' +
-        '</div><div class="tip">켜 두면 자동이체 항목은 결제일 다음 날 낸 걸로 체크돼요. 결제일이 주말·공휴일이면 다음 영업일까지 기다려요.<br>' +
-        '대상은 자동이체가 "O"이거나 결제 방식이 자동이체인 항목이에요. 돈이 안 나갔으면 체크를 풀어 주세요. 푼 건 다시 체크하지 않아요.</div>' : '') +
+        '<button class="li" type="button" id="mAuto"><span class="tx"><b>자동이체 자동 체크</b><small>자동이체 항목은 결제일 다음 날 낸 걸로 체크해요</small></span><span class="switch' + (opt('auto') ? ' on' : '') + '"></span></button>' +
+        '</div>' + (opt('auto') ? '<div class="tip">결제일이 주말·공휴일이면 다음 영업일까지 기다려요. 대상은 자동이체가 "O"이거나 결제 방식이 자동이체인 항목이에요. ' +
+        '돈이 안 나갔으면 체크를 풀어 주세요. 푼 건 다시 체크하지 않아요.</div>' : '') : '') +
       '<div class="glabel">관리</div><div class="grp">' +
       '<button class="li" type="button" id="mAcc"><span>결제 수단</span><span class="r">' + (S.accounts ? (S.accounts.length ? esc(S.accounts.length + '개') : '아직 없음') : '') + '</span>' + CV + '</button>' +
       (S.virtual || !S.url ? '' : '<a class="li" href="' + esc(S.url) + '" target="_blank" rel="noopener"><span>구글 시트 열기</span><span class="r">' + esc(S.sheetName || '') + '</span>' + CV + '</a>') +
@@ -3268,7 +3456,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       '아이폰: Safari → 공유 → 홈 화면에 추가<br>갤럭시: 크롬 → ⋮ → 홈 화면에 추가<br>PC: 즐겨찾기에 추가' +
       (fullUrl ? '<div style="margin-top:8px;color:var(--muted)">주소창 없이 쓰고 싶으면 이 주소로 홈 화면에 추가해봐요 (구글 로그인이 한 번 더 나올 수 있어요).</div><div class="linkbox">' + esc(fullUrl) + '</div>' : '') +
       '</div>' + accountHtml(null)) +
-      (canWipe() ? '<button class="del" type="button" id="mWipe">내 자료 모두 지우기</button>' : '') +
+      (canWipe() ? '<button class="del" type="button" id="mWipe">내 자료 모두 지우기</button>' : '') + legalHtml() +
       '<div class="tip foot">불러온 시각 ' + new Date(S.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + (S.virtual ? '' : ' · 시트가 원본이에요') + '</div>';
     if (refresh) { if (sheetMode !== 'menu') return; $('sheetBody').innerHTML = h; }
     else openSheet('설정', h, 'menu');
@@ -3451,7 +3639,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     closeSheet();
     document.body.classList.add('setup-on');
     document.querySelectorAll('.tab').forEach(function (m) { m.classList.toggle('on', m.id === 'tab-setup'); });
-    $('title').textContent = '';
+    $('title').textContent = ''; $('title')._html = '';
     var h = '<div class="setup"><div class="logo">' + CAL_SVG + '</div><h2>고정비 결제 달력</h2>' +
       '<p>매달 나가는 돈을 달력으로 한눈에 보고, 낸 건 체크하고, 결제일은 구글 캘린더에 자동으로 넣어줘요.</p>';
     if (!res.ready) {
@@ -3494,7 +3682,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     document.body.classList.remove('setup-on');
     $('tab-setup').innerHTML = '';
     document.querySelectorAll('.tab').forEach(function (m) { m.classList.toggle('on', m.id === 'tab-' + tab); });
-    $('title').textContent = tab === 'cal' ? '결제 달력' : '고정비 목록';
+    setTitle();
   }
 
   /* ---------- 친구에게 공유 (시트 주인만) ---------- */
@@ -3536,7 +3724,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!popping) { if (t === 'list') hPush('tab'); else if (hTop() === 'tab') hDrop(1); }
     var el = $('tab-' + t);
     if (el) { el.classList.remove('in-l', 'in-r'); void el.offsetWidth; el.classList.add(from === 'r' ? 'in-r' : 'in-l'); }
-    $('title').textContent = t === 'cal' ? '결제 달력' : '고정비 목록';
+    document.body.classList.toggle('on-cal', t === 'cal');
+    setTitle();
     document.querySelectorAll('.tabbar [data-tab]').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === t); });
     document.querySelectorAll('.tab').forEach(function (m) { m.classList.toggle('on', m.id === 'tab-' + t); });
     if (el) fitAll(el);
@@ -3564,13 +3753,25 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }
   }
   $('list').addEventListener('click', onRowClick);
+  $('lhead').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-sort]');
+    if (b && S) sortBy(b.getAttribute('data-sort'));
+  });
+  $('catFilter').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-cat]');
+    if (!b || !S) return;
+    lv.cat = b.getAttribute('data-cat');
+    openRow = null;
+    renderList();
+    window.scrollTo(0, 0);
+  });
   $('home').addEventListener('click', onRowClick);
   $('welcome').addEventListener('click', function (e) {
-    var b = e.target.closest('[data-preset]');
-    if (!b || !S) return;
-    var pr = PRESETS[+b.getAttribute('data-preset')];
-    openAdd(pr ? { name: pr[0], cat: pr[1] } : null);
+    if (S && e.target.closest('#wAdd')) openAdd();
   });
+  $('calPrev').onclick = function () { moveMonth(-1); };
+  $('calNext').onclick = function () { moveMonth(1); };
+  $('calToday').onclick = function () { view.off = 0; view.sel = ''; renderHome(); };
   $('cal').addEventListener('click', function (e) {
     var c = e.target.closest('[data-day]');
     if (!c) return;
