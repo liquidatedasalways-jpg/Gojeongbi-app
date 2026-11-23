@@ -71,7 +71,8 @@ function create(opt) {
       getName: () => email,
       getEvents(a, b) { return u.events.filter((e) => !e.deleted && e.start.getTime() >= a.getTime() && e.start.getTime() < b.getTime()).map(evApi); },
       createAllDayEvent(title, date, o) {
-        const e = { id: ++u.evSeq, title, start: new FakeDate(date.getTime()), desc: (o && o.description) || '', color: '', tags: {}, deleted: false };
+        // reminders: null = 캘린더 기본 알림을 따름, 배열 = 이 일정에 따로 정한 알림(분)
+        const e = { id: ++u.evSeq, title, start: new FakeDate(date.getTime()), desc: (o && o.description) || '', color: '', tags: {}, deleted: false, reminders: null };
         u.events.push(e);
         return evApi(e);
       }
@@ -79,6 +80,14 @@ function create(opt) {
     function evApi(e) {
       return {
         getTag: (k) => (k in e.tags ? e.tags[k] : null), setTag(k, v) { e.tags[k] = String(v); return this; },
+        deleteTag(k) { delete e.tags[k]; return this; },
+        addPopupReminder(m) {
+          if (!(Number.isInteger(m) && m >= 5 && m <= 40320)) throw new Error('addPopupReminder: 5~40320분만 됨 (' + m + ')');
+          e.reminders = (e.reminders || []).concat(m); return this;
+        },
+        getPopupReminders: () => (e.reminders || []).slice(),
+        removeAllReminders() { e.reminders = []; return this; },
+        resetRemindersToDefault() { e.reminders = null; return this; },
         getColor: () => e.color, setColor(c) { e.color = String(c); return this; },
         getTitle: () => e.title, setTitle(t) { e.title = t; return this; },
         getDescription: () => e.desc, setDescription(t) { e.desc = t; return this; },

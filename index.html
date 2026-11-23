@@ -85,13 +85,19 @@ svg { display: block; }
 .cd .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--red); margin-top: 3px; }
 .cd.has { cursor: pointer; }
 
-/* 이번 달 요약 */
-.sum { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--card); border-radius: 18px; padding: 12px 4px; margin: 10px 0 20px; box-shadow: var(--shadow); }
-.sum > div { padding: 0 12px; min-width: 0; }
-.sum > div + div { border-left: 1px solid var(--line); }
-.sum span { display: block; font-size: 11px; font-weight: 500; color: var(--muted); }
-.sum b { display: block; font-size: 14.5px; font-weight: 700; letter-spacing: -.03em; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sum b.acc { color: var(--accent); }
+/* 맨 위 요약: 이 달에 더 낼 돈(큰 숫자) + 낸 만큼 차는 막대 */
+.hero { background: var(--card); border-radius: 20px; padding: 16px 20px; margin: 0 0 8px; }
+.hero:empty { display: none; }
+.hero .lb { font-size: 13px; font-weight: 600; color: var(--sub); }
+.hero .num { font-size: 28px; font-weight: 800; letter-spacing: -.04em; line-height: 1.25; white-space: nowrap; overflow: hidden; }
+.hero .num small { font-size: .715em; font-weight: 700; margin-left: 1px; }
+.hero .bar { height: 8px; border-radius: 4px; background: var(--fill2); margin: 10px 0 8px; overflow: hidden; }
+.hero .bar i { display: block; height: 100%; border-radius: 4px; background: var(--ok); transition: width .3s ease; }
+.hero .cp { display: flex; justify-content: space-between; gap: 4px 12px; flex-wrap: wrap; font-size: 13px; color: var(--sub); }
+.hero .cp span { white-space: nowrap; }
+.hero .cp b { font-weight: 700; color: #067d4f; }
+@media (prefers-color-scheme: dark) { .hero .cp b { color: #45d795; } }
+#cal { margin-bottom: 20px; }
 
 /* 목록 공통 */
 .sec { display: flex; align-items: baseline; gap: 6px; padding: 0 6px 9px; }
@@ -379,7 +385,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .newr .din { text-align: center; font-weight: 600; border-left: 1px solid var(--line); padding: 0 4px; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 8, "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 9, "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -668,8 +674,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 
 <main class="tab on" id="tab-cal">
   <div id="nodate"></div>
+  <div id="sumline" class="hero"></div>
   <div class="cal" id="cal"></div>
-  <div id="sumline" class="sum"></div>
   <div id="home"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
 </main>
 <main class="tab" id="tab-setup"></main>
@@ -949,6 +955,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     else if (op.type === 'restore') p = call('api_restore');
     else if (op.type === 'sort') p = call('api_sort', op.mode);
     else if (op.type === 'accounts') p = call('api_accounts', op.list);
+    else if (op.type === 'opts') p = call('api_opts', op.patch);
     p.then(function (res) { busy = false; curOp = null; done(op, res || {}); }, function (err) { busy = false; curOp = null; failed(op, err); });
   }
   function done(op, res) {
@@ -979,7 +986,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   var PEND = 'fc_pending', resumed = false;
   function savePending() {
     var ops = (curOp ? [curOp] : []).concat(queue).filter(function (o) { return o.type !== 'load'; }).map(function (o) {
-      return { type: o.type, map: o.map, oldName: o.oldName, vals: o.vals, name: o.name, mode: o.mode, list: o.list, ghost: o.ghost };
+      return { type: o.type, map: o.map, oldName: o.oldName, vals: o.vals, name: o.name, mode: o.mode, list: o.list, ghost: o.ghost, patch: o.patch };
     });
     if (!ops.length || !S || !S.email) return;
     try { sessionStorage.setItem(PEND, JSON.stringify({ at: Date.now(), email: S.email, ops: ops })); } catch (e) {}
@@ -1002,7 +1009,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   if (window.FC_AUTH) window.FC_AUTH.onLeave = savePending;
 
   /* 두 번 보내도 결과가 같은 작업만 자동으로 다시 보냄 (추가·삭제는 두 번 들어가면 안 되니까 제외) */
-  var RESEND_OK = { load: 1, checks: 1, sort: 1, accounts: 1 };
+  var RESEND_OK = { load: 1, checks: 1, sort: 1, accounts: 1, opts: 1 };
   function isNetErr(msg) { return /인터넷 연결|불안정|오래 걸렸|연결이 안 됐/.test(msg) || navigator.onLine === false; }
   function opCount(op) { return op.type === 'checks' ? Object.keys(op.map).length : 1; }
   /** 저장 못 한 작업을 사용자가 '다시 시도'로 다시 함 */
@@ -1011,6 +1018,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (op.type === 'checks') { for (var n in op.map) { var it = findItem(n); if (it && !!it.checked !== !!op.map[n]) toggle(n, true); } }
     else if (op.type === 'delete') { if (findItem(op.name)) removeItem(op.name); }
     else if (op.type === 'sort') changeSort(op.mode);
+    else if (op.type === 'opts') { for (var k in op.patch) setOpt(k, op.patch[k]); }
     else { op.fails = 0; op.tries = 0; if (op.ghost) addGhost(op.ghost); enqueue(op); }
   }
   function fatalHtml(msg) {
@@ -1271,12 +1279,16 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     renderNoDate();
     if (!S) { $('sumline').innerHTML = ''; return; }
 
-    // 한 줄 요약
+    // 맨 위 요약: 그 달에 더 낼 돈(큰 숫자), 낸 만큼 차는 막대, 낸 돈·전체. 금액이 하나도 없는 달엔 숨김
     var total = 0, paidSum = 0;
     occ.forEach(function (o) { if (o.amt != null) { total += o.amt; if (o.st === 'paid') paidSum += o.amt; } });
-    var sumB = function (n, cls) { return '<b' + (cls ? ' class="' + cls + '"' : '') + ' data-fit="sum" data-short="' + esc(wonShort(n)) + '">' + won(n) + '</b>'; };
-    $('sumline').innerHTML = '<div><span>' + m + '월 전체</span>' + sumB(total) + '</div><div><span>낸 돈</span>' + sumB(paidSum) + '</div>' +
-      '<div><span>남은 돈</span>' + sumB(total - paidSum, 'acc') + '</div>';
+    var left = total - paidSum;
+    $('sumline').innerHTML = total > 0
+      ? '<div class="lb">' + m + '월에 더 낼 돈</div>' +
+        '<div class="num" data-fit="hero" data-short="' + esc(wonShort(left)) + '">' + num(left) + '<small>원</small></div>' +
+        '<div class="bar" role="img" aria-label="' + Math.round(paidSum / total * 100) + '% 냈어요"><i style="width:' + (paidSum / total * 100).toFixed(1) + '%"></i></div>' +
+        '<div class="cp"><span><b>' + won(paidSum) + '</b> 냈어요</span><span>전체 ' + won(total) + '</span></div>'
+      : '';
     fitAll($('sumline'));
 
     // 아래 목록
@@ -2680,7 +2692,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       '<button class="li" type="button" id="mCal"><span>결제일 자동 연동</span><span class="switch' + (S.calOn ? ' on' : '') + '"></span></button>' +
       (S.calOn ? '<button class="li li2" type="button" id="mCalNow"><span>지금 다시 맞추기</span>' +
         ((cal.syncing || cal.last) ? '<small>' + esc(cal.syncing ? '맞추는 중…' + (cal.prog ? ' ' + cal.prog : '') : cal.last) + '</small>' : '') + '</button>' : '') +
-      '</div><div class="tip">결제일은 하루 종일 일정(호박색), 종료일 있는 항목의 마지막 결제는 자주색이에요. 캘린더에서 직접 지운 날짜는 다시 안 만들어요.</div>' +
+      (S.calOn && optsReady() ? '<button class="li" type="button" id="mRemind"><span>결제 전날 알림</span><span class="switch' + (opt('remind') ? ' on' : '') + '"></span></button>' : '') +
+      '</div><div class="tip" style="word-break:keep-all">결제일은 하루 종일 일정(호박색), 종료일 있는 항목의 마지막 결제는 자주색이에요. 캘린더에서 직접 지운 날짜는 다시 안 만들어요.' +
+      (S.calOn && optsReady() ? '<br>알림을 켜면 결제 전날 오전 9시에 구글 캘린더 알림이 와요. 이미 낸 결제는 안 울려요.' : '') + '</div>' +
+      (optsReady() && S.virtual ? '<div class="glabel">자동이체</div><div class="grp">' +
+        '<button class="li" type="button" id="mAuto"><span>자동이체 자동 체크</span><span class="switch' + (opt('auto') ? ' on' : '') + '"></span></button>' +
+        '</div><div class="tip" style="word-break:keep-all">켜 두면 자동이체 항목은 결제일 다음 날 낸 걸로 체크돼요. 결제일이 주말·공휴일이면 다음 영업일까지 기다려요.<br>' +
+        '대상은 자동이체가 "O"이거나 결제 방식이 자동이체인 항목이에요. 돈이 안 나갔으면 체크를 풀어 주세요. 푼 건 다시 체크하지 않아요.</div>' : '') +
       '<div class="glabel">결제 수단</div><div class="grp">' +
       '<button class="li" type="button" id="mAcc"><span>결제 수단 관리</span><span class="r">' + (S.accounts ? (S.accounts.length ? esc(S.accounts.length + '개') : '아직 없음') : '') + '</span></button>' +
       '</div>' +
@@ -2713,12 +2731,39 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       }, function (e) { cal.syncing = false; chip(); toast('실패했어요: ' + ((e && e.message) || e), { error: true }); });
     };
     var cn = $('mCalNow'); if (cn) cn.onclick = function () { scheduleSync(); };
+    var mr = $('mRemind'); if (mr) mr.onclick = function () { setOpt('remind', !opt('remind')); };
+    var ma = $('mAuto'); if (ma) ma.onclick = function () { setOpt('auto', !opt('auto')); };
     $('mReload').onclick = function () { closeSheet(); toast(S.virtual ? '다시 불러오는 중' : '시트에서 다시 불러오는 중'); enqueue({ type: 'load' }); };
     $('mRestore').onclick = function () { closeSheet(); restore(); };
     $('mAcc').onclick = function () { openAccounts(false, function () { openMenu(false); }); };
     var ms = $('mShare'); if (ms) ms.onclick = function () { openShare(false); };
     var mv = $('mMove'); if (mv) mv.onclick = function () { moveToApp(mv); };
     var mu = $('mUpd'); if (mu) mu.onclick = function () { leave(runServerUpdate); };
+  }
+
+  /* ---------- 앱 설정: 결제 전날 알림(remind), 자동이체 자동 체크(auto) ----------
+   * 서버에 사람마다 따로 저장돼요. 옛 서버(v8까지)는 이 기능이 없어서 줄을 아예 안 보여줌.
+   * 자동 체크는 앱 저장 공간을 쓰는 사람만 (구글 시트 방식에선 서버가 막아 둠). */
+  var OPT_SAY = {
+    remind: ['결제 전날 알림을 켰어요. 캘린더 일정에 알림을 붙이는 중이에요.', '결제 전날 알림을 껐어요.'],
+    auto: ['자동이체 자동 체크를 켰어요.', '자동이체 자동 체크를 껐어요. 이미 체크된 건 그대로 둬요.']
+  };
+  function optsReady() { return !!(S && S.opts && (Number(S.ver) || 0) >= 9); }
+  function opt(k) { return !!(S && S.opts && S.opts[k]); }
+  function setOpt(k, on) {
+    if (!optsReady()) return;
+    on = !!on;
+    if (opt(k) === on) return;
+    buzz();
+    S.opts[k] = on;               // 스위치는 바로 바뀌고, 저장에 실패하면 서버가 마지막으로 확인해 준 상태로 되돌아감
+    if (sheetMode === 'menu') openMenu(true);
+    var patch = {};
+    patch[k] = on;
+    enqueue({ type: 'opts', patch: patch, ownNotes: true, onDone: function (res) {
+      if (!res.ok) { toast(res.error || '설정을 저장 못 했어요.', { error: true }); return; }
+      var notes = (res.notes || []).filter(Boolean);
+      toast(OPT_SAY[k][on ? 0 : 1] + (notes.length ? '\n' + notes.join('\n') : ''));
+    } });
   }
 
   /* ---------- 시트 → 앱 저장 공간 (시트 주인, 설치용 앱에서) ---------- */
