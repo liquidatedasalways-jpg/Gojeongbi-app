@@ -1,18 +1,89 @@
 <!DOCTYPE html>
-<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>개인정보 처리방침 · 승훈스 고정비앱 V1</title>
-<style>body{margin:0;background:#f2f4f6;color:#191f28;font:15px/1.7 -apple-system,system-ui,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}main{max-width:640px;margin:0 auto;padding:32px 20px}h1{font-size:22px}h2{font-size:16px;margin-top:28px}p,li{color:#333d4b}</style></head>
+<meta name="theme-color" content="#f2f4f6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#101013" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+:root { --bg: #f2f4f6; --card: #ffffff; --ink: #191f28; --ink2: #333d4b; --muted: #8b95a1; --line: #eceef1; --accent: #f26b0f; }
+@media (prefers-color-scheme: dark) { :root { --bg: #101013; --card: #1c1c21; --ink: #f2f3f5; --ink2: #dadde2; --muted: #868b94; --line: #2a2b31; --accent: #ff8133; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body { font: 15px/1.7 -apple-system, BlinkMacSystemFont, system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif; letter-spacing: -.01em; -webkit-text-size-adjust: 100%; }
+main { max-width: 640px; margin: 0 auto; padding: calc(16px + env(safe-area-inset-top)) 20px calc(48px + env(safe-area-inset-bottom)); }
+.back { display: inline-flex; align-items: center; min-height: 44px; margin-left: -4px; padding: 0 4px; color: var(--ink2); font-size: 14px; font-weight: 600; text-decoration: none; }
+h1 { font-size: 22px; letter-spacing: -.04em; margin: 10px 0 4px; }
+.date { color: var(--muted); font-size: 13px; margin: 0 0 18px; }
+h2 { font-size: 16px; letter-spacing: -.03em; margin: 30px 0 8px; }
+p, li { color: var(--ink2); margin: 0 0 8px; }
+ul { padding-left: 20px; margin: 0 0 8px; }
+.box { background: var(--card); border-radius: 16px; padding: 14px 16px; margin: 12px 0; }
+.box p:last-child, .box ul:last-child, .box li:last-child { margin-bottom: 0; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 0; border-top: 1px solid var(--line); color: var(--ink2); }
+tr:first-child th, tr:first-child td { border-top: 0; }
+th { width: 34%; padding-right: 12px; font-weight: 600; color: var(--ink); }
+a { color: var(--accent); }
+small { color: var(--muted); }
+</style></head>
 <body><main>
+<a class="back" href="./" id="back">← 앱으로 돌아가기</a>
 <h1>개인정보 처리방침</h1>
-<p>승훈스 고정비앱 V1(이하 "앱")은 사용자가 고른 구글 계정으로 사용자 본인의 구글 시트와 구글 캘린더에서만 동작해요.</p>
-<h2>쓰는 정보</h2>
+<p class="date">2026년 11월 23일부터 적용</p>
+
+<p>승훈스 고정비앱 V1(이하 "앱")은 개인이 만들어 무료로 나누는 고정비 관리 앱이에요. 앱이 어떤 정보를 어디에 두는지 있는 그대로 적었어요.</p>
+
+<h2>한눈에 보기</h2>
+<div class="box"><ul>
+<li>내가 적은 고정비 목록은 <b>내 구글 계정 몫의 저장 공간</b>에만 들어가요. 다른 사용자는 볼 수 없어요.</li>
+<li>결제일 일정은 <b>내 구글 캘린더</b>에만 만들어요.</li>
+<li>광고, 방문 분석 도구, 정보 판매는 없어요.</li>
+</ul></div>
+
+<h2>앱이 다루는 정보와 두는 곳</h2>
+<div class="box"><table>
+<tr><th>고정비 목록</th><td>항목 이름, 금액, 결제일, 결제 수단 이름과 끝 4자리, 메모, 납부 체크 기록.<br>앱의 서버 역할을 하는 <b>구글 Apps Script의 사용자별 저장 공간</b>에, 로그인한 구글 계정 몫으로 따로 저장해요. 지운 항목은 "방금 지운 항목 되살리기"를 위해 같은 공간의 삭제 기록에 남아요.</td></tr>
+<tr><th>결제일 일정</th><td>캘린더 연동을 켜 두면 <b>내 구글 캘린더</b>에 하루 종일 일정으로 만들어요. 일정에는 항목 이름, 금액, 결제 수단, 메모가 들어가요.</td></tr>
+<tr><th>구글 계정 이메일</th><td>어떤 계정으로 로그인했는지 화면에 보여주고, 계정별로 저장 공간을 나누는 데만 써요.</td></tr>
+<tr><th>이 기기에 남는 것</th><td>로그인 표(1시간짜리 접근 토큰), 마지막으로 본 화면 내용(다음에 빨리 열려고), 쓰다 만 입력 내용. 브라우저 저장 공간에만 있고, 로그아웃하거나 계정을 바꾸면 지워요.</td></tr>
+</table></div>
+<p><small>앱 주인 한 명은 예전 방식대로 자기 구글 시트에 목록을 둘 수 있어요. 다른 사용자의 구글 드라이브에는 파일을 만들지도 읽지도 않아요.</small></p>
+
+<h2>구글에 요청하는 권한</h2>
+<div class="box"><table>
+<tr><th>캘린더</th><td>결제일 일정을 만들고, 고치고, 지워요. 구글 권한 화면에는 "모든 캘린더 보기·수정"으로 나오지만, 앱은 <b>자기가 만든 결제일 일정만</b> 바꿔요. 내가 만든 다른 일정은 바꾸지 않고, 어디에도 저장하거나 보내지 않아요. 공휴일 표시를 위해 "대한민국의 휴일" 캘린더를 읽어요.</td></tr>
+<tr><th>스프레드시트</th><td>앱 주인이 구글 시트 방식을 쓸 때만 써요. 다른 사용자의 시트는 열지 않아요.</td></tr>
+<tr><th>스크립트 예약 실행</th><td>매일 새벽에 캘린더를 한 번 맞추는 예약을 만들 때 써요.</td></tr>
+<tr><th>이메일 주소 보기</th><td>로그인한 계정을 확인할 때 써요.</td></tr>
+</table></div>
+
+<h2>다른 곳에 전달되는 정보</h2>
 <ul>
-<li>구글 계정 이메일: 어떤 계정으로 로그인했는지 보여주는 데만 써요.</li>
-<li>구글 시트: 사용자 본인의 고정비 시트를 읽고 고쳐요.</li>
-<li>구글 캘린더: 사용자가 켠 경우에만 결제일 일정을 만들고 고쳐요.</li>
+<li><b>구글</b>: 로그인, 목록 저장(Apps Script), 캘린더가 모두 구글 서비스라서 위 정보가 구글에 저장돼요.</li>
+<li><b>GitHub Pages</b>: 앱 화면 파일을 내려주는 곳이에요. 접속할 때 IP 주소 같은 접속 기록이 GitHub에 남을 수 있어요. 고정비 내용은 가지 않아요.</li>
+<li><b>jsDelivr</b>: 글꼴 파일을 내려받는 곳이에요. 마찬가지로 접속 기록만 남을 수 있어요.</li>
 </ul>
-<h2>저장과 공유</h2>
-<p>앱은 별도 서버에 사용자 정보를 저장하지 않아요. 모든 내용은 사용자 본인의 구글 드라이브·캘린더에만 있어요. 로그인 표(액세스 토큰)는 사용자 기기 안에만 잠깐 저장되고, 누구와도 공유하거나 판매하지 않아요.</p>
-<h2>그만 쓰기</h2>
-<p>앱 메뉴의 로그아웃을 누르거나, 구글 계정 설정 → 보안 → 서드 파티 액세스에서 이 앱의 권한을 언제든 지울 수 있어요.</p>
-</main></body></html>
+<p>이 밖에 누구에게도 정보를 팔거나 넘기지 않아요.</p>
+
+<h2>앱 만든 사람이 볼 수 있는 것</h2>
+<p>앱 만든 사람은 서버 코드를 관리해요. 구글이 보여주는 실행 기록(언제 어떤 기능이 실행됐는지, 성공했는지, 오류 내용)은 볼 수 있어요. 다른 사용자의 고정비 목록이나 캘린더를 들여다보는 화면이나 기능은 없고, 목록 내용을 따로 기록하지도 않아요.</p>
+
+<h2>지우기와 그만 쓰기</h2>
+<ul>
+<li>항목은 앱에서 지울 수 있어요. 캘린더 일정은 내 구글 캘린더에서 직접 지울 수 있어요.</li>
+<li>앱 메뉴(⋯)의 로그아웃을 누르면 이 기기에 남은 내용이 지워져요.</li>
+<li><a href="https://myaccount.google.com/connections" target="_blank" rel="noopener">구글 계정 → 서드 파티 앱 및 서비스</a>에서 이 앱의 권한을 언제든 끊을 수 있어요. 권한을 끊으면 앱은 내 정보에 더는 접근하지 못해요.</li>
+<li>앱에서 지운 항목은 목록에서 빠지지만, 되살리기용 삭제 기록에는 남아요. 서버 저장 공간을 한 번에 비우는 기능은 아직 없어요.</li>
+</ul>
+
+<h2>바뀌면</h2>
+<p>이 내용이 바뀌면 이 페이지의 적용 날짜를 고쳐서 알려요. 궁금한 점은 앱 주소를 알려준 사람(앱 만든 사람)에게 물어봐 주세요.</p>
+<p><a href="terms.html">이용약관 보기</a></p>
+</main>
+<script>
+/* 앱에서 넘어왔으면 뒤로 가기(앱 화면이 그대로 돌아옴), 주소로 바로 들어왔으면 앱 첫 화면으로 */
+document.getElementById('back').addEventListener('click', function (e) {
+  if (document.referrer && document.referrer.indexOf(location.origin) === 0 && history.length > 1) { e.preventDefault(); history.back(); }
+});
+</script>
+</body></html>
