@@ -130,6 +130,7 @@ t('back-tab-and-datepicker', async () => {
   await p.click('.tabbar [data-tab="list"]'); await sleep(p, 400);
   ok((await tabNow(p)) === 'tab-list', '목록 탭으로');
   await p.click('#addBtn'); await sleep(p, 450);
+  await p.click('#moreBtn'); await sleep(p, 250);
   await p.click('#sheetBody [data-seg] button[data-v="date"]'); await sleep(p, 400);
   const dpOn = () => p.evaluate(() => !!document.querySelector('.dp.on'));
   ok(await dpOn(), '종료일 "날짜"를 누르면 날짜 고르기가 뜸');
@@ -188,7 +189,7 @@ t('money-fit-320', async () => {
   const coupang = names.find((x) => x.name === '쿠팡 와우 멤버십');
   ok(coupang && coupang.w >= 90, '"쿠팡 와우 멤버십" 이름 칸 폭 ' + (coupang && coupang.w) + 'px (전엔 한두 글자만 남았음)');
   ok(names.every((x) => x.tagBelow), '"N일 지남" 표시는 이름 아래 줄에');
-  ok(names.every((x) => x.h <= 46), '줄 높이는 그대로 (가장 높은 줄 ' + Math.max.apply(null, names.map((x) => x.h)) + 'px)');
+  ok(names.every((x) => x.h >= 44 && x.h <= 48), '줄 높이 44~48px (누르기 쉬운 최소 높이, 가장 높은 줄 ' + Math.max.apply(null, names.map((x) => x.h)) + 'px)');
   await h.shot('t-list-320');
   await h.close();
   // 평범한 금액(백만 원대)도 폭 320에서 잘리지 않아야 함 (0.4px 넘쳐서 "1,191,79…"로 보이던 것)
@@ -362,8 +363,10 @@ t('small-form-button', async () => {
   await p.click('#saveBtn'); await sleep(p, 200);
   const btn = () => p.evaluate(() => document.getElementById('saveBtn').textContent);
   ok((await btn()) === '결제일 없이 추가', '결제일 없이 누르면 버튼이 "결제일 없이 추가"로');
-  const dayId = await p.evaluate(() => Array.prototype.filter.call(document.querySelectorAll('#sheetBody select'), (s) => /매월 1일/.test(s.textContent))[0].id);
-  await p.selectOption('#' + dayId, '28'); await sleep(p, 200);
+  await p.click('#dayBtn'); await sleep(p, 400);
+  ok(await p.evaluate(() => !!document.querySelector('.dayp.on')), '결제일 칸을 누르면 숫자판이 뜸');
+  await p.click('.dayp .dg button[data-d="28"]'); await sleep(p, 400);
+  ok(await p.evaluate(() => !document.querySelector('.dayp.on') && /매월 28일/.test(document.getElementById('dayTxt').textContent)), '28을 누르면 숫자판이 닫히고 "매월 28일"로 보임');
   const warn = await p.evaluate(() => document.getElementById('formErr').className);
   ok((await btn()) === '추가' && !/on/.test(warn), '결제일을 고르면 버튼이 "추가"로 돌아오고 안내도 사라짐');
   await p.click('#saveBtn'); await h.idle(800);
@@ -388,18 +391,127 @@ t('small-layout-320', async () => {
   const h = await H.open(Object.assign({}, LIFE, { viewport: SMALL })); const p = h.page;
   await sleep(p, 1200);
   await p.click('#addBtn'); await sleep(p, 450);
+  await p.click('#moreBtn'); await sleep(p, 250);
   await p.click('#sheetBody [data-seg] button[data-v="date"]'); await sleep(p, 400);
   await p.click('.dp.on .dpg button[data-d="20"]'); await sleep(p, 400);
   const d = await p.evaluate(() => { const b = document.querySelector('#sheetBody .wrapc .datebtn'); const r = b.getBoundingClientRect(); return { t: b.textContent, h: Math.round(r.height), cut: b.scrollWidth > b.clientWidth }; });
-  ok(d.h <= 36 && !d.cut, '종료일 날짜가 한 줄로 다 보임: "' + d.t + '" (높이 ' + d.h + 'px)');
+  ok(d.h <= 44 && !d.cut, '종료일 날짜가 한 줄로 다 보임: "' + d.t + '" (높이 ' + d.h + 'px)');
   await p.evaluate(() => document.querySelector('#sheetBody .wrapc').scrollIntoView({ block: 'center' }));
   await h.shot('t-form-320');
   await p.click('#sheetClose'); await sleep(p, 400);
   await p.click('#menuBtn'); await sleep(p, 400);
-  const m = await p.evaluate(() => { const s = document.querySelector('#mCalNow small'); return s ? { t: s.textContent, cut: s.scrollWidth > s.clientWidth } : null; });
-  ok(m && /총 \d+개 일정/.test(m.t) && !m.cut, '⋯ 메뉴의 캘린더 결과가 잘리지 않음: "' + (m && m.t) + '"');
+  await p.click('#mCalNow'); await h.idle(1500);
+  const m = await p.evaluate(() => { const s = document.querySelector('#mCalNow .r'); return s ? { t: s.textContent, cut: s.scrollWidth > s.clientWidth } : null; });
+  ok(m && /맞췄어요/.test(m.t) && !m.cut, '⋯ 메뉴의 캘린더 상태가 잘리지 않음: "' + (m && m.t) + '"');
+  const mt = await toastState(p);
+  ok(/총 \d+개 일정/.test(mt.txt), '"지금 다시 맞추기" 결과를 알림으로 알려줌: "' + mt.txt + '"');
   await h.shot('t-menu-320');
   await h.close();
+});
+/* ---------- 디자인 개편(1~20번) ---------- */
+t('revamp-home', async () => {
+  const h = await H.open(LIFE); const p = h.page;
+  await sleep(p, 1200);
+  const secs = await p.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#home .sec h2, #home .sec .t'), (e) => e.textContent));
+  const txt = await p.evaluate(() => document.getElementById('home').textContent);
+  ok(/지난 결제/.test(txt) && /다가오는 결제/.test(txt), '첫 화면이 "지난 결제"와 "다가오는 결제"로 나뉨 ' + JSON.stringify(secs));
+  ok(await p.evaluate(() => !!document.querySelector('#ndBtn') && /결제일 없는 항목 2개/.test(document.getElementById('ndBtn').textContent)), '결제일 없는 항목 알림이 맨 위 한 줄로');
+  const cal = await p.evaluate(() => ({ paid: document.querySelectorAll('#cal .a.paid').length, over: document.querySelectorAll('#cal .a.over').length, dot: document.querySelectorAll('#cal .dot').length }));
+  ok(cal.paid >= 1 && cal.over >= 1 && cal.dot === 0, '달력: 다 낸 날은 초록 체크, 지난 날은 빨간 금액, 점 표시는 없음 ' + JSON.stringify(cal));
+  // 낸 결제는 한 줄로 접혀 있고, 누르면 펼쳐짐
+  ok(!(await homeHas(p, '넷플릭스')) && /낸 결제 \d+건/.test(await p.evaluate(() => document.getElementById('paidFold').textContent)), '낸 결제는 한 줄로 접혀 있음');
+  await p.click('#paidFold'); await sleep(p, 300);
+  ok(await homeHas(p, '넷플릭스'), '누르면 낸 결제가 펼쳐짐');
+  await p.click('#paidFold'); await sleep(p, 300);
+  // 모두 냈어요
+  const lateNames = ['헬스장', '쿠팡 와우 멤버십', '통신비', '정수기 렌탈'];
+  ok(lateNames.every((n) => srvItem(h, n).checked === false), '지난 결제 4개가 아직 안 낸 상태');
+  await p.click('#payAll'); await h.idle(2500);
+  const ts = await toastState(p);
+  ok(/^\d+건 냈다고 체크했어요$/.test(ts.txt) && ts.btn === '되돌리기', '"모두 냈어요" → 알림 "' + ts.txt + '" + 되돌리기');
+  ok(lateNames.every((n) => srvItem(h, n).checked === true), '지난 결제가 서버에도 전부 냈다고 저장됨');
+  ok(srvItem(h, '월세').checked === false, '아직 안 지난 월세는 건드리지 않음');
+  await p.click('#toastBtn'); await h.idle(2500);
+  ok(lateNames.every((n) => srvItem(h, n).checked === false), '되돌리기 → 전부 다시 안 낸 상태로');
+  ok(realErrors(h).length === 0, '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+});
+t('revamp-list-and-form', async () => {
+  const h = await H.open(LIFE); const p = h.page;
+  await sleep(p, 1200);
+  await p.click('.tabbar [data-tab="list"]'); await sleep(p, 400);
+  const avg = h.gas.call(h.email, 'api_load', [true]).sum.monthlyAvg;
+  const ct = await p.evaluate(() => document.getElementById('countTxt').textContent);
+  ok(ct.indexOf('한 달 평균 ' + avg.toLocaleString('en-US') + '원') >= 0, '목록 맨 위 한 달 평균이 서버 값과 같음: "' + ct + '"');
+  ok(await p.evaluate(() => document.querySelectorAll('#list .th').length === 1), '표 머리글(항목·금액·결제일)은 맨 위 한 번만');
+  // 새 항목: 꼭 필요한 칸만 보이고 나머지는 "더 적기"에
+  await p.click('#addBtn'); await sleep(p, 450);
+  const f0 = await p.evaluate(() => ({ more: document.getElementById('moreBox').classList.contains('on'), seg: document.querySelectorAll('[data-cyc] button').length, foot: !!document.querySelector('#sheetFoot #saveBtn'), h: Math.round(document.getElementById('saveBtn').getBoundingClientRect().height) }));
+  ok(!f0.more && f0.seg === 5 && f0.foot && f0.h >= 48, '새 항목: 더 적기는 접혀 있고, 주기 버튼 5개, 추가 버튼은 아래에 고정 ' + JSON.stringify(f0));
+  await p.fill('#sheetBody [data-money]', '1234567'); await sleep(p, 150);
+  ok((await p.inputValue('#sheetBody [data-money]')) === '1,234,567', '금액은 쉼표를 찍어서 크게 보여줌');
+  // 결제일 숫자판 → 뒤로 가기는 숫자판만 닫음
+  await p.click('#dayBtn'); await sleep(p, 400);
+  ok(await p.evaluate(() => !!document.querySelector('.dayp.on')), '결제일 숫자판이 뜸');
+  await back(p);
+  ok(!(await p.evaluate(() => !!document.querySelector('.dayp.on'))) && (await sheetOn(p)), '뒤로 가기 → 숫자판만 닫히고 양식은 그대로');
+  await p.click('#dayBtn'); await sleep(p, 400);
+  await p.click('.dayp .eom'); await sleep(p, 400);
+  ok(/말일/.test(await p.evaluate(() => document.getElementById('dayTxt').textContent)), '"말일"을 고를 수 있음');
+  // 매년으로 바꾸면 날짜를 고르게 됨
+  await p.click('[data-cyc] button[data-v="매년"]'); await sleep(p, 300);
+  ok((await p.evaluate(() => document.getElementById('dayLbl').textContent)) === '다음 결제일', '매년으로 바꾸면 칸 이름이 "다음 결제일"로');
+  await p.click('#dayBtn'); await sleep(p, 400);
+  ok(await p.evaluate(() => !!document.querySelector('.dp.on:not(.dayp)')), '이때는 달력으로 날짜를 고름');
+  await back(p);
+  await p.evaluate(() => { try { localStorage.removeItem('fc_draft'); } catch (e) {} });
+  await p.click('#sheetClose'); await sleep(p, 400);
+  await p.evaluate(() => { try { localStorage.removeItem('fc_draft'); } catch (e) {} });
+  // 고칠 때는 더 적기가 펼쳐져 있음
+  await p.click('#list .row.tr .tc.nmc'); await sleep(p, 400);
+  await p.click('#list [data-act="edit"]'); await sleep(p, 500);
+  ok(await p.evaluate(() => document.getElementById('moreBox').classList.contains('on')), '고칠 때는 더 적기가 펼쳐져 있음 (칸이 숨지 않음)');
+  ok(realErrors(h).length === 0, '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+});
+t('revamp-empty-and-login', async () => {
+  const h = await H.open({ seed: 'empty', now: '2026-11-23T21:30', viewport: VP, latency: 60 }); const p = h.page;
+  await sleep(p, 800);
+  const chips = await p.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#welcome [data-preset]'), (b) => b.textContent.trim()));
+  ok(chips.length >= 6 && chips.indexOf('월세') >= 0, '처음 쓰는 화면에 자주 쓰는 항목 버튼: ' + chips.join(', '));
+  await p.click('#welcome [data-preset="4"]'); await sleep(p, 600);
+  const nm = await p.evaluate(() => document.querySelector('#sheetBody .fld input[type="text"]').value);
+  ok((await sheetOn(p)) && nm === chips[4], '버튼을 누르면 이름이 채워진 새 항목 창이 뜸 ("' + nm + '")');
+  await p.fill('#sheetBody [data-money]', '17000');
+  await p.click('#dayBtn'); await sleep(p, 400); await p.click('.dayp .dg button[data-d="3"]'); await sleep(p, 400);
+  await p.click('#saveBtn'); await h.idle(1500);
+  ok((srvItem(h, chips[4]) || {}).day === 3, '금액·결제일만 적고 저장됨');
+  ok(await p.evaluate(() => !document.querySelector('#welcome [data-preset]')), '항목이 생기면 처음 안내는 사라짐');
+  ok(realErrors(h).length === 0, '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+  const h2 = await H.open(Object.assign({}, LIFE, { loggedOut: true })); const p2 = h2.page;
+  await sleep(p2, 600);
+  const lg = await p2.evaluate(() => { const b = document.getElementById('fcGo'); return { t: b.textContent.trim(), h: Math.round(b.getBoundingClientRect().height), h1: document.querySelector('#fcLogin h1').textContent, li: document.querySelectorAll('#fcLogin li').length }; });
+  ok(lg.t === '구글 계정으로 시작하기' && lg.h >= 48 && lg.li === 3, '로그인 화면: 한 줄 소개 + 할 수 있는 일 3가지 + 큰 시작 버튼 ' + JSON.stringify(lg));
+  await h2.close();
+});
+t('revamp-tap-size', async () => {
+  // 누르는 곳은 높이 44px 이상 (작으면 폰에서 잘못 눌림)
+  for (const vp of [VP, SMALL]) {
+    const h = await H.open(Object.assign({}, LIFE, { viewport: vp })); const p = h.page;
+    await sleep(p, 1200);
+    const small = (pg) => pg.evaluate(() => Array.prototype.filter.call(document.querySelectorAll('button, a, [role="button"], select, input'), (e) => { const r = (e.closest('.inp') || e).getBoundingClientRect();   /* 큰 입력 칸은 감싼 상자 전체가 눌림 */ if (!r.width || !r.height || getComputedStyle(e).visibility === 'hidden') return false; if (e.type === 'hidden') return false; return r.height < 43.5; }).map((e) => (e.id || e.className || e.tagName) + ':' + Math.round(e.getBoundingClientRect().height)));
+    const a = await small(p);
+    ok(a.length === 0, '폭 ' + vp.width + ' 첫 화면: 44px보다 낮은 버튼 0개 ' + JSON.stringify(a.slice(0, 6)));
+    await p.click('.tabbar [data-tab="list"]'); await sleep(p, 400);
+    const b = await small(p);
+    ok(b.length === 0, '폭 ' + vp.width + ' 목록: 44px보다 낮은 버튼 0개 ' + JSON.stringify(b.slice(0, 6)));
+    await p.click('#addBtn'); await sleep(p, 500);
+    const c = await small(p);
+    ok(c.length === 0, '폭 ' + vp.width + ' 새 항목 창: 44px보다 낮은 버튼 0개 ' + JSON.stringify(c.slice(0, 6)));
+    await p.evaluate(() => { try { localStorage.removeItem('fc_draft'); } catch (e) {} });
+    await h.close();
+  }
 });
 t('small-token-expired', async () => {
   const h = await H.open(LIFE); const p = h.page;
