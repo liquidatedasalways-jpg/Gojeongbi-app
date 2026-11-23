@@ -1,0 +1,8 @@
+{
+  "name": "gojeongbi-dev",
+  "private": true,
+  "description": "화면 테스트 도구 (배포되는 앱과 무관)",
+  "devDependencies": {
+    "pretendard": "1.3.9"
+  }
+}

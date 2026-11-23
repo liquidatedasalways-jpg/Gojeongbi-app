@@ -138,6 +138,9 @@ svg { display: block; }
 .skel { height: 52px; background: var(--card); border-radius: 20px; margin-bottom: 10px; opacity: .7; }
 .fatal { padding: 30px 16px; text-align: center; color: var(--muted); font-size: 13px; }
 .fatal b { display: block; color: var(--ink); font-size: 15px; margin-bottom: 6px; }
+.fatal-acc { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 13px; }
+.fatal-acc span { flex-basis: 100%; color: var(--muted); overflow-wrap: anywhere; }
+.fatal-acc button { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; padding: 8px 4px; min-height: 40px; }
 
 /* 아래 탭 */
 .tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--bar); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
@@ -680,6 +683,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   var busy = false;
   var dirty = false;       // 캘린더를 맞춰야 하는지
   var pendingState = null;
+  var curOp = null;        // 지금 서버에 가 있는 작업
+  var lastGood = '';       // 서버가 마지막으로 확인해 준 상태 (저장 실패 때 여기로 되돌림)
+  var holdUntil = 0;       // 다시 보내기 전에 잠깐 쉬는 시각
   var els = {};            // 목록 탭 요소 (key → element)
   var firstRender = true;
   var hiddenAt = 0;
@@ -770,11 +776,12 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     b.style.display = opt.action ? '' : 'none';
     b.textContent = opt.action || '';
     b.onclick = function () { hideToast(); if (opt.onAction) opt.onAction(); };
-    $('toast').className = 'toast on' + (opt.error ? ' error' : '');
+    $('toast').className = 'toast on' + (opt.error ? ' error' : '') + (opt.sticky ? ' sticky' : '');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(hideToast, opt.ms || Math.min(9000, 2600 + msg.length * 45));
+    // sticky: 꼭 봐야 하는 알림 → 직접 누를 때까지 안 사라짐
+    if (!opt.sticky) toastTimer = setTimeout(hideToast, opt.ms || Math.min(9000, 2600 + msg.length * 45));
   }
-  function hideToast() { $('toast').className = $('toast').className.replace(' on', ''); }
+  function hideToast() { clearTimeout(toastTimer); $('toast').className = $('toast').className.replace(' on', '').replace(' sticky', ''); }
 
   /* ================= 서버 작업 줄 세우기 ================= */
   function enqueue(op) {
@@ -790,8 +797,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function pump() {
     if (busy || !queue.length) return;
+    var wait = holdUntil - Date.now();
+    if (wait > 0) { clearTimeout(pump.t); pump.t = setTimeout(pump, wait + 20); return; }
     var op = queue.shift();
     busy = true;
+    curOp = op;
     $('loadbar').className = 'loadbar on';
     var p;
     if (op.type === 'load') p = call('api_load', !!op.light);
@@ -801,15 +811,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     else if (op.type === 'restore') p = call('api_restore');
     else if (op.type === 'sort') p = call('api_sort', op.mode);
     else if (op.type === 'accounts') p = call('api_accounts', op.list);
-    p.then(function (res) { busy = false; done(op, res || {}); }, function (err) { busy = false; failed(op, err); });
-  }
-  var readySent = false;
-  function sendReady(res) {
-    if (readySent) return; readySent = true;
-    try { if (window.top !== window) window.top.postMessage({ fc: 'ready', email: (res && res.email) || '' }, '*'); } catch (e) {}
+    p.then(function (res) { busy = false; curOp = null; done(op, res || {}); }, function (err) { busy = false; curOp = null; failed(op, err); });
   }
   function done(op, res) {
-    sendReady(res);
     if (res.needSetup) { queue = []; $('loadbar').className = 'loadbar'; renderSetup(res); return; }
     if (res.busy && (op.tries || 0) < 4) {
       op.tries = (op.tries || 0) + 1;
@@ -831,23 +835,67 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }
     pump();
   }
+  /* 두 번 보내도 결과가 같은 작업만 자동으로 다시 보냄 (추가·삭제는 두 번 들어가면 안 되니까 제외) */
+  var RESEND_OK = { load: 1, checks: 1, sort: 1, accounts: 1 };
+  function isNetErr(msg) { return /인터넷 연결|불안정|오래 걸렸|연결이 안 됐/.test(msg) || navigator.onLine === false; }
+  function opCount(op) { return op.type === 'checks' ? Object.keys(op.map).length : 1; }
+  /** 저장 못 한 작업을 사용자가 '다시 시도'로 다시 함 */
+  function replay(op) {
+    if (!S) return;
+    if (op.type === 'checks') { for (var n in op.map) { var it = findItem(n); if (it && !!it.checked !== !!op.map[n]) toggle(n, true); } }
+    else if (op.type === 'delete') { if (findItem(op.name)) removeItem(op.name); }
+    else if (op.type === 'sort') changeSort(op.mode);
+    else { op.fails = 0; op.tries = 0; enqueue(op); }
+  }
+  function fatalHtml(msg) {
+    var W = window.FC_AUTH;
+    // 구글 계정이 여러 개 로그인된 브라우저에서 구글 쪽이 다른 계정으로 요청을 보내 생기는 문제 → 해결 방법을 바로 보여줌
+    var multi = !W && /권한|permission|access|authoriz/i.test(msg);
+    return '<div class="fatal"><b>' + (multi ? '구글 계정이 섞였어요' : '불러오지 못했어요') + '</b>' +
+      (multi ? '이 브라우저에 구글 계정이 2개 이상 로그인돼 있으면 구글이 다른 계정으로 시트를 열려고 해서 생기는 문제예요.<br><br>' +
+        '<span style="text-align:left;display:inline-block">① 이 브라우저에서 구글 계정을 모두 로그아웃<br>② 이 앱에 쓸 계정 하나로만 로그인<br>③ 다시 시도</span><br><br><small style="opacity:.6">' + esc(msg) + '</small>' : esc(msg)) +
+      '<br><br><button class="btn primary" style="display:inline-flex;padding:0 22px" id="retry" type="button">다시 시도</button>' +
+      (W ? '<div class="fatal-acc">' + (W.email() ? '<span>' + esc(W.email()) + '</span>' : '') +
+        '<button type="button" id="fSwitch">다른 계정으로 로그인</button><button type="button" id="fLogout">로그아웃</button></div>' : '') + '</div>';
+  }
   function failed(op, err) {
-    sendReady();
     var msg = (err && err.message) ? err.message : String(err);
-    queue = [];
-    $('loadbar').className = 'loadbar';
-    if (op.onError) op.onError('연결이 안 됐어요. 다시 해주세요.\n(' + msg + ')');
-    if (!S) {
-      // 구글 계정이 여러 개 로그인된 브라우저에서 구글 쪽이 다른 계정으로 요청을 보내 생기는 문제 → 해결 방법을 바로 보여줌
-      var multi = !window.FC_AUTH && /권한|permission|access|authoriz/i.test(msg);
-      $('home').innerHTML = '<div class="fatal"><b>' + (multi ? '구글 계정이 섞였어요' : '불러오지 못했어요') + '</b>' +
-        (multi ? '이 브라우저에 구글 계정이 2개 이상 로그인돼 있으면 구글이 다른 계정으로 시트를 열려고 해서 생기는 문제예요.<br><br>' +
-          '<span style="text-align:left;display:inline-block">① 이 브라우저에서 구글 계정을 모두 로그아웃<br>② 이 앱에 쓸 계정 하나로만 로그인<br>③ 다시 시도</span><br><br><small style="opacity:.6">' + esc(msg) + '</small>' : esc(msg)) +
-        '<br><br><button class="btn primary" style="display:inline-flex;padding:0 22px" id="retry" type="button">다시 시도</button></div>';
-      $('retry').onclick = function () { enqueue({ type: 'load' }); };
+    // 1) 연결 문제면 잠깐 뒤 자동으로 다시 보냄 (두 번까지)
+    if (RESEND_OK[op.type] && isNetErr(msg) && (op.fails || 0) < 2) {
+      op.fails = (op.fails || 0) + 1;
+      queue.unshift(op);
+      holdUntil = Date.now() + (op.fails === 1 ? 1200 : 3000);
+      pump();
       return;
     }
-    toast('연결이 끊겨서 방금 바꾼 게 저장 안 됐을 수 있어요.', { error: true, action: '다시 불러오기', ms: 10000, onAction: function () { enqueue({ type: 'load', light: true }); } });
+    // 2) 끝내 안 됐으면: 줄 서 있던 작업을 다 내리고, 화면을 서버가 마지막으로 확인해 준 상태로 되돌림
+    //    (서버엔 저장이 안 됐는데 화면엔 '냄'으로 남아 있으면 안 낸 돈을 냈다고 믿게 됨)
+    var lost = [op].concat(queue).filter(function (o) { return o.type !== 'load'; });
+    queue = [];
+    holdUntil = 0;
+    $('loadbar').className = 'loadbar';
+    var full = '연결이 안 됐어요. 다시 해주세요.\n(' + msg + ')';
+    lost.forEach(function (o) { if (o.onError) o.onError(full); });
+    if (!S) {
+      $('home').innerHTML = fatalHtml(msg);
+      $('retry').onclick = function () { this.disabled = true; this.textContent = '불러오는 중…'; enqueue({ type: 'load' }); };
+      if ($('fSwitch')) $('fSwitch').onclick = function () { window.FC_AUTH.switchAccount(); };
+      if ($('fLogout')) $('fLogout').onclick = function () { window.FC_AUTH.logout(); };
+      return;
+    }
+    var st = pendingState || (lastGood ? JSON.parse(lastGood) : null);
+    pendingState = null;
+    clearTimeout(moveTimer); moveTimer = null;
+    if (st) apply(st);
+    var redo = lost.filter(function (o) { return !o.onError; });
+    if (!redo.length) {
+      if (op.type === 'load') toast('연결이 안 돼서 새로 못 불러왔어요. 지금 화면은 마지막으로 불러온 내용이에요.', { error: true, action: '다시 시도', ms: 7000, onAction: function () { enqueue({ type: 'load', light: true }); } });
+      return;
+    }
+    var n = redo.reduce(function (a, o) { return a + opCount(o); }, 0);
+    toast('연결이 끊겨서 저장 못 했어요.\n방금 바꾼 ' + (n > 1 ? n + '건은' : '건') + ' 되돌렸어요. (' + msg + ')', {
+      error: true, sticky: true, action: '다시 시도', onAction: function () { redo.forEach(replay); }
+    });
   }
 
   /* ================= 캘린더 동기화 ================= */
@@ -1470,7 +1518,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function apply(res) {
     S = res;
     sticky = {};
-    store('fc_state', res);
+    lastGood = JSON.stringify(res);
+    try { localStorage.setItem('fc_state', lastGood); } catch (e) {}
     renderAll();
     chip();
     if ((sheetMode === 'item' || sheetMode === 'edit') && openName && !findItem(openName)) closeSheet();
@@ -2653,7 +2702,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }, { passive: true });
   })();
   document.querySelectorAll('.tabbar [data-tab]').forEach(function (b) { b.onclick = function () { setTab(b.getAttribute('data-tab')); }; });
-  $('addBtn').onclick = function () { if (S) openAdd(); };
+  $('addBtn').onclick = function () {
+    if (S) { openAdd(); return; }
+    if (document.body.classList.contains('setup-on')) return;
+    toast(busy || queue.length ? '불러오는 중이에요. 잠깐만 기다려주세요.' : '아직 못 불러왔어요. 먼저 "다시 시도"를 눌러주세요.');
+  };
   $('menuBtn').onclick = function () { openMenu(false); };
   $('sync').onclick = function () {
     if (!S) return;
@@ -2661,6 +2714,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (cal.syncing || cal.timer) { toast('캘린더에 반영하는 중이에요. 몇 초면 끝나요.'); return; }
     toast(cal.last || '앱에서 바꾸면 구글 캘린더도 바로 바뀌어요.');
   };
+  $('toast').onclick = function (e) { if (e.target.id !== 'toastBtn') hideToast(); };
   $('backdrop').onclick = closeSheet;
   $('sheetClose').onclick = closeSheet;
   $('sheetBack').onclick = function () { if (sheetBackFn) sheetBackFn(); };
@@ -2692,7 +2746,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   var cached = load('fc_state');
   // 이 기기에 남은 지난 화면은 같은 계정일 때만 먼저 보여줌 (다른 계정 내용이 잠깐이라도 보이면 안 됨)
   var who = window.FC_AUTH ? window.FC_AUTH.email() : '';
-  if (cached && cached.items && cached.meta && (!window.FC_AUTH || (who && cached.email && cached.email.toLowerCase() === who.toLowerCase()))) { S = cached; renderAll(); chip(); }
+  if (cached && cached.items && cached.meta && (!window.FC_AUTH || (who && cached.email && cached.email.toLowerCase() === who.toLowerCase()))) { S = cached; lastGood = JSON.stringify(cached); renderAll(); chip(); }
   enqueue({ type: 'load' });
   (function () {   // 구글 권한 허용하고 돌아온 직후면 서버 업데이트 이어서
     var p = window.FC_AUTH && window.FC_AUTH.resumeUpdate && window.FC_AUTH.resumeUpdate();
