@@ -300,6 +300,25 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync { display: no
 .qd input[type=date] { width: 150px; }
 .grp > .qd + .qd::after { content: ""; position: absolute; left: 18px; right: 18px; top: 0; height: 1px; background: var(--line); }
 
+/* + 버튼: 엑셀처럼 여러 줄 입력 */
+.qa { --qcols: 26px minmax(0, 1fr) 96px 54px; }
+.qa .qh, .qa .qr { display: grid; grid-template-columns: var(--qcols); position: relative; }
+.qa .qh { background: var(--fill); font-size: 11px; font-weight: 600; color: var(--muted); }
+.qa .qh span { padding: 7px 8px; border-left: 1px solid var(--fill2); }
+.qa .qh span:first-child { border-left: 0; }
+.qa .qh span:nth-child(3) { text-align: right; } .qa .qh span:nth-child(4) { text-align: center; }
+.qa .qr + .qr::after, .qa .qh + .qr::after { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1px; background: var(--line); }
+.qa .qr .no { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; color: var(--faint); }
+.qa .qr input { width: 100%; min-width: 0; height: 46px; border: 0; border-left: 1px solid var(--line); background: none; outline: none; font-size: 14.5px; padding: 0 8px; }
+.qa .qr input.qn { font-weight: 600; }
+.qa .qr input.qm { text-align: right; font-weight: 700; }
+.qa .qr input.qd { text-align: center; font-weight: 600; }
+.qa .qr input:focus { background: var(--sel); box-shadow: inset 0 0 0 1.5px var(--accent); }
+.qa .qr input::placeholder { color: var(--faint); font-weight: 500; }
+.qa .qr.bad input.qn { box-shadow: inset 0 0 0 1.5px var(--red); }
+.qmore { display: block; width: 100%; padding: 2px 4px 16px; font-size: 12.5px; font-weight: 600; color: var(--muted); text-align: center; }
+.qmore b { color: var(--accent); font-weight: 700; }
+
 /* 목록 탭: 시트처럼 표 */
 .tbl { --cols: 40px minmax(0, 1fr) 92px 58px; }
 .tbl > .row.tr { display: block; min-height: 0; }
@@ -1818,6 +1837,106 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var later = function () { clearTimeout(draftTimer); draftTimer = setTimeout(saveDraft, 250); };
     body.addEventListener('input', later); body.addEventListener('change', later); body.addEventListener('click', later);
   }
+  /* + 버튼: 엑셀처럼 여러 줄 한 번에 */
+  function qaRowHtml(i, r) {
+    r = r || {};
+    return '<div class="qr"><span class="no">' + (i + 1) + '</span>' +
+      '<input class="qn" placeholder="' + (i === 0 ? '예: 넷플릭스' : '') + '" maxlength="40" enterkeyhint="next" value="' + esc(r.n || '') + '">' +
+      '<input class="qm" inputmode="numeric" placeholder="' + (i === 0 ? '13,500' : '') + '" maxlength="13" enterkeyhint="next" value="' + esc(r.m || '') + '">' +
+      '<input class="qd" inputmode="numeric" placeholder="' + (i === 0 ? '5' : '') + '" maxlength="2" enterkeyhint="next" value="' + esc(r.d || '') + '"></div>';
+  }
+  function openQuickAdd() {
+    openName = null;
+    var saved = load('fc_qadd_' + (S.email || '')) || [];
+    var n = Math.max(3, saved.length + 1);
+    var h = '<div class="tip">엑셀처럼 한 줄에 하나씩 적어요. 결제일은 매월 며칠인지 숫자만. 모르는 칸은 비워도 돼요.</div>' +
+      '<div class="grp qa" id="qaBox"><div class="qh"><span></span><span>항목</span><span>금액</span><span>결제일</span></div>';
+    for (var i = 0; i < n; i++) h += qaRowHtml(i, saved[i]);
+    h += '</div><div class="btns"><button class="btn primary" type="button" id="qaSave">추가</button></div>' +
+      '<button class="qmore" type="button" id="qaMore">결제 수단·주기·기간까지 적으려면 <b>자세히 쓰기</b></button>';
+    openSheet('새 항목', h, 'quick');
+    var box = $('qaBox');
+    function rows() { return Array.prototype.slice.call(box.querySelectorAll('.qr')); }
+    function read() {
+      return rows().map(function (r) {
+        var q = r.querySelectorAll('input');
+        return { n: q[0].value.trim(), m: q[1].value.replace(/[^\d]/g, ''), d: q[2].value.replace(/[^\d]/g, '') };
+      });
+    }
+    function count() {
+      var k = read().filter(function (r) { return r.n; }).length;
+      $('qaSave').textContent = k > 1 ? k + '개 추가' : '추가';
+    }
+    function persist() {
+      var data = read();
+      while (data.length && !data[data.length - 1].n && !data[data.length - 1].m && !data[data.length - 1].d) data.pop();
+      try { if (data.length) store('fc_qadd_' + (S.email || ''), data.map(function (r, i) { var q = rows()[i].querySelectorAll('input'); return { n: q[0].value, m: q[1].value, d: q[2].value }; })); else localStorage.removeItem('fc_qadd_' + (S.email || '')); } catch (e) {}
+    }
+    function wire(r) {
+      var q = r.querySelectorAll('input');
+      q[1].addEventListener('input', function () { var dg = q[1].value.replace(/[^\d]/g, ''); q[1].value = dg ? Number(dg).toLocaleString('ko-KR') : ''; });
+      q[2].addEventListener('input', function () { q[2].value = q[2].value.replace(/[^\d]/g, ''); });
+      q[0].addEventListener('input', function () {
+        r.classList.remove('bad');
+        var all = rows();
+        if (all[all.length - 1] === r && q[0].value.trim()) {   // 마지막 줄에 쓰기 시작하면 빈 줄 하나 더
+          box.insertAdjacentHTML('beforeend', qaRowHtml(all.length));
+          wire(box.lastElementChild);
+        }
+      });
+      for (var j = 0; j < 3; j++) (function (j) {
+        q[j].addEventListener('input', function () { count(); persist(); });
+        q[j].addEventListener('keydown', function (e) {
+          if (e.key !== 'Enter') return;
+          e.preventDefault();
+          if (j < 2) { q[j + 1].focus(); return; }
+          var nx = r.nextElementSibling;
+          if (nx) nx.querySelector('input').focus();
+        });
+      })(j);
+    }
+    rows().forEach(wire);
+    count();
+    setTimeout(function () { var f = rows().filter(function (r) { return !r.querySelector('input').value; })[0]; if (f) f.querySelector('input').focus(); }, 320);
+    $('qaMore').onclick = function () {
+      var first = read().filter(function (r) { return r.n; })[0];
+      openAdd();
+      if (first) {
+        var af = amtFieldOf(), df = dayFieldOf(), set = function (f, v) { var el = f && $('f' + f.col); if (el && v) { el.value = f.money ? Number(v).toLocaleString('ko-KR') : v; el.dispatchEvent(new Event('input', { bubbles: true })); } };
+        set({ col: S.meta.nameCol }, first.n); set(af, first.m); set(df, first.d);
+      }
+    };
+    $('qaSave').onclick = function () {
+      var data = read(), seen = {}, bad = '', list = [];
+      var rs = rows();
+      data.forEach(function (r, i) {
+        if (!r.n) { if ((r.m || r.d) && !bad) { bad = (i + 1) + '번 줄에 항목 이름을 적어주세요'; rs[i].classList.add('bad'); } return; }
+        if (findItem(r.n) || seen[r.n]) { if (!bad) { bad = '"' + r.n + '"은(는) 이미 있어요. 이름을 조금 다르게 적어주세요.'; rs[i].classList.add('bad'); } return; }
+        if (r.d && (+r.d < 1 || +r.d > 31)) { if (!bad) bad = r.n + ': 결제일은 1~31 사이 숫자로 적어주세요'; return; }
+        seen[r.n] = 1;
+        list.push(r);
+      });
+      if (bad) { toast(bad, { error: true }); return; }
+      if (!list.length) { rs[0].querySelector('input').focus(); toast('항목 이름을 하나 이상 적어주세요', { error: true }); return; }
+      try { localStorage.removeItem('fc_qadd_' + (S.email || '')); } catch (e) {}
+      closeSheet();
+      var af = amtFieldOf(), df = dayFieldOf(), left = list.length, okN = 0, noDay = 0;
+      list.forEach(function (r) {
+        var vals = {};
+        S.meta.fields.forEach(function (f) { var dv = defaultFor(f); if (dv) vals[f.col] = dv; });
+        vals[S.meta.nameCol] = r.n;
+        if (af) vals[af.col] = r.m;
+        if (df) vals[df.col] = r.d;
+        if (!r.d) noDay++;
+        enqueue({ type: 'save', oldName: '', vals: vals, onDone: function (res) {
+          if (res.ok) okN++;
+          if (--left) return;
+          toast(okN === 1 ? res.name + ' 추가했어요' : okN + '개 추가했어요', { ms: 3000 });
+          if (okN === 1) setTimeout(function () { flash(res.name); }, 400);
+        } });
+      });
+    };
+  }
   function openAdd() {
     openName = null;
     openSheet('새 항목', formHtml(null), 'add');
@@ -2523,7 +2642,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var b = e.target.closest('[data-act]');
     if (!b || !S) return;
     var act = b.getAttribute('data-act');
-    if (act === 'onb-add') { openAdd(); return; }
+    if (act === 'onb-add') { openQuickAdd(); return; }
     if (act === 'onb-acc') { openAccounts(false, null); return; }
     if (act === 'ackall') { ack(reminders().map(function (r) { return r.key; })); return; }
     if (act === 'ack') { ack([b.getAttribute('data-key')]); return; }
@@ -2578,7 +2697,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }, { passive: true });
   })();
   document.querySelectorAll('.tabbar [data-tab]').forEach(function (b) { b.onclick = function () { setTab(b.getAttribute('data-tab')); }; });
-  $('addBtn').onclick = function () { if (S) openAdd(); };
+  $('addBtn').onclick = function () { if (S) openQuickAdd(); };
   $('menuBtn').onclick = function () { openMenu(false); };
   $('sync').onclick = function () {
     if (!S) return;
