@@ -1184,6 +1184,21 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function amtFieldOf() { return S.meta.fields.filter(isAmtField)[0]; }
   function dayFieldOf() { return S.meta.fields.filter(isDayField)[0]; }
   function startFieldOf() { return S.meta.fields.filter(function (f) { return /^시작일/.test(f.label); })[0]; }
+  /** 새 매월 항목인데 결제일이 이미 지났으면 시작일을 다음 달 그날로 (방금 넣은 게 '지남'으로 안 뜨게) */
+  function startNextIfPast(vals) {
+    var sf = startFieldOf(), df = dayFieldOf();
+    if (!sf || !df || vals[sf.col]) return '';
+    var d = +String(vals[df.col] || '').replace(/[^\d]/g, '');
+    if (!d || d < 1 || d > 31) return '';
+    var cf = S.meta.fields.filter(function (f) { return /주기/.test(f.label); })[0];
+    var cyc = cf ? String(vals[cf.col] || '') : '';
+    if (cyc && cyc !== '매월') return '';
+    var t = parse(today());
+    if (!t || Math.min(d, lastDay(t.y, t.m)) >= t.d) return '';
+    var ny = t.m === 12 ? t.y + 1 : t.y, nm = t.m === 12 ? 1 : t.m + 1;
+    vals[sf.col] = ymd(ny, nm, Math.min(d, lastDay(ny, nm)));
+    return ' · ' + nm + '월 ' + Math.min(d, lastDay(ny, nm)) + '일부터 잡았어요';
+  }
   function cycleShort(it) {
     var e = it.every || 1;
     if (e === 1) return '';
@@ -1283,12 +1298,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var af = amtFieldOf(), df = dayFieldOf();
       if (af) vals[af.col] = am.value.replace(/[^\d]/g, '');
       if (df) vals[df.col] = d;
+      var later = startNextIfPast(vals);
       go.classList.remove('go');
       nm.value = ''; am.value = ''; dy.value = '';
       if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
       enqueue({ type: 'save', oldName: '', vals: vals, onDone: function (res) {
         if (!res.ok) return;
-        toast(res.name + ' 추가했어요' + (d ? '' : ' · 결제일은 나중에 넣어도 돼요'), { action: '자세히', onAction: function () { openEdit(res.name); } });
+        toast(res.name + ' 추가했어요' + (d ? later : ' · 결제일은 나중에 넣어도 돼요'), { action: '자세히', onAction: function () { openEdit(res.name); } });
         setTimeout(function () { flash(res.name); }, 400);
       } });
     }
@@ -2293,6 +2309,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       return true;
     }
     showErr('');
+    var later = it ? '' : startNextIfPast(r.vals);
     var btn = $('saveBtn');
     btn.disabled = true;
     btn.innerHTML = '<span class="spin"></span>' + (it ? '저장 중' : '추가 중');
@@ -2303,7 +2320,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
         if (!res.ok) return;
         dropDraft(it);
         if (sheetMode === mode) closeSheet();
-        toast(it ? '저장했어요' : res.name + ' 추가했어요');
+        toast(it ? '저장했어요' : res.name + ' 추가했어요' + later);
         var nm = res.name;
         setTimeout(function () { flash(nm); var el = els['i:' + nm]; if (tab === 'list' && el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 400);
       },
