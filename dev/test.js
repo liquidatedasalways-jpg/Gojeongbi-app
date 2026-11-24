@@ -1184,11 +1184,11 @@ t('layout-old-categories', async () => {
   const h = await H.open(LIFE); const p = h.page;
   await sleep(p, 1200);
   await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
-  // 예전 7가지 분류로 저장된 항목이 새 9가지 아이콘으로 보이는지 (서버 값은 그대로)
-  const shown = await p.evaluate(() => { const o = {}; document.querySelectorAll('#list .row.tr[data-name]').forEach((r) => { const c = r.querySelector('.icc .cic'); if (c) o[r.getAttribute('data-name')] = (c.getAttribute('style').match(/--c-(\w+)/) || [])[1]; }); return o; });
+  // 예전 7가지 분류로 저장된 항목이 새 9가지 분류로 보이는지 (서버 값은 그대로). 목록엔 이름 아래 회색 글자로 나옴
+  const shown = await p.evaluate(() => { const o = {}; document.querySelectorAll('#list .row.tr[data-name]').forEach((r) => { const c = r.querySelector('.nmc .ctg'); if (c) o[r.getAttribute('data-name')] = c.getAttribute('data-c'); }); return o; });
   const want = { '월세': 'home', '관리비': 'home', '전기요금': 'util', '도시가스': 'util', '통신비': 'tel', '휴대폰 요금': 'tel', '인터넷': 'tel', '넷플릭스': 'sub', '헬스장': 'sub', '정수기 렌탈': 'sub', '실손보험': 'ins', '자동차보험': 'ins', '청년 적금': 'save' };   // 청년 적금은 옛 분류가 '기타'지만 이름을 보고 저축으로
   const bad = Object.keys(want).filter((k) => shown[k] !== want[k]);
-  ok(bad.length === 0, '옛 분류(월세·관리비·통신비·보험·서비스·구독·기타) 항목이 새 아이콘으로 보임' + (bad.length ? ' ✗ ' + bad.map((k) => k + ':' + shown[k]).join(', ') : ''));
+  ok(bad.length === 0, '옛 분류(월세·관리비·통신비·보험·서비스·구독·기타) 항목이 새 분류로 보임' + (bad.length ? ' ✗ ' + bad.map((k) => k + ':' + shown[k]).join(', ') : ''));
   ok(srvItem(h, '월세').cat === '월세' && srvItem(h, '전기요금').cat === '관리비', '보기만 해선 서버에 저장된 분류를 안 바꿈');
   // 고쳐서 저장하면 새 이름으로
   await p.click('#list .row.tr[data-name="월세"] .tc.nmc'); await sleep(p, 300);
@@ -1220,7 +1220,7 @@ t('layout-old-categories', async () => {
   await p.click('#catBtn'); await sleep(p, 450);
   await p.click('.cgrid [data-cat="기타"]'); await sleep(p, 500);
   await p.click('#saveBtn'); await h.idle(900);
-  const icOf = (n) => p.evaluate((x) => ((document.querySelector('#list .row.tr[data-name="' + x + '"] .icc .cic').getAttribute('style') || '').match(/--c-(\w+)/) || [])[1], n);
+  const icOf = (n) => p.evaluate((x) => document.querySelector('#list .row.tr[data-name="' + x + '"] .nmc .ctg').getAttribute('data-c'), n);
   ok((await icOf('청년 적금')) === 'etc', '일부러 기타를 고르면 목록에 기타로 보임 (서버 값: ' + srvItem(h, '청년 적금').cat + ')');
   await p.reload(); await sleep(p, 1500);
   await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
@@ -1240,6 +1240,16 @@ t('layout-flat-list', async () => {
   const st = await p.evaluate(() => ({ heads: document.querySelectorAll('#tab-list .gh').length, chk: document.querySelectorAll('#list .row.tr[data-name] .chk').length, th: document.querySelectorAll('#lhead [data-sort]').length, cards: document.querySelectorAll('#tab-list .grp').length, cnt: document.getElementById('countTxt').textContent }));
   ok(r.length === 15 && st.heads === 0 && st.cards === 1, '묶음 제목 없이 15개가 한 장에 쭉: ' + st.cnt);
   ok(st.chk === 0, '목록엔 체크 칸이 없음 (냈는지는 첫 화면에서)');
+  // 번호·주기 단위·색
+  const look = () => p.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#list .row.tr[data-name]:not(.newr)'), (r2) => ({ n: r2.getAttribute('data-name'), no: (r2.querySelector('.noc') || {}).textContent, cy: (r2.querySelector('.dyc .cy') || {}).textContent || '', cat: (r2.querySelector('.nmc .ctg') || {}).textContent || '', ic: r2.querySelectorAll('.cic').length })));
+  let lk = await look();
+  ok(lk.every((x, i) => x.no === String(i + 1)), '맨 앞에 번호 1~' + lk.length + ' (하위 항목까지 이어서): ' + lk.map((x) => x.no).join(' '));
+  const cyOf = (n) => (lk.filter((x) => x.n === n)[0] || {}).cy;
+  ok(cyOf('넷플릭스') === '매월' && cyOf('헬스장') === '3개월마다' && cyOf('자동차보험') === '매년', '결제일 아래에 주기: 넷플릭스 ' + cyOf('넷플릭스') + ', 헬스장 ' + cyOf('헬스장') + ', 자동차보험 ' + cyOf('자동차보험'));
+  ok(cyOf('도시가스') === '', '결제일이 없는 항목은 "넣기"만 보임');
+  ok(lk.every((x) => x.ic === 0) && lk.filter((x) => x.n === '넷플릭스')[0].cat === '구독', '색 아이콘 없이 분류는 이름 아래 글자로');
+  const cyCss = await p.evaluate(() => { const e = document.querySelector('#list .dyc .cy'), n = document.querySelector('#list .noc'), cs = getComputedStyle(e), ns = getComputedStyle(n), m = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim(); const d = document.createElement('i'); d.style.color = m; document.body.appendChild(d); const mc = getComputedStyle(d).color; d.remove(); return { cy: cs.fontSize, cyGrey: cs.color === mc, no: ns.fontSize, noGrey: ns.color === mc }; });
+  ok(cyCss.cy === '12px' && cyCss.cyGrey && cyCss.no === '12px' && cyCss.noGrey, '번호와 주기는 작은 회색 글자(12px): ' + JSON.stringify(cyCss));
   const top = r.filter((x) => !x.child);
   const days = top.map((x) => (/말일/.test(x.d) ? 31 : +(x.d.match(/(\d+)일/) || [0, 99])[1]));
   ok(days.every((d, i) => !i || days[i - 1] <= d), '처음엔 결제일 빠른 순, 결제일 없는 건 맨 아래: ' + top.map((x) => x.d).join(' '));
@@ -1249,6 +1259,8 @@ t('layout-flat-list', async () => {
   r = await rows();
   let a = r.filter((x) => !x.child && x.a).map((x) => x.a);
   ok(a.every((v, i) => !i || a[i - 1] >= v) && r[0].n === '자동차보험', '"금액"을 누르면 큰 금액부터: ' + a.slice(0, 4).join(' > '));
+  lk = await look();
+  ok(lk[0].n === '자동차보험' && lk.every((x, i) => x.no === String(i + 1)), '줄 세우는 기준을 바꾸면 번호도 보이는 순서대로 다시 매김');
   ok(r[r.length - 1].n === '전기요금', '금액 없는 건 맨 아래');
   await p.click('#lhead [data-sort="amt"]'); await sleep(p, 700);
   r = await rows(); a = r.filter((x) => !x.child && x.a).map((x) => x.a);
@@ -1264,6 +1276,8 @@ t('layout-flat-list', async () => {
   await p.click('#catFilter [data-cat="구독"]'); await sleep(p, 600);
   r = await rows();
   ok(r.length === 5 && /^구독 5개/.test(await p.evaluate(() => document.getElementById('countTxt').textContent)), '구독만: ' + r.map((x) => x.n).join(', '));
+  lk = await look();
+  ok(lk.map((x) => x.no).join('') === '12345' && lk.every((x) => x.cat === ''), '한 분류만 볼 땐 번호 1~5, 이름 아래 분류 글자는 생략');
   // 골라 본 채로 맨 아래 줄에 적으면 그 분류로 들어감
   await p.fill('#nName', '티빙'); await p.fill('#nAmt', '9500'); await p.fill('#nDay', '14'); await p.press('#nDay', 'Enter');
   await h.idle(900);
@@ -1288,6 +1302,36 @@ t('layout-flat-list', async () => {
   ok(await p.evaluate(() => document.querySelector('#lhead [data-sort="name"]').classList.contains('on')), '다시 열어도 줄 세운 기준(항목)이 그대로');
   ok(realErrors(h).length === 0, '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
   await h.close();
+});
+
+t('badge-new-last', async () => {
+  // 이름 옆 작은 표시: 첫 결제가 이번 달이거나 아직 안 온 항목은 NEW, 이번이 마지막 결제면 LAST
+  const seed = JSON.parse(JSON.stringify(H.SEEDS.full));
+  seed.items.push({ n: '티빙', cat: '구독', amt: 9500, day: 27, start: '2026-11-27' });
+  seed.items.push({ n: '웨이브', cat: '구독', amt: 7900, day: 5, start: '2026-12-05' });
+  seed.items.push({ n: '노트북 할부', cat: '대출', amt: 125000, day: 28, start: '2026-06-28', end: '2026-11-28' });
+  for (const vp of [{ width: 360, height: 760 }, { width: 320, height: 640 }]) {
+    const h = await H.open(Object.assign({}, LIFE, { seed, viewport: vp })); const p = h.page;
+    await sleep(p, 1200);
+    const tag = vp.width + ' ';
+    const bd = (root) => p.evaluate((sel) => { const o = {}; document.querySelectorAll(sel).forEach((r) => { const b = Array.prototype.map.call(r.querySelectorAll('.bdg'), (x) => x.textContent).join('+'); if (b) o[r.getAttribute('data-name')] = b; }); return o; }, root);
+    const hm = await bd('#home .row[data-name]');
+    ok(hm['티빙'] === 'NEW' && hm['노트북 할부'] === 'LAST', tag + '첫 화면: 이번 달 처음 나가는 티빙에 NEW, 마지막 결제인 노트북 할부에 LAST ' + JSON.stringify(hm));
+    ok(!hm['월세'] && !hm['넷플릭스'] && !hm['헬스장'], tag + '첫 화면: 전부터 내던 항목엔 표시 없음');
+    await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
+    const ls = await bd('#list .row.tr[data-name]');
+    ok(ls['티빙'] === 'NEW' && ls['웨이브'] === 'NEW' && ls['노트북 할부'] === 'LAST', tag + '목록: 티빙·웨이브(첫 결제가 다음 달) NEW, 노트북 할부 LAST ' + JSON.stringify(ls));
+    ok(!ls['월세'] && !ls['넷플릭스'] && !ls['자동차보험'] && !ls['헬스장'], tag + '목록: 전부터 내던 항목엔 표시 없음');
+    const fit = await p.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#list .bdg'), (b) => { const r = b.getBoundingClientRect(), c = b.closest('.tc.nmc').getBoundingClientRect(), n = b.parentNode.querySelector('.nm').getBoundingClientRect(); return { in: r.right <= c.right + 0.5 && r.left >= n.right - 0.5, h: Math.round(r.height), fs: getComputedStyle(b).fontSize, row: Math.round(b.closest('.tg').getBoundingClientRect().height) }; }));
+    ok(fit.length >= 3 && fit.every((x) => x.in && x.h <= 16 && x.fs === '10px' && x.row === 48), tag + '목록: 표시는 이름 옆 칸 안에 작게(10px), 줄 높이 48px 그대로 ' + JSON.stringify(fit[0]));
+    // 다음 달 달력: 티빙의 두 번째 결제엔 NEW 없음, 웨이브 첫 결제엔 NEW
+    await p.click('.tabbar [data-tab="cal"]'); await sleep(p, 300);
+    await p.evaluate(() => window.scrollTo(0, 0)); await p.click('#calNext'); await sleep(p, 600);
+    const nx = await bd('#home .row[data-name]');
+    ok(nx['웨이브'] === 'NEW' && !nx['티빙'], tag + '다음 달: 웨이브(첫 결제)만 NEW, 티빙(두 번째)은 없음 ' + JSON.stringify(nx));
+    ok(realErrors(h).length === 0, tag + '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+    await h.close();
+  }
 });
 
 t('layout-heights', async () => {

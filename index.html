@@ -180,6 +180,12 @@ body.on-cal .calnav { display: flex; }
 .over { color: var(--red-text); font-weight: 600; }
 .soon { color: var(--accent-text); font-weight: 600; }
 .lastp { color: var(--grape); }
+/* 이름 옆 아주 작은 표시. NEW: 첫 결제가 이번 달이거나 아직 안 온 항목, LAST: 이번이 마지막 결제 */
+.nl { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.nl .nm { min-width: 0; }
+.bdg { flex: none; display: inline-flex; align-items: center; height: 15px; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: .04em; background: var(--sel); color: var(--accent-text); }
+.bdg.last { background: var(--fill); background: color-mix(in srgb, var(--grape) 14%, transparent); color: var(--grape); }
+.checked .bdg, .row.muted .bdg { opacity: .55; }
 .checked .nm, .checked .am, .checked .av, .checked .dv, .row.muted .nm, .row.muted .av, .row.muted .dv { color: var(--muted); font-weight: 500; }
 .row.child { background: var(--child); }
 .row.pending .chk i { opacity: .8; }
@@ -501,20 +507,25 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .row.tr:not(.drag):not(.swiped) .swdel { visibility: hidden; }
 
 /* 목록 탭: 표 한 장 (세로선 없이). 칸 제목은 화면을 내려도 위에 붙어 있고, 누르면 그 칸 기준으로 줄 세움 */
-.lcard { --cols: 48px minmax(0, 1fr) 86px 66px; position: relative; }
-@media (max-width: 340px) { .lcard { --cols: 44px minmax(0, 1fr) 80px 60px; } }
+.lcard { --no: 36px; --cols: var(--no) minmax(0, 1fr) 86px 70px; position: relative; }
+@media (max-width: 340px) { .lcard { --no: 32px; --cols: var(--no) minmax(0, 1fr) 80px 64px; } }
 .lcard > .grp { border-radius: 0 0 var(--r-card) var(--r-card); }
 .tbl > .row.tr { display: block; min-height: 0; }
-.tbl > * + *::after { left: 48px; right: 0; }
+.tbl > * + *::after { left: var(--no); right: 0; }
+/* 줄 사이 가는 선 (밀어서 삭제할 때 줄과 같이 움직이게 줄 안쪽에 그림) */
+.tbl > .row.tr + .row.tr > .tg { box-shadow: inset 0 1px 0 var(--line); }
 .tg { display: grid; grid-template-columns: var(--cols); align-items: stretch; min-height: 48px; padding-right: 4px; }
 .tg > * { min-width: 0; }
 .tg .chk { width: auto; }
 .tg .chk i { width: 22px; height: 22px; }
 .tc.icc { justify-content: center; }
+/* 맨 앞 칸: 지금 보이는 순서대로 매긴 번호 (정렬·분류를 바꾸면 다시 매김) */
+.tc.noc { justify-content: center; padding-left: 4px; font-size: 12px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .tc { display: flex; align-items: center; min-height: 48px; font-size: 15px; cursor: pointer; }
 .tc.nmc { gap: 4px; }
 .tc.nmc .nw { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 5px 0; }
 .tc.nmc .nm { flex: none; line-height: 1.35; }
+.tc.nmc .nl .nm { flex: 0 1 auto; }
 .tc.nmc .tgs { display: flex; gap: 6px; line-height: 1.25; white-space: nowrap; overflow: hidden; }
 .tc.nmc .tag { flex: none; font-size: 12px; color: var(--muted); }
 .tc.nmc .tag.lastp { color: var(--grape); }
@@ -522,6 +533,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .tc.amc .av { min-width: 0; overflow: hidden; }
 .tc.dyc { justify-content: center; flex-direction: column; gap: 0; font-weight: 600; white-space: nowrap; line-height: 1.2; }
 .tc.dyc .dv { max-width: 100%; overflow: hidden; }
+/* 결제일 아래 작은 회색 글자: 얼마나 자주 나가는지 (매월·3개월마다·매년) */
+.tc.dyc .cy { max-width: 100%; overflow: hidden; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: -.02em; }
 .tc .nod { color: var(--accent-text); font-weight: 700; font-size: 13px; }
 .tc .emp { color: var(--muted); font-weight: 500; font-size: 13px; }
 .tc input.ci { width: 100%; height: 44px; border: 0; border-radius: 10px; background: var(--fill); padding: 0 6px; font-size: 15px; font-weight: 700; text-align: right; outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
@@ -533,14 +546,14 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .th button:nth-child(3) { justify-content: flex-end; } .th button:nth-child(4) { justify-content: center; padding-left: 6px; }
 .th button i { flex: none; width: 10px; height: 14px; opacity: .45; }
 .th button.on { color: var(--ink); font-weight: 700; }
-.th button.on i { opacity: 1; color: var(--accent-text); }
+.th button.on i { opacity: 1; }
 .row.tr.child .tc.nmc { padding-left: 4px; }
 .row.tr.child .tc.nmc::before { content: "└"; color: var(--ring); font-size: 12px; margin-right: 2px; }
 .row.tr.child .tc.nmc .nm { font-weight: 500; }
 .row.tr.child .tc.amc { font-weight: 600; }
-.row.tr.open { background: var(--sel); }
+.row.tr.open { background: var(--child); }
 .row.tr.open .tc.nmc .nm { white-space: normal; }
-.tp { padding: 0 14px 12px 48px; }
+.tp { padding: 0 14px 12px var(--no); }
 .tp .kl { display: flex; gap: 10px; font-size: 13px; line-height: 1.5; padding: 2px 0; }
 .tp .kl span { flex: none; width: 70px; color: var(--muted); }
 .tp .kl b { flex: 1; min-width: 0; font-weight: 500; color: var(--ink2); }
@@ -1578,6 +1591,29 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   /* ================= 줄 하나 ================= */
   // o: { it, cls, line2, st, stc, check: 'toggle'|'ack'|'open'|'none', key, ackKey }
   //  왼쪽: 이름 + 결제 수단 / 오른쪽: 금액 + 상태(며칠 지남·언제)
+  /** due가 이 항목의 첫 결제인지 (시작일 이후 처음 돌아오는 결제일) */
+  function isFirstDue(it, due) {
+    var p = parse(due);
+    if (!it.start || !p || due < it.start) return false;
+    var m = p.m - (it.every || 1), y = p.y;
+    while (m < 1) { m += 12; y--; }
+    return ymd(y, m, Math.min(it.day || p.d, lastDay(y, m))) < it.start;
+  }
+  /** 새로 넣은 항목인지: 첫 결제가 이번 달이거나 아직 안 왔으면 새 항목 (넣은 날짜는 따로 저장하지 않아서 시작일로 가림) */
+  function isNew(it) {
+    if (!it.start || it.section === 5) return false;
+    var ym = today().slice(0, 7);
+    return it.start.slice(0, 7) >= ym || (!it.checked && !!it.next && it.next.slice(0, 7) >= ym && isFirstDue(it, it.next));
+  }
+  var BDG_NEW = '<span class="bdg new" title="새로 넣은 항목">NEW</span>', BDG_LAST = '<span class="bdg last" title="마지막 결제">LAST</span>';
+  /** 이름 옆 작은 표시. due를 주면 그 날짜의 결제에 해당할 때만 (달력 아래 줄), 안 주면 항목 기준 (목록) */
+  function bdgHtml(it, due) {
+    if (it.section === 5) return '';
+    var h = '';
+    if (due ? (isNew(it) && isFirstDue(it, due)) : isNew(it)) h += BDG_NEW;
+    if (it.last && (!due || due === it.next)) h += BDG_LAST;
+    return h;
+  }
   function rowHtml(o) {
     var it = o.it;
     var amt = it.amount != null
@@ -1585,7 +1621,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       : '<span class="am none">금액 없음</span>';
     return '<button class="chk' + (o.check === 'none' ? ' static' : '') + '" type="button" data-act="' + (o.check || 'toggle') + '"' +
         (o.ackKey ? ' data-key="' + esc(o.ackKey) + '"' : '') + ' aria-label="' + (o.check === 'ack' ? '확인했어요' : '냈어요 체크') + '"><i>' + CHECK_SVG + '</i></button>' +
-      '<button class="rb" type="button" data-act="open"><span class="rl"><span class="nm">' + esc(it.name) + '</span>' +
+      '<button class="rb" type="button" data-act="open"><span class="rl"><span class="nl"><span class="nm">' + esc(it.name) + '</span>' + (o.bdg || '') + '</span>' +
         (o.line2 ? '<span class="t2">' + o.line2 + '</span>' : '') + '</span>' +
         '<span class="rr">' + amt + (o.st ? '<span class="st' + (o.stc ? ' ' + o.stc : '') + '">' + esc(o.st) + '</span>' : '') + '</span></button>';
   }
@@ -1706,7 +1742,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       un.forEach(function (it) {
         var nx = nextOf(it), s = stOf(nx, !it.checked), late = nx < ts;
         (late ? past : soon).push({ key: 'i:' + it.name, it: it, cls: it.checked ? 'checked' : '', check: 'toggle', st: s.t, stc: it.checked ? '' : s.c,
-          line2: joinDot([it.last ? '<span class="lastp">마지막 결제</span>' : '', acctTxt(it)]) });
+          bdg: bdgHtml(it, nx), line2: acctTxt(it) });
         if (it.checked) return;
         if (late) { pastN++; pastSum += it.amount || 0; if (it.canCheck) canAll++; }
         else { soonN++; soonSum += it.amount || 0; }
@@ -1756,7 +1792,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     else if (o.st === 'paid') s = { t: view.sel ? '냈어요' : dayTxt, c: '' };
     else if (dd >= 0 && dd <= 3) s = { t: relDay(o.due) + (view.sel ? '' : ' · ' + p.d + '일'), c: 'soon' };
     return { key: 'o:' + it.name + o.due, it: it, cls: o.st === 'paid' ? 'checked' : '', check: canToggle ? 'toggle' : 'open', st: s.t, stc: s.c,
-      line2: joinDot([it.last && o.due === it.next ? '<span class="lastp">마지막 결제</span>' : '', acctTxt(it)]) };
+      bdg: bdgHtml(it, o.due), line2: acctTxt(it) };
   }
   function moveMonth(k) {
     var n = view.off + k;
@@ -1848,26 +1884,27 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (e === 12) return '매년';
     return e + '개월마다';
   }
+  /** 표의 결제일 아래에 붙는 단위: 매월 · 3개월마다 · 매년 */
+  function cycleUnit(it) { return cycleShort(it) || '매월'; }
   /** 표의 결제일 칸: 매월이면 '5일'/'말일', 이번 달에 안 나가는 것(3개월마다·매년)은 '3월 20일' */
   function dayCell(it) {
-    var p = parse(it.next || '');
+    var p = parse(it.next || ''), cy = '<small class="cy">' + esc(cycleUnit(it)) + '</small>';
     if ((it.every || 1) > 1 && p && it.next.slice(0, 7) !== today().slice(0, 7)) {
-      return '<span class="dv" data-fit data-short="' + p.m + '/' + p.d + '">' + p.m + '월 ' + p.d + '일</span>';
+      return '<span class="dv" data-fit data-short="' + p.m + '/' + p.d + '">' + p.m + '월 ' + p.d + '일</span>' + cy;
     }
-    return '<span class="dv">' + (it.day >= 31 ? '말일' : it.day + '일') + '</span>';
+    return '<span class="dv">' + (it.day >= 31 ? '말일' : it.day + '일') + '</span>' + cy;
   }
-  function trHtml(it) {
-    // 이름 아래 작은 줄: 주기(3개월마다·매년), 마지막 결제, 끝남
+  /** no: 맨 앞 번호(지금 보이는 순서). 분류 색 아이콘 대신 번호를 두고, 분류는 이름 아래 회색 글자로 (한 분류만 골라 볼 땐 생략) */
+  function trHtml(it, no) {
+    // 이름 옆: NEW·LAST 작은 표시. 이름 아래 작은 줄: 분류, 끝남
     var tags = '';
-    var cs = cycleShort(it);
-    if (cs) tags += '<span class="tag">' + esc(cs) + '</span>';
+    if (!lv.cat) tags += '<span class="tag ctg" data-c="' + (catByK[catKey(it)] || catByK['기타']).c + '">' + esc(catText(it)) + '</span>';
     if (it.section === 5) tags += '<span class="tag">' + (it.status === '종료' ? '종료' : '끝남') + '</span>';
-    else if (it.last) tags += '<span class="tag lastp">마지막 결제</span>';
-    var nameHtml = '<span class="nw"><span class="nm">' + esc(it.name) + '</span>' + (tags ? '<span class="tgs">' + tags + '</span>' : '') + '</span>';
+    var nameHtml = '<span class="nw"><span class="nl"><span class="nm">' + esc(it.name) + '</span>' + bdgHtml(it) + '</span>' + (tags ? '<span class="tgs">' + tags + '</span>' : '') + '</span>';
     var amt = it.amount != null ? '<span class="av" data-fit data-short="' + esc(man(it.amount)) + '">' + esc(num(it.amount)) + '</span>' : '<span class="emp">금액 없음</span>';
     var day = needsDate(it) ? '<span class="nod">넣기</span>' : !it.day ? '<span class="emp">-</span>' : dayCell(it);
     var h = '<div class="tg">' +
-      '<div class="tc icc" data-act="expand">' + catIc(catKey(it), 's') + '</div>' +
+      '<div class="tc noc" data-act="expand">' + (no || '') + '</div>' +
       '<div class="tc nmc" data-act="expand">' + nameHtml + '</div>' +
       '<div class="tc amc" data-act="cell" data-f="amt">' + amt + '</div>' +
       '<div class="tc dyc" data-act="cell" data-f="day">' + day + '</div></div>' +
@@ -2081,8 +2118,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       e.textContent = '아직 넣은 고정비가 없어요. 아래 줄에 이름부터 적어보세요.';
       list.appendChild(e);
     }
-    rows.forEach(function (r) {
-      var it = r.it, el = get('i:' + it.name), html = trHtml(it);
+    rows.forEach(function (r, ix) {
+      var it = r.it, el = get('i:' + it.name), html = trHtml(it, ix + 1);
       el.setAttribute('data-name', it.name);
       if (el._html !== html && !el.querySelector('input.ci')) { el.innerHTML = html; el._html = html; }
       var fl = el.classList.contains('flash') ? ' flash' : '';
