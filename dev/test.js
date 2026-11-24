@@ -1231,6 +1231,36 @@ t('layout-flat-list', async () => {
   await h.close();
 });
 
+t('badge-new-last', async () => {
+  // 이름 옆 작은 표시: 첫 결제가 이번 달이거나 아직 안 온 항목은 NEW, 이번이 마지막 결제면 LAST
+  const seed = JSON.parse(JSON.stringify(H.SEEDS.full));
+  seed.items.push({ n: '티빙', cat: '구독', amt: 9500, day: 27, start: '2026-11-27' });
+  seed.items.push({ n: '웨이브', cat: '구독', amt: 7900, day: 5, start: '2026-12-05' });
+  seed.items.push({ n: '노트북 할부', cat: '대출', amt: 125000, day: 28, start: '2026-06-28', end: '2026-11-28' });
+  for (const vp of [{ width: 360, height: 760 }, { width: 320, height: 640 }]) {
+    const h = await H.open(Object.assign({}, LIFE, { seed, viewport: vp })); const p = h.page;
+    await sleep(p, 1200);
+    const tag = vp.width + ' ';
+    const bd = (root) => p.evaluate((sel) => { const o = {}; document.querySelectorAll(sel).forEach((r) => { const b = Array.prototype.map.call(r.querySelectorAll('.bdg'), (x) => x.textContent).join('+'); if (b) o[r.getAttribute('data-name')] = b; }); return o; }, root);
+    const hm = await bd('#home .row[data-name]');
+    ok(hm['티빙'] === 'NEW' && hm['노트북 할부'] === 'LAST', tag + '첫 화면: 이번 달 처음 나가는 티빙에 NEW, 마지막 결제인 노트북 할부에 LAST ' + JSON.stringify(hm));
+    ok(!hm['월세'] && !hm['넷플릭스'] && !hm['헬스장'], tag + '첫 화면: 전부터 내던 항목엔 표시 없음');
+    await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
+    const ls = await bd('#list .row.tr[data-name]');
+    ok(ls['티빙'] === 'NEW' && ls['웨이브'] === 'NEW' && ls['노트북 할부'] === 'LAST', tag + '목록: 티빙·웨이브(첫 결제가 다음 달) NEW, 노트북 할부 LAST ' + JSON.stringify(ls));
+    ok(!ls['월세'] && !ls['넷플릭스'] && !ls['자동차보험'] && !ls['헬스장'], tag + '목록: 전부터 내던 항목엔 표시 없음');
+    const fit = await p.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#list .bdg'), (b) => { const r = b.getBoundingClientRect(), c = b.closest('.tc.nmc').getBoundingClientRect(), n = b.parentNode.querySelector('.nm').getBoundingClientRect(); return { in: r.right <= c.right + 0.5 && r.left >= n.right - 0.5, h: Math.round(r.height), fs: getComputedStyle(b).fontSize, row: Math.round(b.closest('.tg').getBoundingClientRect().height) }; }));
+    ok(fit.length >= 3 && fit.every((x) => x.in && x.h <= 16 && x.fs === '10px' && x.row === 48), tag + '목록: 표시는 이름 옆 칸 안에 작게(10px), 줄 높이 48px 그대로 ' + JSON.stringify(fit[0]));
+    // 다음 달 달력: 티빙의 두 번째 결제엔 NEW 없음, 웨이브 첫 결제엔 NEW
+    await p.click('.tabbar [data-tab="cal"]'); await sleep(p, 300);
+    await p.evaluate(() => window.scrollTo(0, 0)); await p.click('#calNext'); await sleep(p, 600);
+    const nx = await bd('#home .row[data-name]');
+    ok(nx['웨이브'] === 'NEW' && !nx['티빙'], tag + '다음 달: 웨이브(첫 결제)만 NEW, 티빙(두 번째)은 없음 ' + JSON.stringify(nx));
+    ok(realErrors(h).length === 0, tag + '화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+    await h.close();
+  }
+});
+
 t('layout-heights', async () => {
   // 한 화면에 끝나야 하는 것들이 스크롤 없이 다 보이는지 (360×760 = 갤럭시에 앱으로 설치했을 때쯤, 320×640 = 작은 폰)
   for (const vp of [{ width: 360, height: 760 }, { width: 320, height: 640 }]) {

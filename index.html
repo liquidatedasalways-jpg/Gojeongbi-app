@@ -180,6 +180,12 @@ body.on-cal .calnav { display: flex; }
 .over { color: var(--red-text); font-weight: 600; }
 .soon { color: var(--accent-text); font-weight: 600; }
 .lastp { color: var(--grape); }
+/* 이름 옆 아주 작은 표시. NEW: 첫 결제가 이번 달이거나 아직 안 온 항목, LAST: 이번이 마지막 결제 */
+.nl { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.nl .nm { min-width: 0; }
+.bdg { flex: none; display: inline-flex; align-items: center; height: 15px; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: .04em; background: var(--sel); color: var(--accent-text); }
+.bdg.last { background: var(--fill); background: color-mix(in srgb, var(--grape) 14%, transparent); color: var(--grape); }
+.checked .bdg, .row.muted .bdg { opacity: .55; }
 .checked .nm, .checked .am, .checked .av, .checked .dv, .row.muted .nm, .row.muted .av, .row.muted .dv { color: var(--muted); font-weight: 500; }
 .row.child { background: var(--child); }
 .row.pending .chk i { opacity: .8; }
@@ -519,6 +525,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .tc.nmc { gap: 4px; }
 .tc.nmc .nw { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 5px 0; }
 .tc.nmc .nm { flex: none; line-height: 1.35; }
+.tc.nmc .nl .nm { flex: 0 1 auto; }
 .tc.nmc .tgs { display: flex; gap: 6px; line-height: 1.25; white-space: nowrap; overflow: hidden; }
 .tc.nmc .tag { flex: none; font-size: 12px; color: var(--muted); }
 .tc.nmc .tag.lastp { color: var(--grape); }
@@ -1581,6 +1588,29 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   /* ================= 줄 하나 ================= */
   // o: { it, cls, line2, st, stc, check: 'toggle'|'ack'|'open'|'none', key, ackKey }
   //  왼쪽: 이름 + 결제 수단 / 오른쪽: 금액 + 상태(며칠 지남·언제)
+  /** due가 이 항목의 첫 결제인지 (시작일 이후 처음 돌아오는 결제일) */
+  function isFirstDue(it, due) {
+    var p = parse(due);
+    if (!it.start || !p || due < it.start) return false;
+    var m = p.m - (it.every || 1), y = p.y;
+    while (m < 1) { m += 12; y--; }
+    return ymd(y, m, Math.min(it.day || p.d, lastDay(y, m))) < it.start;
+  }
+  /** 새로 넣은 항목인지: 첫 결제가 이번 달이거나 아직 안 왔으면 새 항목 (넣은 날짜는 따로 저장하지 않아서 시작일로 가림) */
+  function isNew(it) {
+    if (!it.start || it.section === 5) return false;
+    var ym = today().slice(0, 7);
+    return it.start.slice(0, 7) >= ym || (!it.checked && !!it.next && it.next.slice(0, 7) >= ym && isFirstDue(it, it.next));
+  }
+  var BDG_NEW = '<span class="bdg new" title="새로 넣은 항목">NEW</span>', BDG_LAST = '<span class="bdg last" title="마지막 결제">LAST</span>';
+  /** 이름 옆 작은 표시. due를 주면 그 날짜의 결제에 해당할 때만 (달력 아래 줄), 안 주면 항목 기준 (목록) */
+  function bdgHtml(it, due) {
+    if (it.section === 5) return '';
+    var h = '';
+    if (due ? (isNew(it) && isFirstDue(it, due)) : isNew(it)) h += BDG_NEW;
+    if (it.last && (!due || due === it.next)) h += BDG_LAST;
+    return h;
+  }
   function rowHtml(o) {
     var it = o.it;
     var amt = it.amount != null
@@ -1588,7 +1618,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       : '<span class="am none">금액 없음</span>';
     return '<button class="chk' + (o.check === 'none' ? ' static' : '') + '" type="button" data-act="' + (o.check || 'toggle') + '"' +
         (o.ackKey ? ' data-key="' + esc(o.ackKey) + '"' : '') + ' aria-label="' + (o.check === 'ack' ? '확인했어요' : '냈어요 체크') + '"><i>' + CHECK_SVG + '</i></button>' +
-      '<button class="rb" type="button" data-act="open"><span class="rl"><span class="nm">' + esc(it.name) + '</span>' +
+      '<button class="rb" type="button" data-act="open"><span class="rl"><span class="nl"><span class="nm">' + esc(it.name) + '</span>' + (o.bdg || '') + '</span>' +
         (o.line2 ? '<span class="t2">' + o.line2 + '</span>' : '') + '</span>' +
         '<span class="rr">' + amt + (o.st ? '<span class="st' + (o.stc ? ' ' + o.stc : '') + '">' + esc(o.st) + '</span>' : '') + '</span></button>';
   }
@@ -1709,7 +1739,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       un.forEach(function (it) {
         var nx = nextOf(it), s = stOf(nx, !it.checked), late = nx < ts;
         (late ? past : soon).push({ key: 'i:' + it.name, it: it, cls: it.checked ? 'checked' : '', check: 'toggle', st: s.t, stc: it.checked ? '' : s.c,
-          line2: joinDot([it.last ? '<span class="lastp">마지막 결제</span>' : '', acctTxt(it)]) });
+          bdg: bdgHtml(it, nx), line2: acctTxt(it) });
         if (it.checked) return;
         if (late) { pastN++; pastSum += it.amount || 0; if (it.canCheck) canAll++; }
         else { soonN++; soonSum += it.amount || 0; }
@@ -1759,7 +1789,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     else if (o.st === 'paid') s = { t: view.sel ? '냈어요' : dayTxt, c: '' };
     else if (dd >= 0 && dd <= 3) s = { t: relDay(o.due) + (view.sel ? '' : ' · ' + p.d + '일'), c: 'soon' };
     return { key: 'o:' + it.name + o.due, it: it, cls: o.st === 'paid' ? 'checked' : '', check: canToggle ? 'toggle' : 'open', st: s.t, stc: s.c,
-      line2: joinDot([it.last && o.due === it.next ? '<span class="lastp">마지막 결제</span>' : '', acctTxt(it)]) };
+      bdg: bdgHtml(it, o.due), line2: acctTxt(it) };
   }
   function moveMonth(k) {
     var n = view.off + k;
@@ -1863,12 +1893,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   /** no: 맨 앞 번호(지금 보이는 순서). 분류 색 아이콘 대신 번호를 두고, 분류는 이름 아래 회색 글자로 (한 분류만 골라 볼 땐 생략) */
   function trHtml(it, no) {
-    // 이름 아래 작은 줄: 분류, 마지막 결제, 끝남
+    // 이름 옆: NEW·LAST 작은 표시. 이름 아래 작은 줄: 분류, 끝남
     var tags = '';
     if (!lv.cat) tags += '<span class="tag ctg" data-c="' + (catByK[catKey(it)] || catByK['기타']).c + '">' + esc(catText(it)) + '</span>';
     if (it.section === 5) tags += '<span class="tag">' + (it.status === '종료' ? '종료' : '끝남') + '</span>';
-    else if (it.last) tags += '<span class="tag lastp">마지막 결제</span>';
-    var nameHtml = '<span class="nw"><span class="nm">' + esc(it.name) + '</span>' + (tags ? '<span class="tgs">' + tags + '</span>' : '') + '</span>';
+    var nameHtml = '<span class="nw"><span class="nl"><span class="nm">' + esc(it.name) + '</span>' + bdgHtml(it) + '</span>' + (tags ? '<span class="tgs">' + tags + '</span>' : '') + '</span>';
     var amt = it.amount != null ? '<span class="av" data-fit data-short="' + esc(man(it.amount)) + '">' + esc(num(it.amount)) + '</span>' : '<span class="emp">금액 없음</span>';
     var day = needsDate(it) ? '<span class="nod">넣기</span>' : !it.day ? '<span class="emp">-</span>' : dayCell(it);
     var h = '<div class="tg">' +
