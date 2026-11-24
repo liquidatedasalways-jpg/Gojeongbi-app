@@ -195,7 +195,7 @@ body.on-cal .calnav { display: flex; }
 .row.enter { animation: enter .3s ease-out; }
 @keyframes enter { from { opacity: 0; } }
 .empty { padding: 22px 16px; font-size: 13px; color: var(--muted); text-align: center; }
-/* 낸 결제: 한 줄로 접어 둠 */
+/* 결제 완료: 한 줄로 접어 둠 */
 .fold { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 48px; margin-top: 8px; padding: 0 14px; background: var(--card); border-radius: var(--r-card); font-size: 15px; font-weight: 600; }
 .fold .ci { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--ok); color: var(--on-ok); display: flex; align-items: center; justify-content: center; }
 .fold .ci svg { width: 13px; height: 13px; }
@@ -1729,7 +1729,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       lh = secHtml(sp.m + '월 ' + sp.d + '일 ' + wd(view.sel) + '요일', joinDot([hol[view.sel] ? esc(hol[view.sel]) : '', day.length + '건', day.length ? won(sumOf(day)) : '']),
         '<button class="act" type="button" id="selClear">전체 보기</button>') + grpHtml(day.map(occRow), '이날은 결제가 없어요');
     } else if (view.off === 0) {
-      // 이번 달: 지난 결제(지났는데 안 낸 것) / 다가오는 결제 / 낸 결제(한 줄로 접어 둠)
+      // 이번 달: 지난 결제(지났는데 안 낸 것) / 다가오는 결제 / 결제 완료(낸 것, 한 줄로 접어 둠)
       var rem = reminders(), pm = prevMonth();
       var un = items().filter(function (it) { return isUnpaid(it) || (sticky[it.name] && sticky[it.name].home); });
       var nextOf = function (it) { return sticky[it.name] ? sticky[it.name].next : it.next; };
@@ -1756,7 +1756,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       }
       var paid = occ.filter(function (o) { return o.st === 'paid'; });
       if (paid.length) {
-        lh += '<button class="fold' + (view.paidOpen ? ' open' : '') + '" type="button" id="paidFold" aria-expanded="' + (view.paidOpen ? 'true' : 'false') + '"><span class="ci">' + CHECK_SVG + '</span>낸 결제 ' + paid.length + '건' +
+        lh += '<button class="fold' + (view.paidOpen ? ' open' : '') + '" type="button" id="paidFold" aria-expanded="' + (view.paidOpen ? 'true' : 'false') + '"><span class="ci">' + CHECK_SVG + '</span>결제 완료 ' + paid.length + '건' +
           '<span class="r">' + won(sumOf(paid)) + DOWN_SVG + '</span></button>';
         var shown = paid.filter(function (o) { return !sticky[o.it.name]; });   // 방금 체크한 줄은 제자리에 있는 동안 여기엔 안 보임
         if (view.paidOpen && shown.length) lh += grpHtml(shown.map(occRow), '');

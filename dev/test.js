@@ -429,10 +429,10 @@ t('revamp-home', async () => {
   ok(await p.evaluate(() => !!document.querySelector('#ndBtn') && /결제일 없는 항목 2개/.test(document.getElementById('ndBtn').textContent)), '결제일 없는 항목 알림이 맨 위 한 줄로');
   const cal = await p.evaluate(() => ({ paid: document.querySelectorAll('#cal .a.paid').length, over: document.querySelectorAll('#cal .a.over').length, dot: document.querySelectorAll('#cal .dot').length }));
   ok(cal.paid >= 1 && cal.over >= 1 && cal.dot === 0, '달력: 다 낸 날은 초록 체크, 지난 날은 빨간 금액, 점 표시는 없음 ' + JSON.stringify(cal));
-  // 낸 결제는 한 줄로 접혀 있고, 누르면 펼쳐짐
-  ok(!(await homeHas(p, '넷플릭스')) && /낸 결제 \d+건/.test(await p.evaluate(() => document.getElementById('paidFold').textContent)), '낸 결제는 한 줄로 접혀 있음');
+  // 결제 완료는 한 줄로 접혀 있고, 누르면 펼쳐짐
+  ok(!(await homeHas(p, '넷플릭스')) && /^결제 완료 \d+건/.test(await p.evaluate(() => document.getElementById('paidFold').textContent)), '결제 완료는 한 줄로 접혀 있음');
   await p.click('#paidFold'); await sleep(p, 300);
-  ok(await homeHas(p, '넷플릭스'), '누르면 낸 결제가 펼쳐짐');
+  ok(await homeHas(p, '넷플릭스'), '누르면 결제 완료가 펼쳐짐');
   await p.click('#paidFold'); await sleep(p, 300);
   // 모두 냈어요
   const lateNames = ['헬스장', '쿠팡 와우 멤버십', '통신비', '정수기 렌탈'];
