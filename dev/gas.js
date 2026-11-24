@@ -6,6 +6,10 @@
  *   → 그 순간에 다른 호출(gas.call)을 끼워 넣어 '두 기기가 겹쳐 저장'하는 상황을 만듦.
  * 사람별 잠금은 실제처럼 한 실행만 쥘 수 있음(다른 실행은 tryLock이 false). 실행이 끝나면 저절로 풀림.
  * create({ strict: true }): 값 하나가 9KB를 넘으면 구글처럼 오류. gas.state.writes: 속성 쓰기 횟수.
+ * 권한(scope)도 실제처럼 따짐:
+ *   - 서버 설정(setup/appsscript.json.txt)의 oauthScopes에 없는 권한이 필요한 구글 기능을 부르면 구글처럼 오류
+ *     ("You do not have permission to call …"). 구글 시트(SpreadsheetApp)는 무엇을 건드리든 시트 권한이 필요한 것으로 침.
+ *   - gas.grant(email, 'scope scope …'): 그 사람이 구글 권한 화면에서 허용한 것만 (일부만 체크한 상황). null이면 전부 허용.
  */
 const fs = require('fs');
 const path = require('path');
@@ -16,7 +20,9 @@ function create(opt) {
   opt = opt || {};
   const codePath = opt.code || path.join(__dirname, '..', 'setup', 'Code.gs.txt');
   const code = fs.readFileSync(codePath, 'utf8');
-  const st = { users: {}, script: { props: {}, cache: {} }, offset: 0, slept: 0, log: [], holidays: opt.holidays || {}, hook: {}, writes: 0, strict: !!opt.strict };
+  const manifest = opt.scopes || JSON.parse(fs.readFileSync(opt.manifest || path.join(__dirname, '..', 'setup', 'appsscript.json.txt'), 'utf8')).oauthScopes || [];
+  const SC = { sheet: 'https://www.googleapis.com/auth/spreadsheets', cal: 'https://www.googleapis.com/auth/calendar', trig: 'https://www.googleapis.com/auth/script.scriptapp' };
+  const st = { users: {}, script: { props: {}, cache: {} }, offset: 0, slept: 0, failTrigger: 0, log: [], holidays: opt.holidays || {}, hook: {}, writes: 0, strict: !!opt.strict };
   function fire(n, a) { const h = st.hook[n]; if (h) { st.hook[n] = null; h(a); } }
   let execSeq = 0;
 
@@ -26,7 +32,7 @@ function create(opt) {
   }
 
   function user(email) {
-    if (!st.users[email]) st.users[email] = { props: {}, cache: {}, triggers: [], events: [], evSeq: 0, lock: 0 };
+    if (!st.users[email]) st.users[email] = { props: {}, cache: {}, triggers: [], events: [], evSeq: 0, lock: 0, scopes: null };
     return st.users[email];
   }
   function propStore(o) {
@@ -126,6 +132,15 @@ function create(opt) {
             getAllDayEndDate: () => new FakeDate(h.t.getTime() + 86400000), getTitle: () => st.holidays[h.ds] }));
       }
     };
+    /** 이 기능에 필요한 권한이 서버 설정에 있고, 이 사람이 허용했는지 */
+    const need = (scope, what) => {
+      const granted = u.scopes ? String(u.scopes).split(/\s+/) : null;
+      if (manifest.indexOf(scope) < 0 || (granted && granted.indexOf(scope) < 0)) {
+        st.log.push('NO_SCOPE ' + what);
+        throw new Error('You do not have permission to call ' + what + '. Required permissions: ' + scope);
+      }
+    };
+    const sheetApp = new Proxy({}, { get(_, k) { if (typeof k === 'symbol') return undefined; need(SC.sheet, 'SpreadsheetApp.' + String(k)); return SHEET_API[k]; } });
     const trig = (fn) => {
       const t = { fn, getHandlerFunction: () => fn };
       const b = { forSpreadsheet: () => b, onEdit: () => b, timeBased: () => b, everyDays: () => b, atHour: () => b, after: () => b, create() { u.triggers.push(t); return t; } };
@@ -140,22 +155,28 @@ function create(opt) {
       LockService: { getUserLock: () => userLock, getScriptLock: () => ({ tryLock: () => true, waitLock() {}, releaseLock() {} }) },
       Session: { getEffectiveUser: () => ({ getEmail: () => email }), getActiveUser: () => ({ getEmail: () => email }), getScriptTimeZone: () => 'Asia/Seoul' },
       ScriptApp: {
-        getProjectTriggers: () => u.triggers.slice(), newTrigger: trig,
-        deleteTrigger(t) { u.triggers = u.triggers.filter((x) => x !== t); },
+        getProjectTriggers: () => { need(SC.trig, 'ScriptApp.getProjectTriggers'); return u.triggers.slice(); },
+        newTrigger: (fn) => { need(SC.trig, 'ScriptApp.newTrigger'); if (st.failTrigger > 0) { st.failTrigger--; throw new Error('Service error: Script'); } return trig(fn); },
+        deleteTrigger(t) { need(SC.trig, 'ScriptApp.deleteTrigger'); u.triggers = u.triggers.filter((x) => x !== t); },
         getService: () => ({ getUrl: () => '' })
       },
-      SpreadsheetApp: {
-        getActive: () => null, openById() { throw new Error('You do not have permission to access the requested document.'); },
-        flush() {}, getUi() { throw new Error('no ui'); },
-        DataValidationCriteria: { VALUE_IN_RANGE: 'VALUE_IN_RANGE', VALUE_IN_LIST: 'VALUE_IN_LIST', NUMBER_BETWEEN: 'NUMBER_BETWEEN',
-          NUMBER_GREATER_THAN_OR_EQUAL_TO: 'NUMBER_GREATER_THAN_OR_EQUAL_TO', DATE_IS_VALID_DATE: 'DATE_IS_VALID_DATE', CUSTOM_FORMULA: 'CUSTOM_FORMULA', CHECKBOX: 'CHECKBOX' },
-        CopyPasteType: { PASTE_VALUES: 'PASTE_VALUES' }
+      SpreadsheetApp: sheetApp,
+      CalendarApp: {
+        getDefaultCalendar: () => { need(SC.cal, 'CalendarApp.getDefaultCalendar'); return cal; },
+        getCalendarById: (id) => { need(SC.cal, 'CalendarApp.getCalendarById'); return /holiday/.test(id) ? holCal : null; }
       },
-      CalendarApp: { getDefaultCalendar: () => cal, getCalendarById: (id) => (/holiday/.test(id) ? holCal : null) },
       HtmlService: { createHtmlOutput: () => ({}), XFrameOptionsMode: { ALLOWALL: 1 } }
     };
   }
 
+  // 시트 권한이 있을 때의 구글 시트 흉내 (독립 스크립트라 열린 시트는 없음)
+  const SHEET_API = {
+    getActive: () => null, openById() { throw new Error('You do not have permission to access the requested document.'); },
+    flush() {}, getUi() { throw new Error('no ui'); },
+    DataValidationCriteria: { VALUE_IN_RANGE: 'VALUE_IN_RANGE', VALUE_IN_LIST: 'VALUE_IN_LIST', NUMBER_BETWEEN: 'NUMBER_BETWEEN',
+      NUMBER_GREATER_THAN_OR_EQUAL_TO: 'NUMBER_GREATER_THAN_OR_EQUAL_TO', DATE_IS_VALID_DATE: 'DATE_IS_VALID_DATE', CUSTOM_FORMULA: 'CUSTOM_FORMULA', CHECKBOX: 'CHECKBOX' },
+    CopyPasteType: { PASTE_VALUES: 'PASTE_VALUES' }
+  };
   const NAMES = ['Date', 'Utilities', 'console', 'PropertiesService', 'CacheService', 'LockService', 'Session', 'ScriptApp', 'SpreadsheetApp', 'CalendarApp', 'HtmlService'];
   const factory = new Function(...NAMES, code + '\n;return function (__n) { return eval(__n); };');
 
@@ -181,6 +202,9 @@ function create(opt) {
     },
     now: () => new RealDate(RealDate.now() + st.offset),
     events(email) { return user(email).events.filter((e) => !e.deleted); },
+    /** 그 사람이 구글 권한 화면에서 허용한 권한 ('scope scope …'). null이면 전부 허용한 것으로 */
+    grant(email, scopes) { user(email).scopes = scopes == null ? null : String(scopes); },
+    manifest,
     user
   };
 }

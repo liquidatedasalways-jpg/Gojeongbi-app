@@ -33,14 +33,15 @@ try { var fcTone = localStorage.getItem('fc_tone'); if (fcTone === 'blue' || fcT
   --red: #f04452; --red-text: #d02937; --red-soft: #feeef0; --danger: #d02937; --on-danger: #ffffff;
   --sun: #d02937; --sat: var(--ink); --sat-h: var(--muted); --grape: #8b4ad8;
   --tone-navy: #1c2b6e; --tone-blue: #1f63f0; --tone-violet: #6a3de8;
+  --toast-act: #b3c0ff;   /* 알림 띠(밝은·다크 모두 어두운 바탕) 안의 버튼 글자: 강조색의 밝은 값 */
   --bar: rgba(255,255,255,.94); --backdrop: rgba(0,0,0,.42); --shadow: none; --fab: 0 4px 14px rgba(28,43,110,.32);
   --r-card: 20px; --r-ctl: 14px;
   /* 분류 9가지 색 (아이콘 바탕) */
   --c-home: #3b82f6; --c-util: #f2a20c; --c-tel: #e85f9e; --c-sub: #8b5cf6; --c-ins: #10b3a3; --c-loan: #5567d8; --c-save: #58b530; --c-edu: #f0685f; --c-etc: #8b95a1; --c-ink: #ffffff;
 }
 /* 강조색이 파랑 계열(네이비·블루)이면 토요일은 평일과 같은 색, 바이올렛이면 토요일 파랑을 살리고 '마지막 결제' 표시를 자주색으로. */
-:root[data-tone="blue"] { --accent: #1f63f0; --accent-ink: #ffffff; --accent-text: #1a55d1; --sel: #e9f1ff; --fab: 0 4px 14px rgba(31,99,240,.32); }
-:root[data-tone="violet"] { --accent: #6a3de8; --accent-ink: #ffffff; --accent-text: #5a2fd0; --sel: #f1ecff; --fab: 0 4px 14px rgba(106,61,232,.32); --sat: #1b64da; --sat-h: #1b64da; --grape: #b0308f; }
+:root[data-tone="blue"] { --toast-act: #8db6ff; --accent: #1f63f0; --accent-ink: #ffffff; --accent-text: #1a55d1; --sel: #e9f1ff; --fab: 0 4px 14px rgba(31,99,240,.32); }
+:root[data-tone="violet"] { --toast-act: #bda7ff; --accent: #6a3de8; --accent-ink: #ffffff; --accent-text: #5a2fd0; --sel: #f1ecff; --fab: 0 4px 14px rgba(106,61,232,.32); --sat: #1b64da; --sat-h: #1b64da; --grape: #b0308f; }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #101013; --card: #1c1c21; --child: #222227;
@@ -418,7 +419,7 @@ body.on-cal .calnav { display: flex; }
 .toast.on { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
 .toast.error { background: #c62f3b; }
 .toast span { flex: 1; min-width: 0; padding: 10px 0; }
-.toast button { flex: none; min-width: 44px; min-height: 44px; padding: 0 10px; font-weight: 700; color: #ffb27a; text-align: center; white-space: nowrap; }
+.toast button { flex: none; min-width: 44px; min-height: 44px; padding: 0 10px; font-weight: 700; color: var(--toast-act); text-align: center; white-space: nowrap; }
 .toast.error button { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
 
 @keyframes tabInL { from { opacity: .3; transform: translateX(28px); } to { opacity: 1; transform: none; } }
@@ -573,7 +574,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "scriptId": "AKfycbzbjX7CIpmkZiPT4ZRyOq_N-Ppjgy6siC_tPajSVr-NqZsDyPZz47xJjAKGXr8lL5E2cA", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 10, "contact": "liquidatedasalways@gmail.com", "altIds": ["13qXGas5_MQaXCZOUmO9fZECfvXI-WxNPj-OnVO3MIeipD4aEeJwc7UCE"]};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 22, "slim": false, "verified": false};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -581,13 +582,13 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 (function () {
   if (window.FC_FRAMED) return;
   var C = window.FC_CONFIG;
-  var SCOPES = [
-    'https://www.googleapis.com/auth/spreadsheets',
-    'https://www.googleapis.com/auth/calendar',
-    'https://www.googleapis.com/auth/script.scriptapp',
-    'https://www.googleapis.com/auth/script.container.ui',
-    'https://www.googleapis.com/auth/userinfo.email'
-  ].join(' ');
+  /* 구글에 요청하는 권한. 서버 v11부터는 구글 시트 권한 없이 돌아서 3개면 됨(C.slim).
+   * 서버가 아직 v10인데 3개만 요청하면 서버가 안 돌아요 → 서버를 v11로 올린 걸 확인한 뒤에 slim을 켬. */
+  var SLIM = !!C.slim;
+  var SCOPES = (SLIM ? [] : ['https://www.googleapis.com/auth/spreadsheets']).concat(
+    ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/script.scriptapp'],
+    SLIM ? [] : ['https://www.googleapis.com/auth/script.container.ui'],
+    ['https://www.googleapis.com/auth/userinfo.email']).join(' ');
   var APP_URL = location.origin + location.pathname.replace(/index\.html$/, '');
   var K = 'fc_auth';
 
@@ -596,7 +597,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
   /* 구글 권한 화면은 항목마다 체크 칸이 있어서, 체크를 빼고 '계속'을 누르면 일부 권한만 든 표가 와요.
    * 그 표로는 서버가 중간에 멈춰요("You do not have permission to call …"). 구글이 알려준 허용 목록(scope)에 빠진 게 있으면 쓰지 않고 다시 허용받아요.
    * 허용 목록을 모르는 옛 저장분은 통과 (서버가 권한 오류를 내면 그때 lack 표시). */
-  var NEED = ['auth/spreadsheets', 'auth/calendar', 'auth/script.scriptapp', 'auth/script.container.ui'];
+  var NEED = SLIM ? ['auth/calendar', 'auth/script.scriptapp'] : ['auth/spreadsheets', 'auth/calendar', 'auth/script.scriptapp', 'auth/script.container.ui'];
   function lacking(a) {
     if (!a) return false;
     if (a.lack) return true;
@@ -723,11 +724,9 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
     return '문제가 생겼어요. 다시 해주세요. (' + m + ')';
   }
 
-  /* 서버는 두 군데:
-   *  - 주인 서버(시트에 붙은 스크립트): 시트 주인만 들어갈 수 있음. 주인 시트를 그대로 씀.
-   *  - 모두용 서버(독립 스크립트, C.otherId): 다른 계정. 시트 없이 앱 저장 공간 + 자기 캘린더.
-   * 주인 서버에 먼저 가 보고 '문서 권한 없음'이면 모두용 서버로 (계정별로 기억). */
-  var ids = [C.scriptId].concat(C.altIds || []), idIx = 0;
+  /* 서버는 한 군데: 모두용 서버(독립 스크립트, C.otherId). 누구나 자기 구글 계정 권한으로 부르고, 목록은 그 사람 앱 저장 공간 + 그 사람 캘린더.
+   * 예전엔 주인 서버(주인 시트에 붙은 스크립트, C.scriptId)가 따로 있었음. 2026-11-25부터 설정에서 뺌 (아래 넘어가기 코드는 설정에 있을 때만 움직임). */
+  var ids = [C.scriptId].concat(C.altIds || []).filter(Boolean), idIx = 0;
   try { var sv = Number(localStorage.getItem('fc_idix')); if (sv > 0 && sv < ids.length) idIx = sv; } catch (e) {}
   // 2026-11-24: 처음 온 계정도 바로 모두용 서버로 감. 예전엔 주인 서버에 먼저 가 보고 넘어왔는데,
   // 주인 서버(옛 코드)가 다른 계정에 엉뚱한 답을 줘서 '아직 준비 중'에 막혔음. 주인도 이미 모두용 서버로 옮겨 씀.
@@ -830,6 +829,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
       var x = get(); if (lacking(x)) go('consent', x.chk ? '' : (x.email || '')); else go('select_account');
     };
     if (valid(get()) && (!get().email || get().chk)) loadEmail();
+    // 구글 심사(검증)를 통과한 뒤에는 '확인되지 않은 앱' 화면이 안 나와서 그 안내를 뺌
+    if (C.verified) { var unv = document.getElementById('fcUnv'); if (unv && unv.parentNode) unv.parentNode.removeChild(unv); }
   });
   if (back && back.access_token) loadEmail();
 
@@ -893,6 +894,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
     /** 권한을 다시 허용하고 온 직후 한 번만 true (캘린더 연동 켜기용) */
     takeCalFix: function () { var x = get(); if (!x.calfix) return false; delete x.calfix; put(x); return true; },
     serverVer: C.serverVer || 0,
+    build: C.build || 0,
+    verified: !!C.verified,
     canUpdate: !!(C.otherScript && C.otherId),
     /** 서버 업데이트. 처음 한 번은 구글 권한 허용 화면으로 갔다가 돌아와서 이어서 함. */
     updateServer: function () {
@@ -976,7 +979,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   </div>
   <button class="gbtn" id="fcGo" type="button"><svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글 계정으로 시작하기</button>
   <div class="err" id="fcErr"></div>
-  <p class="fine">목록은 고른 구글 계정에만 저장돼요. 처음에 '확인되지 않은 앱' 화면이 나오면 고급 → 이동을 누르고, 권한 화면에서는 <b>모두 선택</b>을 체크해주세요.</p>
+  <p class="fine">목록은 고른 구글 계정에만 저장돼요. <span id="fcUnv">처음에 '확인되지 않은 앱' 화면이 나오면 고급 → 이동을 누르고, </span>권한 화면에서는 <b>모두 선택</b>을 체크해주세요.</p>
   <div class="legal"><a href="privacy.html">개인정보 처리방침</a><a href="terms.html">이용약관</a><a href="mailto:liquidatedasalways@gmail.com">문의</a></div>
 </div>
 
@@ -1150,6 +1153,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function prevMonth() { var p = parse(today()); var y = p.m === 1 ? p.y - 1 : p.y, m = p.m === 1 ? 12 : p.m - 1; return { y: y, m: m, s: y + '-' + pad(m, 2) }; }
   function wd(ds) { var p = parse(ds); return p ? WD.charAt(new Date(p.y, p.m - 1, p.d).getDay()) : ''; }
   function fmtDate(ds) { var p = parse(ds); return p ? p.m + '월 ' + p.d + '일 (' + wd(ds) + ')' : (ds || ''); }
+  /** 기간(시작 ~ 종료)용: 올해가 아닌 날짜는 연도를 붙임 ('2028년 6월 1일 (목)'). 몇 년에 걸친 기간이 한 해 안처럼 보이지 않게 */
+  function fmtDateP(ds) { var p = parse(ds), t = parse(today()); return p && t && p.y !== t.y ? p.y + '년 ' + fmtDate(ds) : fmtDate(ds); }
   function ddays(ds) { var a = serial(ds), b = serial(today()); return a == null ? null : a - b; }
   function relDay(ds) {
     var d = ddays(ds); if (d == null) return '';
@@ -2000,7 +2005,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var linked = acct ? accMemo(acct) : '';
       var nextS = it.checked ? (it.next ? '이번 결제 냄 · 다음 ' + esc(fmtDate(it.next)) : '이번 결제 냄')
         : it.next ? esc(fmtDate(it.next)) : esc(it.nextText || (it.day ? '' : '결제일을 넣어주세요'));
-      var period = (it.start || it.endDate || it.endText) ? esc(it.start ? fmtDate(it.start) : '시작일 없음') + ' ~ ' + esc(it.endDate ? fmtDate(it.endDate) : (it.endText || '무기한')) : '';
+      var period = (it.start || it.endDate || it.endText) ? esc(it.start ? fmtDateP(it.start) : '시작일 없음') + ' ~ ' + esc(it.endDate ? fmtDateP(it.endDate) : (it.endText || '무기한')) : '';
       var kl = function (k, v) { return v ? '<div class="kl"><span>' + esc(k) + '</span><b>' + v + '</b></div>' : ''; };
       h += '<div class="tp">' +
         kl('다음 결제', nextS) +
@@ -2123,9 +2128,10 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var box = $('welcome');
     var show = !!S && !S.items.some(function (x) { return !x.sep; });
     if (!show) { if (box._on) { box.innerHTML = ''; box._on = false; } return; }
-    if (box._on) return;
-    box._on = true;
-    box.innerHTML = '<div class="welcome"><h2>매달 나가는 돈,<br>한 번만 적어두세요</h2><p>종류를 고르고 금액과 결제일만 적으면 달력에 나와요.</p>' +
+    var mark = S.calOn ? 'cal' : 'plain';   // 캘린더 연동이 켜져 있으면 그것도 알려줌 (켜고 끄면 문구도 바뀜)
+    if (box._on === mark) return;
+    box._on = mark;
+    box.innerHTML = '<div class="welcome"><h2>매달 나가는 돈,<br>한 번만 적어두세요</h2><p>종류를 고르고 금액과 결제일만 적으면 달력에 나와요.' + (S.calOn ? '<br>내 구글 캘린더에도 자동으로 들어가요.' : '') + '</p>' +
       '<button class="btn primary" type="button" id="wAdd">' + PLUS_SVG + '첫 고정비 넣기</button></div>';
   }
   function openNoDate(only) {
@@ -2538,7 +2544,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }
     var acct = String(it.account || '').trim();
     var linked = acct ? accMemo(acct) : '';
-    var period = (it.start || it.endDate || it.endText) ? esc(it.start ? fmtDate(it.start) : '시작일 없음') + ' ~ ' + esc(it.endDate ? fmtDate(it.endDate) : (it.endText || '무기한')) : '';
+    var period = (it.start || it.endDate || it.endText) ? esc(it.start ? fmtDateP(it.start) : '시작일 없음') + ' ~ ' + esc(it.endDate ? fmtDateP(it.endDate) : (it.endText || '무기한')) : '';
     var rows = [
       kv('결제 수단', esc(acct === '?' ? '? (확인 필요)' : (acct || '-')), linked ? esc(linked) : ''),
       kv('결제일', esc(dayLabel(it) || '-')),
@@ -3647,7 +3653,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       (fullUrl ? '<div style="margin-top:8px;color:var(--muted)">주소창 없이 쓰고 싶으면 이 주소로 홈 화면에 추가해봐요 (구글 로그인이 한 번 더 나올 수 있어요).</div><div class="linkbox">' + esc(fullUrl) + '</div>' : '') +
       '</div>' + accountHtml(null)) +
       (canWipe() ? '<button class="del" type="button" id="mWipe">내 자료 모두 지우기</button>' : '') + legalHtml() +
-      '<div class="tip foot">' + (CONTACT_ADDR() ? '문의 <span id="mAskAddr">' + esc(CONTACT_ADDR()) + '</span><br>' : '') + '불러온 시각 ' + new Date(S.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + (S.virtual ? '' : ' · 시트가 원본이에요') + '</div>';
+      '<div class="tip foot">' + (CONTACT_ADDR() ? '문의 <span id="mAskAddr">' + esc(CONTACT_ADDR()) + '</span><br>' : '') + '불러온 시각 ' + new Date(S.at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + (S.virtual ? '' : ' · 시트가 원본이에요') +
+      (WEB && WEB.build ? '<br><span id="mVer">버전 ' + esc(WEB.build + (S.ver ? '.' + S.ver : '')) + '</span>' : '') + '</div>';
     if (refresh) { if (sheetMode !== 'menu') return; $('sheetBody').innerHTML = h; }
     else openSheet('설정', h, 'menu');
     var offSure = false;
@@ -3893,13 +3900,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function openShare(refresh) {
     var url = (window.FC_AUTH && window.FC_AUTH.appUrl) || S.appUrl || '';
-    var h = '<div class="tip">친구는 이 주소를 열고 자기 구글 계정으로 로그인하면 바로 써요. 결제일은 친구 구글 캘린더에만 들어가고, 친구 드라이브에 시트가 생기지 않아요. 서로 내용은 안 보여요.</div>' +
+    var h = '<div class="tip">친구는 이 주소를 열고 자기 구글 계정으로 로그인하면 바로 써요. 결제일은 친구 구글 캘린더에만 들어가고, 서로 내용은 안 보여요.</div>' +
       '<div class="grp">' +
       (url ? '<div class="kv" style="display:block"><div class="linkbox" style="margin-top:0">' + esc(url) + '</div></div>' +
         '<button class="li" type="button" id="shCopy"><span>주소 복사</span></button>' +
         (navigator.share ? '<button class="li" type="button" id="shSend"><span>카톡 등으로 보내기</span>' + CV + '</button>' : '') : '<div class="kv">주소를 못 찾았어요.</div>') +
       '</div>' +
-      '<div class="tip">처음 로그인할 때 \'확인되지 않은 앱\' 화면이 나오면 고급 → 이동을 누르면 돼요. 구글 심사를 안 받은 개인 앱이라 나오는 화면이에요.</div>';
+      (window.FC_AUTH && window.FC_AUTH.verified ? '' : '<div class="tip">처음 로그인할 때 \'확인되지 않은 앱\' 화면이 나오면 고급 → 이동을 누르면 돼요. 구글 심사를 안 받은 개인 앱이라 나오는 화면이에요.</div>');
     if (refresh) { if (sheetMode !== 'share') return; $('sheetBody').innerHTML = h; }
     else openSheet('친구에게 알려주기', h, 'share', function () { openMenu(false); });
     var cp = $('shCopy'); if (cp) cp.onclick = function () { copyText(url); };

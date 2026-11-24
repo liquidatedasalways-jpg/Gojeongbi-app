@@ -116,6 +116,9 @@ async function open(opt) {
     if (failNext > 0 && (!failFn || failFn === body.function)) { failNext--; return route.abort('internetdisconnected'); }
     let out;
     const who = whoOf(route);   // 로그인 표가 'tok-이메일'이면 그 계정, 아니면 기본 계정
+    // 구글 화면을 거쳐 받은 표면, 그때 허용된 권한만 가진 것으로 서버를 돌림 (모르는 표는 전부 허용한 것으로)
+    const tk = (route.request().headers()['authorization'] || '').replace(/^Bearer /, '');
+    gas.grant(who, Object.prototype.hasOwnProperty.call(tokScopes, tk) ? tokScopes[tk] : null);
     try { out = { done: true, response: { result: gas.call(who, body.function, body.parameters) } }; }
     catch (e) { out = { error: { code: 500, message: String(e && e.message || e), status: 'INTERNAL', details: [{ errorMessage: String(e && e.message || e) }] } }; }
     calls.push({ fn: body.function, who, ms: Date.now() - t0, args: body.parameters });
@@ -128,12 +131,14 @@ async function open(opt) {
   /* 구글 로그인 화면 흉내: 바로 새 로그인 표를 들고 앱으로 돌려보냄.
    *  - 기본: 기본 계정의 표(fake1, fake2 …)
    *  - h.google.pick = '이메일': 계정 고르기 화면에서 그 계정을 고른 것처럼 (표는 'tok-이메일')
-   *  - h.google.silent = false (또는 opt.authFail): 조용히 새 표 받기(prompt=none)가 실패 → 앱이 로그인 화면을 보여줌 */
+   *  - h.google.silent = false (또는 opt.authFail): 조용히 새 표 받기(prompt=none)가 실패 → 앱이 로그인 화면을 보여줌
+   *  - h.google.grant = (요청한 권한 배열, prompt) => 허용한 권한 배열: 권한 화면에서 일부만 체크한 상황. 서버(gas.js)도 그 권한만 가진 것으로 돎 */
   let auths = 0;
+  const tokScopes = {};
   await ctx.route('https://accounts.google.com/o/oauth2/v2/auth**', (route) => {
     const u = new URL(route.request().url()), sp = u.searchParams;
     auths++;
-    h.oauth.push({ prompt: sp.get('prompt'), hint: sp.get('login_hint') });
+    h.oauth.push({ prompt: sp.get('prompt'), hint: sp.get('login_hint'), scope: sp.get('scope') || '' });
     // h.google.cancel: 계정 고르기·권한 화면에서 취소 → 구글이 error=access_denied 로 돌려보냄
     // h.google.hold: 계정 고르기 화면에 머무름(사용자가 거기서 뒤로 가거나 앱을 닫는 경우 흉내용)
     if (h.google.hold && sp.get('prompt') !== 'none') { route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Google</title><p>계정 선택</p>' }); return; }
@@ -142,7 +147,10 @@ async function open(opt) {
     else if (opt.authFail || (sp.get('prompt') === 'none' && !h.google.silent)) q = 'error=interaction_required';
     else {
       const tok = h.google.pick ? 'tok-' + encodeURIComponent(sp.get('prompt') === 'none' ? (sp.get('login_hint') || h.google.pick) : h.google.pick) : 'fake' + auths;
-      q = 'access_token=' + tok + '&token_type=Bearer&expires_in=3600&scope=' + encodeURIComponent(sp.get('scope') || '');
+      const asked = (sp.get('scope') || '').split(/\s+/).filter(Boolean);
+      const got = (h.google.grant ? h.google.grant(asked, sp.get('prompt')) : asked).join(' ');
+      tokScopes[tok] = got;
+      q = 'access_token=' + tok + '&token_type=Bearer&expires_in=3600&scope=' + encodeURIComponent(got);
     }
     route.fulfill({ status: 302, headers: { location: sp.get('redirect_uri') + '#' + q + '&state=' + encodeURIComponent(sp.get('state') || '') } });
   });
@@ -158,6 +166,13 @@ async function open(opt) {
       } catch (e) {}
     }, email);
   }
+  // opt.config: 앱 설정(FC_CONFIG)의 일부를 바꿔서 엶 (예: { slim: true })
+  if (opt.config) {
+    await ctx.addInitScript((over) => {
+      let v;
+      Object.defineProperty(window, 'FC_CONFIG', { configurable: true, get: () => v, set: (x) => { v = Object.assign({}, x, over); } });
+    }, opt.config);
+  }
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message));
@@ -165,7 +180,7 @@ async function open(opt) {
   fs.mkdirSync(OUT, { recursive: true });
   h = {
     page, ctx, browser, gas, email, calls, errors, base,
-    oauth: [], google: { pick: '', silent: true, cancel: false, hold: false }, userinfoDelay: 0,
+    oauth: [], google: { pick: '', silent: true, cancel: false, hold: false, grant: null }, userinfoDelay: 0,
     /** 다음 서버 호출 n번을 연결 끊김으로. fn을 주면 그 기능을 부를 때만 */
     failNext(n, fn) { failNext = n; failFn = fn || ''; },
     auths: () => auths,
