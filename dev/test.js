@@ -1449,6 +1449,43 @@ t('rename', async () => {
   ok(g.events(ME).every((e) => !/승훈스/.test(e.desc) && e.desc.indexOf('고정비 달력 앱에서 만든 일정이에요') >= 0), '설명의 옛 이름이 전부 새 이름으로 바뀜');
 });
 
+/* ---------- 다른 계정이 처음 열면 '아직 준비 중'에 막히던 것 (2026-11-24 친구 폰) ----------
+ * 주인 서버(시트에 붙은 옛 코드)는 주인이 아닌 계정에 오류 대신 needSetup(템플릿 없음)을 돌려줌.
+ * 앱은 '문서 권한 없음' 오류일 때만 모두용 서버로 넘어가서, 그 화면에 그대로 멈췄음. */
+t('friend-first-open', async () => {
+  const FRIEND = 'friend@example.com';
+  const h = await H.open({ seed: 'empty', now: '2026-11-24T20:47', viewport: VP, latency: 50, loggedOut: true }); const p = h.page;
+  const OWNER_ID = await p.evaluate(() => window.FC_CONFIG.scriptId);
+  const hits = { owner: 0, other: 0 };
+  await h.ctx.route('https://script.googleapis.com/v1/scripts/**', async (route) => {
+    if (route.request().url().indexOf(encodeURIComponent(OWNER_ID)) >= 0) {
+      hits.owner++;
+      return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ done: true, response: { result: { ok: true, needSetup: true, ready: false, email: FRIEND, notes: [] } } }) });
+    }
+    hits.other++;
+    return route.fallback();
+  });
+  await p.waitForSelector('#fcLogin.on', { timeout: 8000 });
+  h.google.pick = FRIEND;
+  await p.click('#fcGo');
+  await p.waitForLoadState('load'); await h.idle(1500);
+  const v = await p.evaluate(() => ({
+    stuck: /아직 준비 중/.test(document.body.innerText), setup: document.body.classList.contains('setup-on'),
+    srv: (JSON.parse(localStorage.getItem('fc_auth') || '{}') || {}).srv, email: (JSON.parse(localStorage.getItem('fc_auth') || '{}') || {}).email
+  }));
+  ok(hits.owner >= 1, '처음엔 주인 서버로 감 (' + hits.owner + '번)');
+  ok(!v.stuck && !v.setup, "'아직 준비 중' 화면에 멈추지 않음");
+  ok(v.srv === 'other' && hits.other >= 1, '모두용 서버로 넘어가고 기억함 (srv=' + v.srv + ', 모두용 ' + hits.other + '번)');
+  ok(v.email === FRIEND, '친구 계정으로 로그인됨 (' + v.email + ')');
+  await h.shot('friend-first-open');
+  const before = hits.owner;
+  await p.reload(); await h.idle(1200);
+  ok(hits.owner === before, '다시 열면 주인 서버를 거치지 않고 바로 모두용 서버로');
+  ok(!(await p.evaluate(() => /아직 준비 중/.test(document.body.innerText))), '다시 열어도 막히지 않음');
+  ok(!h.errors.length, '화면 오류 없음 ' + JSON.stringify(h.errors));
+  await h.close();
+});
+
 (async () => {
   const only = process.argv.slice(2);
   const t0 = Date.now();
