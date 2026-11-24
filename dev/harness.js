@@ -134,8 +134,12 @@ async function open(opt) {
     const u = new URL(route.request().url()), sp = u.searchParams;
     auths++;
     h.oauth.push({ prompt: sp.get('prompt'), hint: sp.get('login_hint') });
+    // h.google.cancel: 계정 고르기·권한 화면에서 취소 → 구글이 error=access_denied 로 돌려보냄
+    // h.google.hold: 계정 고르기 화면에 머무름(사용자가 거기서 뒤로 가거나 앱을 닫는 경우 흉내용)
+    if (h.google.hold && sp.get('prompt') !== 'none') { route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>Google</title><p>계정 선택</p>' }); return; }
     let q;
-    if (opt.authFail || (sp.get('prompt') === 'none' && !h.google.silent)) q = 'error=interaction_required';
+    if (h.google.cancel && sp.get('prompt') !== 'none') q = 'error=access_denied';
+    else if (opt.authFail || (sp.get('prompt') === 'none' && !h.google.silent)) q = 'error=interaction_required';
     else {
       const tok = h.google.pick ? 'tok-' + encodeURIComponent(sp.get('prompt') === 'none' ? (sp.get('login_hint') || h.google.pick) : h.google.pick) : 'fake' + auths;
       q = 'access_token=' + tok + '&token_type=Bearer&expires_in=3600&scope=' + encodeURIComponent(sp.get('scope') || '');
@@ -161,7 +165,7 @@ async function open(opt) {
   fs.mkdirSync(OUT, { recursive: true });
   h = {
     page, ctx, browser, gas, email, calls, errors, base,
-    oauth: [], google: { pick: '', silent: true }, userinfoDelay: 0,
+    oauth: [], google: { pick: '', silent: true, cancel: false, hold: false }, userinfoDelay: 0,
     /** 다음 서버 호출 n번을 연결 끊김으로. fn을 주면 그 기능을 부를 때만 */
     failNext(n, fn) { failNext = n; failFn = fn || ''; },
     auths: () => auths,

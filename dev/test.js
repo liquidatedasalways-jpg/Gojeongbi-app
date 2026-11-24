@@ -987,6 +987,79 @@ t('gap-account-switch', async () => {
   await h.close();
 });
 
+/* ---------- 계정 바꾸기를 눌렀다가 취소·뒤로 가기·앱 닫기: 지금 계정 그대로 (2026-11-24 버그) ---------- */
+t('switch-cancel-keeps-login', async () => {
+  const prep = async (o) => {
+    const h = await H.open(Object.assign({}, LIFE, o || {})); const p = h.page;
+    await sleep(p, 1500); await h.idle();
+    await addForm(p); await p.waitForSelector('#saveBtn');
+    await p.fill('#f3', 'A가 쓰던 항목'); await sleep(p, 600);
+    await p.click('#sheetClose'); await sleep(p, 300);
+    await p.evaluate(() => localStorage.setItem('fc_admin', 'a@example.com'));
+    return h;
+  };
+  const clickSwitch = async (p) => { await p.click('#menuBtn'); await p.waitForSelector('#mSwitch'); await p.click('#mSwitch'); };
+  const backIn = async (h, label) => {
+    const p = h.page;
+    await h.idle(1500);
+    const st = await p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), auth: JSON.parse(localStorage.getItem('fc_auth') || '{}'), admin: localStorage.getItem('fc_admin') }));
+    ok(!st.login, label + ': 로그인 화면이 안 뜸');
+    ok(st.auth.token && st.auth.email === h.email && st.auth.srv === 'other' && !st.auth.chk, label + ': 로그인 표·계정·서버 기억 그대로 ' + JSON.stringify({ e: st.auth.email, srv: st.auth.srv, chk: st.auth.chk }));
+    ok(await homeHas(p, '월세'), label + ': 내 항목이 그대로 보임');
+    ok(st.admin === 'a@example.com', label + ': 앱 주인 표시 그대로');
+    await addForm(p); await p.waitForSelector('#saveBtn'); await sleep(p, 300);
+    ok((await p.inputValue('#f3')) === 'A가 쓰던 항목', label + ': 쓰던 내용도 그대로');
+    await p.click('#sheetClose'); await sleep(p, 300);
+    ok(realErrors(h).length === 0, label + ': 화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+  };
+
+  // ① 계정 고르기·권한 화면에서 취소 → 구글이 error=access_denied 로 돌려보냄
+  let h = await prep(); let p = h.page;
+  h.google.cancel = true;
+  const n0 = h.calls.length;
+  await clickSwitch(p);
+  await p.waitForFunction(() => !/error=/.test(location.hash), null, { timeout: 8000 });
+  await backIn(h, '취소');
+  ok(!(await bodyHas(p, 'access_denied')), '취소: 오류 문구가 안 보임');
+  ok(h.calls.slice(n0).every((c) => c.who === h.email), '취소: 서버는 계속 지금 계정으로 부름');
+  await h.shot('t-switch-cancel');
+  await h.close();
+
+  // ② 계정 고르기 화면에서 뒤로 가기·앱 닫기 → 다시 앱을 엶 (구글에서 아무것도 안 들고 옴)
+  h = await prep(); p = h.page;
+  h.google.hold = true;
+  await clickSwitch(p);
+  await p.waitForURL(/accounts\.google\.com/, { timeout: 8000 });
+  h.google.hold = false;
+  await p.goto(h.base);
+  await backIn(h, '뒤로 가기');
+
+  // ③ 로그인 표가 만료된 뒤 취소하고 와도: 조용히 새 표를 받아 지금 계정 그대로 (로그인 화면 아님)
+  await p.evaluate(() => { const a = JSON.parse(localStorage.getItem('fc_auth')); a.exp = Date.now() - 1000; localStorage.setItem('fc_auth', JSON.stringify(a)); });
+  h.google.cancel = true;
+  const a0 = h.oauth.length;
+  await clickSwitch(p);
+  await h.idle(2500);
+  ok(h.oauth.slice(a0).some((o) => o.prompt === 'none' && o.hint === h.email), '만료 + 취소: 지금 계정으로 조용히 새 표를 받으러 감');
+  await backIn(h, '만료 + 취소');
+  await h.close();
+
+  // ④ 메뉴에서 다른 계정(B)을 실제로 고르면: 그때 A 것을 지우고 B로
+  h = await prep(); p = h.page;
+  h.gas.call(B_ACC, 'api_load', [false]);
+  h.google.pick = B_ACC;
+  await clickSwitch(p);
+  await h.idle(3000);
+  const st = await p.evaluate(() => ({ auth: JSON.parse(localStorage.getItem('fc_auth') || '{}'), ls: Object.keys(localStorage).filter((k) => /^fc_draft(?!_who)|^fc_admin/.test(k)) }));
+  ok(st.auth.email === B_ACC && !st.auth.srv && !st.auth.chk, '다른 계정: 로그인 계정이 B로 바뀌고 A의 서버 기억은 지움 ' + JSON.stringify({ e: st.auth.email, srv: st.auth.srv }));
+  ok(st.ls.length === 0, '다른 계정: A가 쓰던 내용·주인 표시를 지움 ' + JSON.stringify(st.ls));
+  ok(!(await homeHas(p, '월세')), '다른 계정: A 항목이 안 보임');
+  const who = [...new Set(h.calls.slice(-2).map((c) => c.who))].join(',');
+  ok(who === B_ACC, '다른 계정: 서버는 B로 부름 (' + who + ')');
+  ok(realErrors(h).length === 0, '다른 계정: 화면 오류 0건 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+});
+
 /* ---------- 꼭 16: 문의할 곳 ---------- */
 t('gap-contact', async () => {
   const fs = require('fs'), path = require('path');
