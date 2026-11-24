@@ -1111,11 +1111,11 @@ t('layout-old-categories', async () => {
   const h = await H.open(LIFE); const p = h.page;
   await sleep(p, 1200);
   await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
-  // 예전 7가지 분류로 저장된 항목이 새 9가지 아이콘으로 보이는지 (서버 값은 그대로)
-  const shown = await p.evaluate(() => { const o = {}; document.querySelectorAll('#list .row.tr[data-name]').forEach((r) => { const c = r.querySelector('.icc .cic'); if (c) o[r.getAttribute('data-name')] = (c.getAttribute('style').match(/--c-(\w+)/) || [])[1]; }); return o; });
+  // 예전 7가지 분류로 저장된 항목이 새 9가지 분류로 보이는지 (서버 값은 그대로). 목록엔 이름 아래 회색 글자로 나옴
+  const shown = await p.evaluate(() => { const o = {}; document.querySelectorAll('#list .row.tr[data-name]').forEach((r) => { const c = r.querySelector('.nmc .ctg'); if (c) o[r.getAttribute('data-name')] = c.getAttribute('data-c'); }); return o; });
   const want = { '월세': 'home', '관리비': 'home', '전기요금': 'util', '도시가스': 'util', '통신비': 'tel', '휴대폰 요금': 'tel', '인터넷': 'tel', '넷플릭스': 'sub', '헬스장': 'sub', '정수기 렌탈': 'sub', '실손보험': 'ins', '자동차보험': 'ins', '청년 적금': 'save' };   // 청년 적금은 옛 분류가 '기타'지만 이름을 보고 저축으로
   const bad = Object.keys(want).filter((k) => shown[k] !== want[k]);
-  ok(bad.length === 0, '옛 분류(월세·관리비·통신비·보험·서비스·구독·기타) 항목이 새 아이콘으로 보임' + (bad.length ? ' ✗ ' + bad.map((k) => k + ':' + shown[k]).join(', ') : ''));
+  ok(bad.length === 0, '옛 분류(월세·관리비·통신비·보험·서비스·구독·기타) 항목이 새 분류로 보임' + (bad.length ? ' ✗ ' + bad.map((k) => k + ':' + shown[k]).join(', ') : ''));
   ok(srvItem(h, '월세').cat === '월세' && srvItem(h, '전기요금').cat === '관리비', '보기만 해선 서버에 저장된 분류를 안 바꿈');
   // 고쳐서 저장하면 새 이름으로
   await p.click('#list .row.tr[data-name="월세"] .tc.nmc'); await sleep(p, 300);
@@ -1147,7 +1147,7 @@ t('layout-old-categories', async () => {
   await p.click('#catBtn'); await sleep(p, 450);
   await p.click('.cgrid [data-cat="기타"]'); await sleep(p, 500);
   await p.click('#saveBtn'); await h.idle(900);
-  const icOf = (n) => p.evaluate((x) => ((document.querySelector('#list .row.tr[data-name="' + x + '"] .icc .cic').getAttribute('style') || '').match(/--c-(\w+)/) || [])[1], n);
+  const icOf = (n) => p.evaluate((x) => document.querySelector('#list .row.tr[data-name="' + x + '"] .nmc .ctg').getAttribute('data-c'), n);
   ok((await icOf('청년 적금')) === 'etc', '일부러 기타를 고르면 목록에 기타로 보임 (서버 값: ' + srvItem(h, '청년 적금').cat + ')');
   await p.reload(); await sleep(p, 1500);
   await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
@@ -1167,6 +1167,16 @@ t('layout-flat-list', async () => {
   const st = await p.evaluate(() => ({ heads: document.querySelectorAll('#tab-list .gh').length, chk: document.querySelectorAll('#list .row.tr[data-name] .chk').length, th: document.querySelectorAll('#lhead [data-sort]').length, cards: document.querySelectorAll('#tab-list .grp').length, cnt: document.getElementById('countTxt').textContent }));
   ok(r.length === 15 && st.heads === 0 && st.cards === 1, '묶음 제목 없이 15개가 한 장에 쭉: ' + st.cnt);
   ok(st.chk === 0, '목록엔 체크 칸이 없음 (냈는지는 첫 화면에서)');
+  // 번호·주기 단위·색
+  const look = () => p.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#list .row.tr[data-name]:not(.newr)'), (r2) => ({ n: r2.getAttribute('data-name'), no: (r2.querySelector('.noc') || {}).textContent, cy: (r2.querySelector('.dyc .cy') || {}).textContent || '', cat: (r2.querySelector('.nmc .ctg') || {}).textContent || '', ic: r2.querySelectorAll('.cic').length })));
+  let lk = await look();
+  ok(lk.every((x, i) => x.no === String(i + 1)), '맨 앞에 번호 1~' + lk.length + ' (하위 항목까지 이어서): ' + lk.map((x) => x.no).join(' '));
+  const cyOf = (n) => (lk.filter((x) => x.n === n)[0] || {}).cy;
+  ok(cyOf('넷플릭스') === '매월' && cyOf('헬스장') === '3개월마다' && cyOf('자동차보험') === '매년', '결제일 아래에 주기: 넷플릭스 ' + cyOf('넷플릭스') + ', 헬스장 ' + cyOf('헬스장') + ', 자동차보험 ' + cyOf('자동차보험'));
+  ok(cyOf('도시가스') === '', '결제일이 없는 항목은 "넣기"만 보임');
+  ok(lk.every((x) => x.ic === 0) && lk.filter((x) => x.n === '넷플릭스')[0].cat === '구독', '색 아이콘 없이 분류는 이름 아래 글자로');
+  const cyCss = await p.evaluate(() => { const e = document.querySelector('#list .dyc .cy'), n = document.querySelector('#list .noc'), cs = getComputedStyle(e), ns = getComputedStyle(n), m = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim(); const d = document.createElement('i'); d.style.color = m; document.body.appendChild(d); const mc = getComputedStyle(d).color; d.remove(); return { cy: cs.fontSize, cyGrey: cs.color === mc, no: ns.fontSize, noGrey: ns.color === mc }; });
+  ok(cyCss.cy === '12px' && cyCss.cyGrey && cyCss.no === '12px' && cyCss.noGrey, '번호와 주기는 작은 회색 글자(12px): ' + JSON.stringify(cyCss));
   const top = r.filter((x) => !x.child);
   const days = top.map((x) => (/말일/.test(x.d) ? 31 : +(x.d.match(/(\d+)일/) || [0, 99])[1]));
   ok(days.every((d, i) => !i || days[i - 1] <= d), '처음엔 결제일 빠른 순, 결제일 없는 건 맨 아래: ' + top.map((x) => x.d).join(' '));
@@ -1176,6 +1186,8 @@ t('layout-flat-list', async () => {
   r = await rows();
   let a = r.filter((x) => !x.child && x.a).map((x) => x.a);
   ok(a.every((v, i) => !i || a[i - 1] >= v) && r[0].n === '자동차보험', '"금액"을 누르면 큰 금액부터: ' + a.slice(0, 4).join(' > '));
+  lk = await look();
+  ok(lk[0].n === '자동차보험' && lk.every((x, i) => x.no === String(i + 1)), '줄 세우는 기준을 바꾸면 번호도 보이는 순서대로 다시 매김');
   ok(r[r.length - 1].n === '전기요금', '금액 없는 건 맨 아래');
   await p.click('#lhead [data-sort="amt"]'); await sleep(p, 700);
   r = await rows(); a = r.filter((x) => !x.child && x.a).map((x) => x.a);
@@ -1191,6 +1203,8 @@ t('layout-flat-list', async () => {
   await p.click('#catFilter [data-cat="구독"]'); await sleep(p, 600);
   r = await rows();
   ok(r.length === 5 && /^구독 5개/.test(await p.evaluate(() => document.getElementById('countTxt').textContent)), '구독만: ' + r.map((x) => x.n).join(', '));
+  lk = await look();
+  ok(lk.map((x) => x.no).join('') === '12345' && lk.every((x) => x.cat === ''), '한 분류만 볼 땐 번호 1~5, 이름 아래 분류 글자는 생략');
   // 골라 본 채로 맨 아래 줄에 적으면 그 분류로 들어감
   await p.fill('#nName', '티빙'); await p.fill('#nAmt', '9500'); await p.fill('#nDay', '14'); await p.press('#nDay', 'Enter');
   await h.idle(900);

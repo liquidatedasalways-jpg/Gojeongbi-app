@@ -501,16 +501,20 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .row.tr:not(.drag):not(.swiped) .swdel { visibility: hidden; }
 
 /* 목록 탭: 표 한 장 (세로선 없이). 칸 제목은 화면을 내려도 위에 붙어 있고, 누르면 그 칸 기준으로 줄 세움 */
-.lcard { --cols: 48px minmax(0, 1fr) 86px 66px; position: relative; }
-@media (max-width: 340px) { .lcard { --cols: 44px minmax(0, 1fr) 80px 60px; } }
+.lcard { --no: 36px; --cols: var(--no) minmax(0, 1fr) 86px 70px; position: relative; }
+@media (max-width: 340px) { .lcard { --no: 32px; --cols: var(--no) minmax(0, 1fr) 80px 64px; } }
 .lcard > .grp { border-radius: 0 0 var(--r-card) var(--r-card); }
 .tbl > .row.tr { display: block; min-height: 0; }
-.tbl > * + *::after { left: 48px; right: 0; }
+.tbl > * + *::after { left: var(--no); right: 0; }
+/* 줄 사이 가는 선 (밀어서 삭제할 때 줄과 같이 움직이게 줄 안쪽에 그림) */
+.tbl > .row.tr + .row.tr > .tg { box-shadow: inset 0 1px 0 var(--line); }
 .tg { display: grid; grid-template-columns: var(--cols); align-items: stretch; min-height: 48px; padding-right: 4px; }
 .tg > * { min-width: 0; }
 .tg .chk { width: auto; }
 .tg .chk i { width: 22px; height: 22px; }
 .tc.icc { justify-content: center; }
+/* 맨 앞 칸: 지금 보이는 순서대로 매긴 번호 (정렬·분류를 바꾸면 다시 매김) */
+.tc.noc { justify-content: center; padding-left: 4px; font-size: 12px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .tc { display: flex; align-items: center; min-height: 48px; font-size: 15px; cursor: pointer; }
 .tc.nmc { gap: 4px; }
 .tc.nmc .nw { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 5px 0; }
@@ -522,6 +526,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .tc.amc .av { min-width: 0; overflow: hidden; }
 .tc.dyc { justify-content: center; flex-direction: column; gap: 0; font-weight: 600; white-space: nowrap; line-height: 1.2; }
 .tc.dyc .dv { max-width: 100%; overflow: hidden; }
+/* 결제일 아래 작은 회색 글자: 얼마나 자주 나가는지 (매월·3개월마다·매년) */
+.tc.dyc .cy { max-width: 100%; overflow: hidden; font-size: 12px; font-weight: 500; color: var(--muted); letter-spacing: -.02em; }
 .tc .nod { color: var(--accent-text); font-weight: 700; font-size: 13px; }
 .tc .emp { color: var(--muted); font-weight: 500; font-size: 13px; }
 .tc input.ci { width: 100%; height: 44px; border: 0; border-radius: 10px; background: var(--fill); padding: 0 6px; font-size: 15px; font-weight: 700; text-align: right; outline: none; box-shadow: inset 0 0 0 1.5px var(--accent); }
@@ -533,14 +539,14 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .th button:nth-child(3) { justify-content: flex-end; } .th button:nth-child(4) { justify-content: center; padding-left: 6px; }
 .th button i { flex: none; width: 10px; height: 14px; opacity: .45; }
 .th button.on { color: var(--ink); font-weight: 700; }
-.th button.on i { opacity: 1; color: var(--accent-text); }
+.th button.on i { opacity: 1; }
 .row.tr.child .tc.nmc { padding-left: 4px; }
 .row.tr.child .tc.nmc::before { content: "└"; color: var(--ring); font-size: 12px; margin-right: 2px; }
 .row.tr.child .tc.nmc .nm { font-weight: 500; }
 .row.tr.child .tc.amc { font-weight: 600; }
-.row.tr.open { background: var(--sel); }
+.row.tr.open { background: var(--child); }
 .row.tr.open .tc.nmc .nm { white-space: normal; }
-.tp { padding: 0 14px 12px 48px; }
+.tp { padding: 0 14px 12px var(--no); }
 .tp .kl { display: flex; gap: 10px; font-size: 13px; line-height: 1.5; padding: 2px 0; }
 .tp .kl span { flex: none; width: 70px; color: var(--muted); }
 .tp .kl b { flex: 1; min-width: 0; font-weight: 500; color: var(--ink2); }
@@ -1845,26 +1851,28 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (e === 12) return '매년';
     return e + '개월마다';
   }
+  /** 표의 결제일 아래에 붙는 단위: 매월 · 3개월마다 · 매년 */
+  function cycleUnit(it) { return cycleShort(it) || '매월'; }
   /** 표의 결제일 칸: 매월이면 '5일'/'말일', 이번 달에 안 나가는 것(3개월마다·매년)은 '3월 20일' */
   function dayCell(it) {
-    var p = parse(it.next || '');
+    var p = parse(it.next || ''), cy = '<small class="cy">' + esc(cycleUnit(it)) + '</small>';
     if ((it.every || 1) > 1 && p && it.next.slice(0, 7) !== today().slice(0, 7)) {
-      return '<span class="dv" data-fit data-short="' + p.m + '/' + p.d + '">' + p.m + '월 ' + p.d + '일</span>';
+      return '<span class="dv" data-fit data-short="' + p.m + '/' + p.d + '">' + p.m + '월 ' + p.d + '일</span>' + cy;
     }
-    return '<span class="dv">' + (it.day >= 31 ? '말일' : it.day + '일') + '</span>';
+    return '<span class="dv">' + (it.day >= 31 ? '말일' : it.day + '일') + '</span>' + cy;
   }
-  function trHtml(it) {
-    // 이름 아래 작은 줄: 주기(3개월마다·매년), 마지막 결제, 끝남
+  /** no: 맨 앞 번호(지금 보이는 순서). 분류 색 아이콘 대신 번호를 두고, 분류는 이름 아래 회색 글자로 (한 분류만 골라 볼 땐 생략) */
+  function trHtml(it, no) {
+    // 이름 아래 작은 줄: 분류, 마지막 결제, 끝남
     var tags = '';
-    var cs = cycleShort(it);
-    if (cs) tags += '<span class="tag">' + esc(cs) + '</span>';
+    if (!lv.cat) tags += '<span class="tag ctg" data-c="' + (catByK[catKey(it)] || catByK['기타']).c + '">' + esc(catText(it)) + '</span>';
     if (it.section === 5) tags += '<span class="tag">' + (it.status === '종료' ? '종료' : '끝남') + '</span>';
     else if (it.last) tags += '<span class="tag lastp">마지막 결제</span>';
     var nameHtml = '<span class="nw"><span class="nm">' + esc(it.name) + '</span>' + (tags ? '<span class="tgs">' + tags + '</span>' : '') + '</span>';
     var amt = it.amount != null ? '<span class="av" data-fit data-short="' + esc(man(it.amount)) + '">' + esc(num(it.amount)) + '</span>' : '<span class="emp">금액 없음</span>';
     var day = needsDate(it) ? '<span class="nod">넣기</span>' : !it.day ? '<span class="emp">-</span>' : dayCell(it);
     var h = '<div class="tg">' +
-      '<div class="tc icc" data-act="expand">' + catIc(catKey(it), 's') + '</div>' +
+      '<div class="tc noc" data-act="expand">' + (no || '') + '</div>' +
       '<div class="tc nmc" data-act="expand">' + nameHtml + '</div>' +
       '<div class="tc amc" data-act="cell" data-f="amt">' + amt + '</div>' +
       '<div class="tc dyc" data-act="cell" data-f="day">' + day + '</div></div>' +
@@ -2078,8 +2086,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       e.textContent = '아직 넣은 고정비가 없어요. 아래 줄에 이름부터 적어보세요.';
       list.appendChild(e);
     }
-    rows.forEach(function (r) {
-      var it = r.it, el = get('i:' + it.name), html = trHtml(it);
+    rows.forEach(function (r, ix) {
+      var it = r.it, el = get('i:' + it.name), html = trHtml(it, ix + 1);
       el.setAttribute('data-name', it.name);
       if (el._html !== html && !el.querySelector('input.ci')) { el.innerHTML = html; el._html = html; }
       var fl = el.classList.contains('flash') ? ' flash' : '';
