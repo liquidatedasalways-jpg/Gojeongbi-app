@@ -1486,6 +1486,55 @@ t('friend-first-open', async () => {
   await h.close();
 });
 
+/* ---------- 구글 권한 화면에서 체크를 다 안 하고 온 경우 (2026-11-24 친구 폰) ----------
+ * 일부 권한만 든 표로 서버를 부르면 "시트를 못 읽었어요: You do not have permission to call ScriptApp.getProjectTriggers…"가 그대로 떴음.
+ * 구글이 알려준 허용 목록에 빠진 게 있으면 서버를 부르지 않고, 모두 허용하라고 알려준 뒤 권한 화면(prompt=consent)으로 다시 보냄. */
+t('friend-partial-consent', async () => {
+  const FRIEND = 'friend@example.com';
+  const h = await H.open({ seed: 'empty', now: '2026-11-24T21:05', viewport: VP, latency: 50, loggedOut: true }); const p = h.page;
+  const seen = [];
+  await h.ctx.route('https://accounts.google.com/o/oauth2/v2/auth**', (route) => {
+    const sp = new URL(route.request().url()).searchParams;
+    seen.push({ prompt: sp.get('prompt'), hint: sp.get('login_hint') });
+    // 권한 화면(consent)을 다시 거칠 때만 전부 체크한 것으로, 그 전엔 캘린더·스크립트 권한을 빼먹은 것으로
+    const all = sp.get('scope') || '';
+    const scope = sp.get('prompt') === 'consent' ? all : all.split(' ').filter((x) => !/script\.scriptapp|auth\/calendar/.test(x)).join(' ');
+    const q = 'access_token=tok-' + encodeURIComponent(FRIEND) + '&token_type=Bearer&expires_in=3600&scope=' + encodeURIComponent(scope);
+    route.fulfill({ status: 302, headers: { location: sp.get('redirect_uri') + '#' + q + '&state=' + encodeURIComponent(sp.get('state') || '') } });
+  });
+  await p.waitForSelector('#fcLogin.on', { timeout: 8000 });
+  await p.click('#fcGo'); await p.waitForLoadState('load'); await sleep(p, 1500);
+  let v = await p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), msg: document.getElementById('fcErr').textContent, raw: /You do not have permission/.test(document.body.innerText) }));
+  ok(v.login && /모두 허용/.test(v.msg) && /모두 선택/.test(v.msg), '체크를 빼먹고 오면 로그인 화면에 안내가 뜸: ' + v.msg);
+  ok(h.calls.length === 0 && !v.raw, '덜 허용된 표로 서버를 부르지 않음 (영어 오류 안 뜸, 서버 호출 ' + h.calls.length + '번)');
+  await h.shot('friend-partial-consent');
+  const n = seen.length;
+  await p.reload(); await sleep(p, 1200);
+  v = await p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), msg: document.getElementById('fcErr').textContent }));
+  ok(v.login && /모두 허용/.test(v.msg) && seen.length === n, '다시 열어도 같은 안내 (구글에 조용히 다녀오며 맴돌지 않음)');
+  await p.click('#fcGo'); await p.waitForLoadState('load'); await h.idle(1500);
+  const last = seen[seen.length - 1];
+  ok(last.prompt === 'consent' && last.hint === FRIEND, '버튼을 누르면 그 계정의 권한 화면으로 감: ' + JSON.stringify(last));
+  v = await p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), cal: !!document.querySelector('.tabbar'), raw: /You do not have permission|아직 준비 중/.test(document.body.innerText) }));
+  ok(!v.login && v.cal && !v.raw && h.calls.length > 0, '모두 허용하고 오면 앱이 열림 (서버 호출 ' + h.calls.length + '번)');
+  ok(!h.errors.length, '화면 오류 없음 ' + JSON.stringify(h.errors));
+  await h.close();
+
+  // 허용 목록을 모르는 표(옛 저장분)인데 서버가 권한 오류를 돌려준 경우에도 같은 안내로
+  const h2 = await H.open({ seed: 'empty', now: '2026-11-24T21:05', viewport: VP, latency: 50 }); const p2 = h2.page;
+  let hit = 0;
+  await h2.ctx.route('https://script.googleapis.com/v1/scripts/**', async (route) => {
+    hit++;
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ done: true, response: { result: { ok: false, error: '시트를 못 읽었어요: You do not have permission to call ScriptApp.getProjectTriggers. Required permissions: https://www.googleapis.com/auth/script.scriptapp.' } } }) });
+  });
+  await p2.reload(); await sleep(p2, 2000);
+  const v2 = await p2.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), msg: document.getElementById('fcErr').textContent }));
+  ok(hit >= 1 && v2.login && /모두 허용/.test(v2.msg), '서버가 권한 오류를 주면 영어 오류 대신 "모두 허용" 안내 (서버 ' + hit + '번)');
+  const hit0 = hit; await sleep(p2, 1500);
+  ok(hit === hit0, '안내가 뜬 뒤엔 서버를 계속 부르지 않음');
+  await h2.close();
+});
+
 (async () => {
   const only = process.argv.slice(2);
   const t0 = Date.now();
