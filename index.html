@@ -593,7 +593,17 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 
   function get() { try { return JSON.parse(localStorage.getItem(K) || 'null') || {}; } catch (e) { return {}; } }
   function put(o) { try { localStorage.setItem(K, JSON.stringify(o)); } catch (e) {} }
-  function valid(a) { return a.token && a.exp && Date.now() < a.exp - 60000; }
+  /* 구글 권한 화면은 항목마다 체크 칸이 있어서, 체크를 빼고 '계속'을 누르면 일부 권한만 든 표가 와요.
+   * 그 표로는 서버가 중간에 멈춰요("You do not have permission to call …"). 구글이 알려준 허용 목록(scope)에 빠진 게 있으면 쓰지 않고 다시 허용받아요.
+   * 허용 목록을 모르는 옛 저장분은 통과 (서버가 권한 오류를 내면 그때 lack 표시). */
+  var NEED = ['auth/spreadsheets', 'auth/calendar', 'auth/script.scriptapp', 'auth/script.container.ui'];
+  function lacking(a) {
+    if (!a) return false;
+    if (a.lack) return true;
+    var s = a.scope ? ' ' + a.scope + ' ' : '';
+    return !!s && NEED.some(function (n) { return s.indexOf(n + ' ') < 0; });
+  }
+  function valid(a) { return a.token && a.exp && Date.now() < a.exp - 60000 && !lacking(a); }
 
   function go(prompt, hint, extra) {
     // 조용히 새 표를 받으러 갈 때(화면이 새로 열림): 앱이 보내던 작업을 적어 두게 함 → 돌아와서 이어서 함
@@ -626,7 +636,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
     a.scope = back.scope || '';
     // 로그인 화면·계정 고르기·권한 화면을 거쳐 받은 표는 누구 것인지 아직 몰라요(앞 계정과 다른 계정을 골랐을 수 있음).
     // 구글에 물어 확인될 때까지(chk) 이 기기에 남은 앞 계정의 화면·쓰던 내용·서버 기억을 쓰지 않아요.
-    if (mode !== 'none') a.chk = 1;
+    if (mode !== 'none') { a.chk = 1; delete a.lack; }
     put(a);
   }
   // 조용히 새 표 받기(prompt=none)가 실패한 경우만. 계정 고르기·권한 화면에서 취소하고 온 건 실패가 아님(지금 계정 그대로 씀)
@@ -662,6 +672,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
   /** 쓸 수 있는 로그인 표를 돌려줌. 없으면 구글에서 조용히 새로 받아오거나(화면 깜빡임 정도), 로그인 화면을 보여줌. */
   function ensure() {
     var x = get();
+    if (lacking(x)) { showLogin(); return new Promise(function (res) { waiting.push(res); }); }   // 권한이 덜 허용된 표: 조용히 새로 받아도 똑같아서 다시 허용받게 함
     if (valid(x)) {
       if (!x.chk) return Promise.resolve(x.token);
       // 방금 로그인해서 받은 표: 누구 것인지 확인한 뒤에 서버를 부름
@@ -723,6 +734,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
           if (!force && C.otherId && id !== C.otherId && (NOT_OWNER.test(rawErr(d)) || r.status === 404 || /deleted|trash|휴지통|삭제/i.test(rawErr(d)))) { var y = get(); y.srv = 'other'; put(y); return run(fn, args, tries); }
           if (!r.ok || d.error) throw new Error(errText(d, r.status));
           var res = d.response ? d.response.result : undefined;
+          // 권한이 덜 허용된 표로 서버가 멈춘 경우(허용 목록을 몰라 미리 못 거른 경우): 표시해 두고 다시 허용받는 화면으로
+          if (res && res.error && /You do not have permission to call|Required permissions/i.test(String(res.error)) && !get().lack) { var w = get(); w.lack = 1; put(w); location.reload(); return new Promise(function () {}); }
           // 주인 서버(옛 코드)는 시트 주인이 아닌 계정에 오류 대신 '처음 설정(needSetup)'을 돌려줌 → 다른 계정이 '아직 준비 중' 화면에 막힘.
           // 그 경우도 모두용 서버로 넘김 (계정별로 기억).
           if (!force && C.otherId && id !== C.otherId && res && res.needSetup) { var z = get(); z.srv = 'other'; put(z); return run(fn, args, tries); }
@@ -753,6 +766,12 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
     var el = document.getElementById('fcLogin');
     if (!el) return;
     el.classList.add('on');
+    if (lacking(get())) {   // 구글 권한 화면에서 체크를 다 안 하고 온 경우
+      var le = document.getElementById('fcErr');
+      le.className = 'err lack';
+      le.innerHTML = '<b>구글 권한을 모두 허용해야 쓸 수 있어요.</b><br>위 버튼을 누르고, 구글 화면에서 <b>모두 선택</b>을 체크한 뒤 계속을 눌러주세요.';
+      return;
+    }
     if (bye) {   // '내 자료 모두 지우기'를 끝내고 온 경우
       var er = document.getElementById('fcErr');
       er.className = 'err bye';
@@ -764,7 +783,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
   }
   document.addEventListener('DOMContentLoaded', function () {
     var b = document.getElementById('fcGo');
-    if (b) b.onclick = function () { go('select_account'); };
+    if (b) b.onclick = function () { var x = get(); if (lacking(x)) go('consent', x.chk ? '' : (x.email || '')); else go('select_account'); };
     if (valid(get()) && (!get().email || get().chk)) loadEmail();
   });
   if (back && back.access_token) loadEmail();
@@ -819,7 +838,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
     switchAccount: function () { go('select_account'); },
     logout: function (byeMark) { put({}); forget(); if (byeMark) { try { sessionStorage.setItem('fc_bye', '1'); } catch (e) {} } location.reload(); },
     /** 이 기기에 남은 지난 화면을 먼저 보여줘도 되는지: 확인된 로그인 표가 있거나, 곧 조용히 새로 받을 때만 (로그인 화면이 뜰 땐 안 됨) */
-    trusted: function () { var x = get(); return !x.chk && (valid(x) || !!(x.email && !silentFailed)); },
+    trusted: function () { var x = get(); return !x.chk && !lacking(x) && (valid(x) || !!(x.email && !silentFailed)); },
     contact: C.contact || '',
     /** 시트 → 앱 저장 공간 옮기기용: 모두용 서버(other) / 주인 서버(owner)를 골라서 부름 */
     hasOther: !!C.otherId,
@@ -878,6 +897,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 .fcl .gbtn { display: flex; align-items: center; justify-content: center; gap: 10px; height: 54px; border-radius: var(--r-ctl); background: var(--card); color: var(--ink); font-size: 17px; font-weight: 700; box-shadow: 0 1px 3px rgba(0,0,0,.08), inset 0 0 0 1px var(--fill2); }
 .fcl .err { color: var(--red-text); font-size: 13px; font-weight: 600; text-align: center; margin-top: 10px; }
 .fcl .err:empty { display: none; }
+.fcl .err.lack { color: var(--ink); font-weight: 500; line-height: 1.55; word-break: keep-all; text-align: left; background: var(--card, transparent); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; } .fcl .err.lack b { font-weight: 700; }
 .fcl .err.bye { color: var(--sub); font-weight: 500; line-height: 1.55; word-break: keep-all; } .fcl .err.bye a { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .fcl .fine { margin-top: 12px; margin-bottom: 0; font-size: 12px; color: var(--sub); text-align: center; line-height: 1.5; }
 .fcl .legal { display: flex; justify-content: center; gap: 4px; }
