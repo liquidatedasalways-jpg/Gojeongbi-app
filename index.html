@@ -722,7 +722,11 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
           if (!force && r.status === 404 && id !== C.otherId && idIx < ids.length - 1) { idIx++; try { localStorage.setItem('fc_idix', String(idIx)); } catch (e) {} return run(fn, args, tries); }
           if (!force && C.otherId && id !== C.otherId && (NOT_OWNER.test(rawErr(d)) || r.status === 404 || /deleted|trash|휴지통|삭제/i.test(rawErr(d)))) { var y = get(); y.srv = 'other'; put(y); return run(fn, args, tries); }
           if (!r.ok || d.error) throw new Error(errText(d, r.status));
-          return d.response ? d.response.result : undefined;
+          var res = d.response ? d.response.result : undefined;
+          // 주인 서버(옛 코드)는 시트 주인이 아닌 계정에 오류 대신 '처음 설정(needSetup)'을 돌려줌 → 다른 계정이 '아직 준비 중' 화면에 막힘.
+          // 그 경우도 모두용 서버로 넘김 (계정별로 기억).
+          if (!force && C.otherId && id !== C.otherId && res && res.needSetup) { var z = get(); z.srv = 'other'; put(z); return run(fn, args, tries); }
+          return res;
         });
       }, function () { throw new Error('인터넷 연결을 확인해주세요.'); });
     });
