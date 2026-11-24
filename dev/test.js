@@ -1473,14 +1473,13 @@ t('friend-first-open', async () => {
     stuck: /아직 준비 중/.test(document.body.innerText), setup: document.body.classList.contains('setup-on'),
     srv: (JSON.parse(localStorage.getItem('fc_auth') || '{}') || {}).srv, email: (JSON.parse(localStorage.getItem('fc_auth') || '{}') || {}).email
   }));
-  ok(hits.owner >= 1, '처음엔 주인 서버로 감 (' + hits.owner + '번)');
+  ok(hits.owner === 0, '새 계정은 주인 서버를 아예 거치지 않음 (' + hits.owner + '번)');
   ok(!v.stuck && !v.setup, "'아직 준비 중' 화면에 멈추지 않음");
-  ok(v.srv === 'other' && hits.other >= 1, '모두용 서버로 넘어가고 기억함 (srv=' + v.srv + ', 모두용 ' + hits.other + '번)');
+  ok(hits.other >= 1 && await p.evaluate(() => !!document.querySelector('.tabbar') && !document.getElementById('fcLogin').classList.contains('on')), '바로 모두용 서버로 가서 달력이 열림 (모두용 ' + hits.other + '번)');
   ok(v.email === FRIEND, '친구 계정으로 로그인됨 (' + v.email + ')');
   await h.shot('friend-first-open');
-  const before = hits.owner;
   await p.reload(); await h.idle(1200);
-  ok(hits.owner === before, '다시 열면 주인 서버를 거치지 않고 바로 모두용 서버로');
+  ok(hits.owner === 0, '다시 열어도 주인 서버를 거치지 않음');
   ok(!(await p.evaluate(() => /아직 준비 중/.test(document.body.innerText))), '다시 열어도 막히지 않음');
   ok(!h.errors.length, '화면 오류 없음 ' + JSON.stringify(h.errors));
   await h.close();
@@ -1503,6 +1502,9 @@ t('friend-partial-consent', async () => {
     route.fulfill({ status: 302, headers: { location: sp.get('redirect_uri') + '#' + q + '&state=' + encodeURIComponent(sp.get('state') || '') } });
   });
   await p.waitForSelector('#fcLogin.on', { timeout: 8000 });
+  // (준비) 권한이 모자란 표로 서버에 한 번 다녀간 계정: 서버엔 '처음 시작함'만 찍히고 캘린더 연동은 꺼진 채 남음
+  h.gas.call(FRIEND, 'api_load', [false]); h.gas.call(FRIEND, 'api_calendar', ['off']);
+  ok(h.gas.call(FRIEND, 'api_load', [true]).calOn === false, '(준비) 캘린더 연동이 꺼진 채 남은 계정');
   await p.click('#fcGo'); await p.waitForLoadState('load'); await sleep(p, 1500);
   let v = await p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), msg: document.getElementById('fcErr').textContent, raw: /You do not have permission/.test(document.body.innerText) }));
   ok(v.login && /모두 허용/.test(v.msg) && /모두 선택/.test(v.msg), '체크를 빼먹고 오면 로그인 화면에 안내가 뜸: ' + v.msg);
@@ -1517,6 +1519,10 @@ t('friend-partial-consent', async () => {
   ok(last.prompt === 'consent' && last.hint === FRIEND, '버튼을 누르면 그 계정의 권한 화면으로 감: ' + JSON.stringify(last));
   v = await p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), cal: !!document.querySelector('.tabbar'), raw: /You do not have permission|아직 준비 중/.test(document.body.innerText) }));
   ok(!v.login && v.cal && !v.raw && h.calls.length > 0, '모두 허용하고 오면 앱이 열림 (서버 호출 ' + h.calls.length + '번)');
+  await h.idle(1500);
+  ok(h.calls.some((c) => c.fn === 'api_calendar' && c.args[0] === 'on') && h.gas.call(FRIEND, 'api_load', [true]).calOn === true, '꺼진 채 남았던 캘린더 연동을 앱이 켜 줌');
+  await p.reload(); await h.idle(1200);
+  ok(h.calls.filter((c) => c.fn === 'api_calendar').length === 1, '한 번만 켬 (다시 열어도 또 부르지 않음)');
   ok(!h.errors.length, '화면 오류 없음 ' + JSON.stringify(h.errors));
   await h.close();
 
@@ -1533,6 +1539,55 @@ t('friend-partial-consent', async () => {
   const hit0 = hit; await sleep(p2, 1500);
   ok(hit === hit0, '안내가 뜬 뒤엔 서버를 계속 부르지 않음');
   await h2.close();
+});
+
+/* ---------- 새 계정 로그인 길 전체 점검 (2026-11-24) ---------- */
+// 구글에 다녀오는 사이 이 창의 기억(sessionStorage)이 비어도 로그인이 됨 (홈 화면 앱, 다른 탭으로 돌아온 경우)
+t('login-state-lost', async () => {
+  const FRIEND = 'friend@example.com';
+  const h = await H.open({ seed: 'empty', now: '2026-11-24T21:20', viewport: VP, latency: 50, loggedOut: true }); const p = h.page;
+  await h.ctx.addInitScript(() => { try { if (/access_token=/.test(location.hash)) { sessionStorage.removeItem('fc_state'); sessionStorage.removeItem('fc_mode'); } } catch (e) {} });
+  await p.waitForSelector('#fcLogin.on', { timeout: 8000 });
+  h.google.pick = FRIEND;
+  await p.click('#fcGo'); await p.waitForLoadState('load'); await h.idle(1500);
+  const v = await p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), cal: !!document.querySelector('.tabbar'), email: (JSON.parse(localStorage.getItem('fc_auth') || '{}') || {}).email, left: localStorage.getItem('fc_ost') }));
+  ok(!v.login && v.cal && v.email === FRIEND, '창의 기억이 비어도 로그인돼서 달력이 열림 (' + v.email + ')');
+  ok(v.left === null, '기기 저장소에 적어 둔 확인 값은 쓰고 지움');
+  // 확인 값이 아예 안 맞으면(남이 만든 주소) 받지 않고, 왜 그런지 알려줌
+  await p.evaluate(() => { localStorage.removeItem('fc_auth'); });
+  await p.goto(h.base + '#access_token=tok-evil%40example.com&token_type=Bearer&expires_in=3600&state=zzz'); await p.reload(); await sleep(p, 1000);
+  const v2 = await p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), tok: (JSON.parse(localStorage.getItem('fc_auth') || '{}') || {}).token || '' }));
+  ok(v2.login && !v2.tok, '확인 값이 안 맞는 로그인 표는 받지 않음');
+  await h.close();
+});
+
+// 앱 안 브라우저(카톡·인스타 등)에서는 구글이 로그인을 막음 → 구글로 보내지 않고 폰 브라우저로 여는 법을 알려줌
+t('login-inapp-browser', async () => {
+  const cases = [
+    { name: '인스타그램(안드로이드)', ua: 'Mozilla/5.0 (Linux; Android 14; SM-S918N Build/UP1A; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36 Instagram 350.0.0.0', inapp: true, chrome: true },
+    { name: '네이버 앱(아이폰)', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 NAVER(inapp; search; 2000; 12.9.5; 15PRO)', inapp: true, chrome: false },
+    { name: '이름 모를 앱 안 브라우저(아이폰)', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148', inapp: true, chrome: false },
+    { name: '아이폰 사파리', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.1 Mobile/15E148 Safari/604.1', inapp: false },
+    { name: '아이폰 크롬', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/130.0.6723.90 Mobile/15E148 Safari/604.1', inapp: false },
+    { name: '삼성 인터넷', ua: 'Mozilla/5.0 (Linux; Android 14; SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/26.0 Chrome/122.0.0.0 Mobile Safari/537.36', inapp: false },
+    { name: '안드로이드 크롬', ua: 'Mozilla/5.0 (Linux; Android 14; SM-S918N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Mobile Safari/537.36', inapp: false }
+  ];
+  for (const c of cases) {
+    const h = await H.open({ seed: 'empty', now: '2026-11-24T21:20', viewport: VP, latency: 50, loggedOut: true, userAgent: c.ua }); const p = h.page;
+    await p.waitForSelector('#fcLogin.on', { timeout: 8000 });
+    await p.click('#fcGo'); await sleep(p, 900); await h.idle(600);
+    const v = await p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), msg: document.getElementById('fcErr').textContent,
+      chrome: (document.getElementById('fcChrome') || {}).href || '', copy: !!document.getElementById('fcCopy') }));
+    if (c.inapp) {
+      ok(h.oauth.length === 0 && v.login && /앱 안 브라우저/.test(v.msg) && v.copy, c.name + ': 구글로 안 보내고 안내 + 주소 복사');
+      ok(c.chrome ? /^intent:\/\/127\.0\.0\.1.*package=com\.android\.chrome/.test(v.chrome) : !v.chrome, c.name + (c.chrome ? ': 크롬으로 열기 버튼' : ': 사파리에 붙여넣기 안내') + ' ' + v.chrome.slice(0, 60));
+      if (!c.chrome) ok(/Safari/.test(v.msg), c.name + ': Safari 안내 문구');
+      if (c === cases[0]) await h.shot('login-inapp');
+    } else {
+      ok(h.oauth.length === 1 && !v.login, c.name + ': 평소대로 구글 로그인 → 앱 열림');
+    }
+    await h.close();
+  }
 });
 
 (async () => {
