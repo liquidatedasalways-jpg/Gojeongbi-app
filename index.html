@@ -606,17 +606,18 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
   }
 
   var a = get();
+  var mode = ''; try { mode = sessionStorage.getItem('fc_mode') || ''; } catch (e) {}
   if (back && back.access_token) {
     a.token = back.access_token;
     a.exp = Date.now() + (Number(back.expires_in) || 3600) * 1000;
     a.scope = back.scope || '';
     // 로그인 화면·계정 고르기·권한 화면을 거쳐 받은 표는 누구 것인지 아직 몰라요(앞 계정과 다른 계정을 골랐을 수 있음).
     // 구글에 물어 확인될 때까지(chk) 이 기기에 남은 앞 계정의 화면·쓰던 내용·서버 기억을 쓰지 않아요.
-    var mode = ''; try { mode = sessionStorage.getItem('fc_mode') || ''; } catch (e) {}
     if (mode !== 'none') a.chk = 1;
     put(a);
   }
-  var silentFailed = !!(back && back.error);
+  // 조용히 새 표 받기(prompt=none)가 실패한 경우만. 계정 고르기·권한 화면에서 취소하고 온 건 실패가 아님(지금 계정 그대로 씀)
+  var silentFailed = !!(back && back.error && mode === 'none');
   var bye = null; try { bye = sessionStorage.getItem('fc_bye'); sessionStorage.removeItem('fc_bye'); } catch (e) {}
 
   var waiting = [], fetchingEmail = null;
@@ -796,7 +797,9 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
   window.FC_AUTH = {
     appUrl: APP_URL,
     email: email,
-    switchAccount: function () { var x = get(); delete x.token; delete x.email; delete x.srv; put(x); forget(); go('select_account'); },
+    // 지금 로그인은 그대로 두고 계정 고르기로 감. 취소·뒤로 가기로 돌아오면 지금 계정 그대로.
+    // 다른 계정 표를 들고 돌아오면 chk 표시 → loadEmail()이 앞 계정과 다른 걸 확인하고 그때 앞 계정 것을 지움.
+    switchAccount: function () { go('select_account'); },
     logout: function (byeMark) { put({}); forget(); if (byeMark) { try { sessionStorage.setItem('fc_bye', '1'); } catch (e) {} } location.reload(); },
     /** 이 기기에 남은 지난 화면을 먼저 보여줘도 되는지: 확인된 로그인 표가 있거나, 곧 조용히 새로 받을 때만 (로그인 화면이 뜰 땐 안 됨) */
     trusted: function () { var x = get(); return !x.chk && (valid(x) || !!(x.email && !silentFailed)); },
