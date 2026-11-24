@@ -610,6 +610,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
     if (prompt === 'none') { try { if (window.FC_AUTH && window.FC_AUTH.onLeave) window.FC_AUTH.onLeave(); } catch (e) {} }
     var st = Math.random().toString(36).slice(2);
     try { sessionStorage.setItem('fc_state', st); sessionStorage.setItem('fc_mode', prompt); } catch (e) {}
+    // 구글에 다녀오는 사이 이 창의 기억(sessionStorage)이 비는 경우가 있어요(홈 화면 앱, 다른 탭으로 돌아옴). 기기 저장소에도 10분짜리로 적어 둠
+    try { localStorage.setItem('fc_ost', JSON.stringify({ s: st, m: prompt, t: Date.now() })); } catch (e) {}
     var q = {
       client_id: C.clientId, redirect_uri: APP_URL, response_type: 'token', scope: SCOPES + (extra ? ' ' + extra : ''),
       include_granted_scopes: 'true', state: st, prompt: prompt
@@ -619,17 +621,24 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
   }
 
   // 구글에서 돌아왔을 때 (#access_token=… 또는 #error=…)
-  var back = null;
+  var back = null, backMode = null, stateLost = false;
   if (/access_token=|error=/.test(location.hash)) {
     var h = {};
     location.hash.slice(1).split('&').forEach(function (p) { var i = p.indexOf('='); h[decodeURIComponent(p.slice(0, i))] = decodeURIComponent(p.slice(i + 1).replace(/\+/g, ' ')); });
     var st = null; try { st = sessionStorage.getItem('fc_state'); } catch (e) {}
+    var ost = null; try { ost = JSON.parse(localStorage.getItem('fc_ost') || 'null'); localStorage.removeItem('fc_ost'); } catch (e) {}
+    if (ost && !(ost.s && Date.now() - ost.t < 10 * 60000)) ost = null;
     history.replaceState(null, '', location.pathname + location.search);
     if (h.state && st && h.state === st) back = h;
+    else if (h.state && ost && h.state === ost.s) { back = h; backMode = ost.m || ''; }   // 창의 기억이 비었어도 기기 저장소의 것과 맞으면 받음
+    else stateLost = true;
   }
 
   var a = get();
   var mode = ''; try { mode = sessionStorage.getItem('fc_mode') || ''; } catch (e) {}
+  if (backMode !== null) mode = backMode;
+  // 캘린더 연동을 못 켜게 만드는 권한(캘린더·예약 실행)이 빠져 있었는지
+  var wasLack = !!a.lack || (!!a.scope && [' ' + a.scope + ' '].some(function (s) { return s.indexOf('auth/calendar ') < 0 || s.indexOf('auth/script.scriptapp ') < 0; }));
   if (back && back.access_token) {
     a.token = back.access_token;
     a.exp = Date.now() + (Number(back.expires_in) || 3600) * 1000;
@@ -637,6 +646,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
     // 로그인 화면·계정 고르기·권한 화면을 거쳐 받은 표는 누구 것인지 아직 몰라요(앞 계정과 다른 계정을 골랐을 수 있음).
     // 구글에 물어 확인될 때까지(chk) 이 기기에 남은 앞 계정의 화면·쓰던 내용·서버 기억을 쓰지 않아요.
     if (mode !== 'none') { a.chk = 1; delete a.lack; }
+    // 권한을 덜 허용했던 계정이 다 허용하고 돌아옴: 그 사이 서버가 못 켠 캘린더 연동을 앱이 한 번 켜 줌 (takeCalFix)
+    if (wasLack && !lacking(a)) a.calfix = 1;
     put(a);
   }
   // 조용히 새 표 받기(prompt=none)가 실패한 경우만. 계정 고르기·권한 화면에서 취소하고 온 건 실패가 아님(지금 계정 그대로 씀)
@@ -718,7 +729,9 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
    * 주인 서버에 먼저 가 보고 '문서 권한 없음'이면 모두용 서버로 (계정별로 기억). */
   var ids = [C.scriptId].concat(C.altIds || []), idIx = 0;
   try { var sv = Number(localStorage.getItem('fc_idix')); if (sv > 0 && sv < ids.length) idIx = sv; } catch (e) {}
-  function target() { return (get().srv === 'other' && C.otherId) ? C.otherId : ids[idIx]; }
+  // 2026-11-24: 처음 온 계정도 바로 모두용 서버로 감. 예전엔 주인 서버에 먼저 가 보고 넘어왔는데,
+  // 주인 서버(옛 코드)가 다른 계정에 엉뚱한 답을 줘서 '아직 준비 중'에 막혔음. 주인도 이미 모두용 서버로 옮겨 씀.
+  function target() { return C.otherId ? C.otherId : ids[idIx]; }
   function run(fn, args, tries, force) {
     tries = tries || 0;
     return ensure().then(function (tok) {
@@ -778,12 +791,44 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
       er.innerHTML = '자료를 모두 지웠어요.<br>구글 계정에 남은 이 앱의 권한은 <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener">구글 계정 설정</a>에서 끊을 수 있어요.';
       return;
     }
+    if (inApp()) { showInApp(); return; }
+    document.getElementById('fcErr').className = 'err';
     document.getElementById('fcErr').textContent = (back && back.error && back.error !== 'interaction_required' && back.error !== 'login_required' && back.error !== 'consent_required')
-      ? '로그인이 안 됐어요 (' + back.error + '). 다시 눌러주세요.' : '';
+      ? (back.error === 'access_denied' ? '구글 화면에서 취소했어요. 다시 눌러주세요.' : '로그인이 안 됐어요 (' + back.error + '). 다시 눌러주세요.')
+      : (stateLost ? '로그인 확인이 끊겼어요. 다시 눌러주세요.' : '');
+  }
+  /* 카카오톡·네이버·인스타그램 같은 앱 안 브라우저에서는 구글이 로그인을 막아요(403 disallowed_useragent).
+   * 구글로 보내지 않고, 폰 브라우저로 여는 방법을 알려줌. */
+  function inApp() {
+    var ua = navigator.userAgent || '';
+    if (/KAKAOTALK|NAVER\(inapp|Instagram|FBAN|FBAV|FB_IAB|Line[/]|DaumApps|everytimeApp|BAND[/]|Twitter|Snapchat|; wv\)/i.test(ua)) return true;
+    // 아이폰의 이름 모를 앱 안 브라우저: 사파리·크롬 등은 UA에 Safari/ 가 있고, 홈 화면 앱은 standalone
+    var ios = /iPhone|iPad|iPod/i.test(ua), standalone = false;
+    try { standalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches; } catch (e) {}
+    return ios && !standalone && !/Safari[/]/i.test(ua);
+  }
+  function showInApp() {
+    var le = document.getElementById('fcErr'), ua = navigator.userAgent || '';
+    var and = /Android/i.test(ua);
+    le.className = 'err lack';
+    le.innerHTML = '<b>이 화면(앱 안 브라우저)에서는 구글 로그인이 막혀요.</b><br>' +
+      (and ? '아래 <b>크롬으로 열기</b>를 누르거나, 주소를 복사해서 크롬·삼성 인터넷에 붙여넣어 주세요.'
+           : '주소를 복사해서 <b>Safari</b>에 붙여넣어 주세요.') +
+      '<div class="lackbtns">' + (and ? '<a id="fcChrome" href="intent://' + location.host + location.pathname + '#Intent;scheme=https;package=com.android.chrome;end">크롬으로 열기</a>' : '') +
+      '<button type="button" id="fcCopy">주소 복사</button></div>';
+    var cp = document.getElementById('fcCopy');
+    cp.onclick = function () {
+      var u = APP_URL, okf = function () { cp.textContent = '복사했어요'; };
+      var old = function () { try { var t = document.createElement('textarea'); t.value = u; t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;opacity:0'; document.body.appendChild(t); t.select(); t.setSelectionRange(0, u.length); document.execCommand('copy'); document.body.removeChild(t); okf(); } catch (e) { cp.textContent = u; } };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(u).then(okf, old); else old();
+    };
   }
   document.addEventListener('DOMContentLoaded', function () {
     var b = document.getElementById('fcGo');
-    if (b) b.onclick = function () { var x = get(); if (lacking(x)) go('consent', x.chk ? '' : (x.email || '')); else go('select_account'); };
+    if (b) b.onclick = function () {
+      if (inApp()) { showInApp(); try { document.getElementById('fcErr').scrollIntoView({ block: 'center' }); } catch (e) {} return; }
+      var x = get(); if (lacking(x)) go('consent', x.chk ? '' : (x.email || '')); else go('select_account');
+    };
     if (valid(get()) && (!get().email || get().chk)) loadEmail();
   });
   if (back && back.access_token) loadEmail();
@@ -845,6 +890,8 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
     onOther: function () { return !!C.otherId && target() === C.otherId; },
     runOn: function (which, fn, args) { return run(fn, args || [], 0, which === 'other' ? C.otherId : ids[idIx]); },
     useOther: function () { var x = get(); x.srv = 'other'; put(x); },
+    /** 권한을 다시 허용하고 온 직후 한 번만 true (캘린더 연동 켜기용) */
+    takeCalFix: function () { var x = get(); if (!x.calfix) return false; delete x.calfix; put(x); return true; },
     serverVer: C.serverVer || 0,
     canUpdate: !!(C.otherScript && C.otherId),
     /** 서버 업데이트. 처음 한 번은 구글 권한 허용 화면으로 갔다가 돌아와서 이어서 함. */
@@ -898,6 +945,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 .fcl .err { color: var(--red-text); font-size: 13px; font-weight: 600; text-align: center; margin-top: 10px; }
 .fcl .err:empty { display: none; }
 .fcl .err.lack { color: var(--ink); font-weight: 500; line-height: 1.55; word-break: keep-all; text-align: left; background: var(--card, transparent); border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; } .fcl .err.lack b { font-weight: 700; }
+.fcl .lackbtns { display: flex; gap: 8px; margin-top: 10px; } .fcl .lackbtns a, .fcl .lackbtns button { flex: 1; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: var(--fill); color: var(--ink); font-size: 14px; font-weight: 700; text-decoration: none; }
+.fcl .lackbtns a { background: var(--accent); color: var(--accent-ink); }
 .fcl .err.bye { color: var(--sub); font-weight: 500; line-height: 1.55; word-break: keep-all; } .fcl .err.bye a { color: var(--ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .fcl .fine { margin-top: 12px; margin-bottom: 0; font-size: 12px; color: var(--sub); text-align: center; line-height: 1.5; }
 .fcl .legal { display: flex; justify-content: center; gap: 4px; }
@@ -927,7 +976,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   </div>
   <button class="gbtn" id="fcGo" type="button"><svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>구글 계정으로 시작하기</button>
   <div class="err" id="fcErr"></div>
-  <p class="fine">목록은 고른 구글 계정에만 저장돼요. 처음에 '확인되지 않은 앱' 화면이 나오면 고급 → 이동을 눌러주세요.</p>
+  <p class="fine">목록은 고른 구글 계정에만 저장돼요. 처음에 '확인되지 않은 앱' 화면이 나오면 고급 → 이동을 누르고, 권한 화면에서는 <b>모두 선택</b>을 체크해주세요.</p>
   <div class="legal"><a href="privacy.html">개인정보 처리방침</a><a href="terms.html">이용약관</a><a href="mailto:liquidatedasalways@gmail.com">문의</a></div>
 </div>
 
@@ -1282,6 +1331,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (dirty) { dirty = false; scheduleSync(); }
     }
     if (op.type === 'load' && S && !resumed) { resumed = true; resumePending(); }
+    if (op.type === 'load' && S) calFix();
     pump();
   }
   /* 로그인 표(1시간짜리)가 만료되면 구글에 잠깐 다녀오느라 화면이 새로 열림.
@@ -1323,6 +1373,18 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     else if (op.type === 'sort') changeSort(op.mode);
     else if (op.type === 'opts') { for (var k in op.patch) setOpt(k, op.patch[k]); }
     else { op.fails = 0; op.tries = 0; if (op.ghost) addGhost(op.ghost); enqueue(op); }
+  }
+  /** 구글 권한을 덜 허용해서 첫 실행 때 캘린더 연동을 못 켠 계정: 다 허용하고 돌아온 직후 한 번 켜 줌.
+   *  (서버는 '처음 시작함' 표시를 먼저 남겨서, 그대로 두면 연동이 꺼진 채로 남음) */
+  function calFix() {
+    var W = window.FC_AUTH;
+    if (!W || !W.takeCalFix || !W.takeCalFix()) return;
+    if (!S.virtual || S.calOn) return;
+    cal.syncing = true; chip();
+    call('api_calendar', 'on').then(function (r) {
+      cal.syncing = false; S.calOn = !!(r && r.calOn); if (r && r.msg) cal.last = r.msg; chip();
+      if (S.calOn) { toast('구글 캘린더 연동을 켰어요.'); scheduleSync(); }
+    }, function () { cal.syncing = false; chip(); toast('캘린더 연동은 못 켰어요. 오른쪽 위 ⋯에서 다시 켜주세요.', { error: true }); });
   }
   function fatalHtml(msg) {
     var W = window.FC_AUTH;

@@ -98,7 +98,7 @@ async function open(opt) {
   const ctx = await browser.newContext(Object.assign({}, dev, {
     locale: 'ko-KR', timezoneId: 'Asia/Seoul', serviceWorkers: 'block', colorScheme: opt.dark ? 'dark' : 'light',
     deviceScaleFactor: opt.dsf || 2
-  }, opt.viewport ? { viewport: opt.viewport } : {}));
+  }, opt.viewport ? { viewport: opt.viewport } : {}, opt.userAgent ? { userAgent: opt.userAgent } : {}));
   const calls = [];
   const lat = opt.latency == null ? 150 : opt.latency;
   await ctx.route('https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/variable/**', (route) => {
