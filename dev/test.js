@@ -1818,6 +1818,57 @@ t('update-banner', async () => {
   }
 });
 
+/* ---------- 첫 화면 '다가오는 결제': 오늘 낼 것만 채운 알약, 내일부터는 회색 글자 ---------- */
+t('home-today-pill', async () => {
+  const seed = { accounts: [], items: [
+    { n: '월세', cat: '주거', amt: 650000, day: 25, start: '2026-06-25' },
+    { n: '통신비', cat: '통신', amt: 69000, day: 26, start: '2026-06-26' },
+    { n: '실손보험', cat: '보험', amt: 48200, day: 27, start: '2026-06-27' },
+    { n: '청년 적금', cat: '저축', amt: 500000, day: 28, start: '2026-06-28' },
+    { n: '관리비', cat: '공과금', amt: 120000, day: 30, start: '2026-06-30' }
+  ] };
+  const stOf = (p, where) => p.evaluate((w) => {
+    const out = {}, acc = getComputedStyle(document.documentElement);
+    document.querySelectorAll(w + ' .row[data-name]').forEach((r) => {
+      const e = r.querySelector('.st'), cs = e ? getComputedStyle(e) : null;
+      out[r.getAttribute('data-name')] = e ? { t: e.textContent, cls: e.className, bg: cs.backgroundColor, col: cs.color, h: Math.round(r.getBoundingClientRect().height) } : null;
+    });
+    const probe = document.createElement('i'); probe.style.cssText = 'background:var(--accent);color:var(--muted)'; document.body.appendChild(probe);
+    out._accent = getComputedStyle(probe).backgroundColor; out._muted = getComputedStyle(probe).color; probe.remove();
+    return out;
+  }, where);
+  for (const o of [{ dark: false, tone: '' }, { dark: true, tone: 'violet' }]) {
+    const h = await H.open({ seed, seedAt: '2026-11-22', now: '2026-11-25T21:00', viewport: VP, latency: 0, dark: o.dark }); const p = h.page;
+    if (o.tone) { await p.evaluate((t) => localStorage.setItem('fc_tone', t), o.tone); await p.reload(); await h.idle(); }
+    const tag = (o.dark ? '다크' : '밝은') + (o.tone ? '·' + o.tone : '') + ': ';
+    const s = await stOf(p, '#home');
+    ok(s['월세'] && s['월세'].t === '오늘' && /today/.test(s['월세'].cls) && s['월세'].bg === s._accent, tag + '오늘 낼 것은 강조색으로 채운 "오늘" 알약: ' + JSON.stringify(s['월세']));
+    ok(['통신비', '실손보험', '청년 적금'].every((n) => s[n] && !/today|soon/.test(s[n].cls) && s[n].col === s._muted && s[n].bg === 'rgba(0, 0, 0, 0)'),
+      tag + '내일·모레·3일 뒤는 회색 글자: ' + ['통신비', '실손보험', '청년 적금'].map((n) => s[n] && s[n].t).join(' / '));
+    ok(s['통신비'].t === '내일 · 26일' && s['실손보험'].t === '모레 · 27일' && s['청년 적금'].t === '3일 뒤 · 28일' && s['관리비'].t === '30일 (월)', tag + '글자는 그대로(내일 · 26일 …, 30일 (월))');
+    ok(s['월세'].h === s['통신비'].h && s['월세'].h === s['관리비'].h, tag + '알약이 있어도 줄 높이가 같음: ' + s['월세'].h + 'px');
+    if (!o.dark) {
+      await p.click('#cal .cd.today'); await sleep(p, 300);
+      const d = await stOf(p, '#home');
+      ok(d['월세'] && d['월세'].t === '오늘' && /today/.test(d['월세'].cls), '달력에서 오늘을 눌러도 "오늘" 알약');
+      await p.click('#selClear'); await sleep(p, 200);
+      await p.click('#home .row[data-name="월세"] .rb'); await sleep(p, 500);
+      const pill = await p.evaluate(() => { const e = document.querySelector('#sheet .pill'); return e ? { t: e.textContent, cls: e.className } : null; });
+      ok(pill && pill.t === '오늘' && /today/.test(pill.cls), '항목 창의 상태 알약도 오늘만 채운 색: ' + JSON.stringify(pill));
+      await p.click('#sheetClose'); await sleep(p, 400);
+      await p.click('#home .row[data-name="통신비"] .rb'); await sleep(p, 500);
+      const pill2 = await p.evaluate(() => { const e = document.querySelector('#sheet .pill'); return e ? { t: e.textContent, cls: e.className } : null; });
+      ok(pill2 && pill2.t === '내일' && !/today|soon/.test(pill2.cls), '내일 것은 회색 알약: ' + JSON.stringify(pill2));
+      await p.click('#sheetClose'); await sleep(p, 400);
+      await p.click('#home .row[data-name="월세"] .chk'); await sleep(p, 600);
+      const c = await stOf(p, '#home');
+      ok(!c['월세'] || !/today/.test(c['월세'].cls), '체크하면 알약이 사라짐: ' + JSON.stringify(c['월세'] && c['월세'].t));
+    }
+    ok(!realErrors(h).length, tag + '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
+    await h.close();
+  }
+});
+
 (async () => {
   const only = process.argv.slice(2);
   const t0 = Date.now();
