@@ -583,7 +583,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 23, "slim": false, "verified": false};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 24, "slim": false, "verified": false};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -2333,7 +2333,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function needUpdate() { return isAdmin() && (Number(S.ver) || 0) < window.FC_AUTH.serverVer; }
   function checkServerUpdate() { refreshUpb(); }
   /* ---------- 업데이트 알림 띠 (화면 위에서 내려옴) ----------
-   *  - 앱 새 버전(모두): 앱을 켜 둔 채 오래 쓰면 옛 화면이 남음. 배포된 sw.js의 버전 번호가 지금 화면(build)보다 크면 '새로고침'을 권함.
+   *  - 앱 새 버전(모두): 앱을 켜 둔 채 오래 쓰면 옛 화면이 남음. 배포된 sw.js의 버전 번호가 지금 화면(build)보다 크면 '지금 업데이트'(화면을 새로 받아 옴)를 권함.
    *    안 눌러도 다음에 앱을 새로 열면 새 화면이 자동으로 옴.
    *  - 서버 새 버전(앱 주인에게만): 누르면 서버 업데이트. 주인이 아닌 계정에는 안 뜸 (isAdmin).
    *  닫기(✕)를 누르면 같은 버전은 하루 동안 다시 안 뜸. 기록은 이 기기에만 (fc_upb: { 'app23': 다시 뜰 시각 }) */
@@ -2357,7 +2357,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!key) { el.classList.remove('on'); return; }
     var app = key.indexOf('app') === 0;
     $('upbTxt').textContent = app ? '새 버전이 나왔어요' : '서버 새 버전이 있어요';
-    $('upbGoTxt').textContent = app ? '새로고침' : '업데이트';
+    $('upbGoTxt').textContent = '지금 업데이트';   // 앱 새 버전이면 화면을 새로 받아 오고, 서버 새 버전이면 서버를 올림
     el.classList.add('on');
   }
   /** 배포된 앱 버전을 확인 (열 때 한 번, 그 뒤로는 앱으로 돌아올 때 10분에 한 번까지) */

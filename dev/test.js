@@ -1734,7 +1734,7 @@ t('sale-ui-bits', async () => {
 });
 
 /* ---------- 업데이트 알림 띠 (2026-11-25): 화면 위에서 내려옴 ----------
- * 앱 새 버전(모두): 배포된 sw.js 번호가 지금 화면보다 크면 '새로고침'. 서버 새 버전: 앱 주인에게만 '업데이트'. */
+ * 앱 새 버전(모두): 배포된 sw.js 번호가 지금 화면보다 크면 띠. 서버 새 버전: 앱 주인에게만. 버튼은 둘 다 '지금 업데이트'. */
 const upbOf = (p) => p.evaluate(() => {
   const e = document.getElementById('upb'), r = e.getBoundingClientRect(), cs = getComputedStyle(e);
   const box = (id) => { const b = document.getElementById(id).getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height) }; };
@@ -1756,7 +1756,7 @@ t('update-banner', async () => {
   await h.ctx.route('**/sw.js*', (route) => { swHits++; route.fulfill({ status: 200, contentType: 'text/javascript', body: "var C = 'fc-shell-v99';" }); });
   await h.go(); await sleep(p, 1500);
   b = await upbOf(p);
-  ok(b.on && b.vis && b.txt === '새 버전이 나왔어요' && b.go === '새로고침', '배포된 버전이 더 높으면 위에서 띠가 내려옴: ' + b.txt + ' [' + b.go + ']');
+  ok(b.on && b.vis && b.txt === '새 버전이 나왔어요' && b.go === '지금 업데이트', '배포된 버전이 더 높으면 위에서 띠가 내려옴: ' + b.txt + ' [' + b.go + ']');
   ok(b.top >= 0 && b.top <= 16 && b.left >= 8 && b.right <= b.vw - 8 && b.bottom - b.top <= 64, '띠가 화면 맨 위에, 양옆 여백 안에 있음 ' + JSON.stringify({ t: b.top, b: b.bottom, l: b.left, r: b.right }));
   ok(b.goBox.h >= 44 && b.xBox.h >= 44 && b.xBox.w >= 44, '누르는 곳 44px 이상 ' + JSON.stringify([b.goBox, b.xBox]));
   await h.shot('update-banner-app');
@@ -1770,7 +1770,7 @@ t('update-banner', async () => {
   ok((await upbOf(p)).on, '하루가 지나면 다시 뜸');
   await p.evaluate(() => { window.__mark = 1; });
   await p.click('#upbGo'); await p.waitForFunction(() => !window.__mark, null, { timeout: 8000 }).catch(() => {}); await h.idle(1200); await sleep(p, 800);
-  ok(await p.evaluate(() => !window.__mark), '새로고침을 누르면 화면을 새로 받아 옴');
+  ok(await p.evaluate(() => !window.__mark), '지금 업데이트를 누르면 화면을 새로 받아 옴');
   b = await upbOf(p);
   ok(!b.on, '새로 받았는데도 옛 화면이면(중간 저장소가 아직 옛것) 띠가 바로 또 뜨며 맴돌지 않음');
   ok(await homeHas(p, '넷플릭스') && !realErrors(h).length, '새로 연 뒤 화면 정상, 오류 없음 ' + JSON.stringify(realErrors(h)));
@@ -1798,7 +1798,7 @@ t('update-banner', async () => {
       ok(!realErrors(h).length, '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
       await h.close(); continue;
     }
-    ok(b.on && b.vis && b.txt === '서버 새 버전이 있어요' && b.go === '업데이트', '앱 주인에게는 띠가 내려옴: ' + b.txt + ' [' + b.go + ']');
+    ok(b.on && b.vis && b.txt === '서버 새 버전이 있어요' && b.go === '지금 업데이트', '앱 주인에게는 띠가 내려옴: ' + b.txt + ' [' + b.go + ']');
     await h.shot('update-banner-server');
     await p.click('#upbX'); await sleep(p, 500);
     await p.reload(); await h.idle(1200); await sleep(p, 600);
