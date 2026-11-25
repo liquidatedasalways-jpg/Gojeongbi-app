@@ -180,6 +180,8 @@ body.on-cal .calnav { display: flex; }
 .st { font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 .over { color: var(--red-text); font-weight: 600; }
 .soon { color: var(--accent-text); font-weight: 600; }
+/* 오늘 낼 것만 채운 알약(달력의 오늘 동그라미와 같은 색). 내일부터는 회색 글자 그대로. 줄 높이가 안 바뀌게 글자 줄 높이와 같게 */
+.st.today { padding: 0 7px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); font-size: 11px; font-weight: 700; line-height: calc(12px * 1.4); }
 .lastp { color: var(--grape); }
 /* 이름 옆 아주 작은 표시. NEW: 첫 결제가 이번 달이거나 아직 안 온 항목, LAST: 이번이 마지막 결제 */
 .nl { display: flex; align-items: center; gap: 5px; min-width: 0; }
@@ -271,6 +273,7 @@ body.on-cal .calnav { display: flex; }
 .pill { flex: none; height: 24px; padding: 0 8px; border-radius: 12px; display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; white-space: nowrap; background: var(--fill); color: var(--sub); }
 .pill.red { background: var(--red-soft); color: var(--red-text); }
 .pill.soon { background: var(--sel); color: var(--accent-text); }
+.pill.today { background: var(--accent); color: var(--accent-ink); }
 .pill.ok { background: var(--ok-soft); color: var(--ok-text); }
 .kvs { margin-top: 14px; border-top: 1px solid var(--line); }
 .kv { display: flex; align-items: baseline; gap: 12px; padding: 10px 18px; font-size: 15px; position: relative; }
@@ -583,7 +586,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 24, "slim": false, "verified": false};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 25, "slim": false, "verified": false};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -1736,13 +1739,14 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (unpaid && d <= 3) return '<span class="soon">' + relDay(ds) + '</span>';
     return esc(fmtDate(ds));
   }
-  /** 첫 화면 줄의 오른쪽 아래 상태: '18일 지남'(빨강) / '모레 · 25일'(강조색) / '30일 (월)' */
+  /** 첫 화면 줄의 오른쪽 아래 상태: '18일 지남'(빨강) / '오늘'(채운 알약, 오늘만) / '모레 · 25일' / '30일 (월)' (둘 다 회색) */
   function stOf(ds, unpaid) {
     var p = parse(ds);
     if (!p) return { t: '', c: '' };
     var d = ddays(ds);
     if (unpaid && d < 0) return { t: (-d) + '일 지남', c: 'over' };
-    if (unpaid && d <= 3) return { t: relDay(ds) + ' · ' + p.d + '일', c: 'soon' };
+    if (unpaid && d === 0) return { t: '오늘', c: 'today' };
+    if (unpaid && d <= 3) return { t: relDay(ds) + ' · ' + p.d + '일', c: '' };
     return { t: (ds.slice(0, 7) === today().slice(0, 7) ? '' : p.m + '월 ') + p.d + '일 (' + wd(ds) + ')', c: '' };
   }
 
@@ -1891,7 +1895,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var s = { t: view.sel ? (dd >= 0 ? relDay(o.due) : '') : dayTxt, c: '' };
     if (o.st === 'missed') s = { t: (-dd) + '일 지남', c: 'over' };
     else if (o.st === 'paid') s = { t: view.sel ? '냈어요' : dayTxt, c: '' };
-    else if (dd >= 0 && dd <= 3) s = { t: relDay(o.due) + (view.sel ? '' : ' · ' + p.d + '일'), c: 'soon' };
+    else if (dd === 0) s = { t: '오늘', c: 'today' };
+    else if (dd > 0 && dd <= 3) s = { t: relDay(o.due) + (view.sel ? '' : ' · ' + p.d + '일'), c: '' };
     return { key: 'o:' + it.name + o.due, it: it, cls: o.st === 'paid' ? 'checked' : '', check: canToggle ? 'toggle' : 'open', st: s.t, stc: s.c,
       bdg: bdgHtml(it, o.due), line2: acctTxt(it) };
   }
@@ -2578,13 +2583,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var it = findItem(name);
     if (!it) return;
     openName = name;
-    // 맨 위: 금액 크게 + 상태 알약(지남 빨강 / 곧 강조색 / 냄 초록) + 언제
+    // 맨 위: 금액 크게 + 상태 알약(지남 빨강 / 오늘 채운 강조색 / 냄 초록) + 언제
     var pill = '', when = '';
     if (isMissing(it)) { pill = '<span class="pill soon">결제일 없음</span>'; when = '달력과 캘린더에 안 나와요'; }
     else if (it.checked) { pill = '<span class="pill ok">냈어요</span>'; when = it.next ? '다음 ' + esc(fmtDate(it.next)) : esc(it.nextText || ''); }
     else if (it.next) {
       var dd = ddays(it.next);
-      pill = '<span class="pill' + (dd < 0 ? ' red' : dd <= 3 ? ' soon' : '') + '">' + esc(relDay(it.next)) + '</span>';
+      pill = '<span class="pill' + (dd < 0 ? ' red' : dd === 0 ? ' today' : '') + '">' + esc(relDay(it.next)) + '</span>';
       when = esc(fmtDate(it.next)) + ' 결제';
     } else if (it.nextText) when = esc(it.nextText);
     var meta = joinDot([when, esc(cycleShort(it)), it.amtType === '변동' ? '변동 금액' : '', it.last ? '<span class="lastp">마지막 결제</span>' : '']);
