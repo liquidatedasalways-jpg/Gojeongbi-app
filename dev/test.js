@@ -1287,10 +1287,12 @@ t('layout-flat-list', async () => {
   await p.fill('#nName', '전세대출 이자'); await p.fill('#nAmt', '310000'); await p.fill('#nDay', '21'); await p.press('#nDay', 'Enter');
   await h.idle(900);
   ok(srvItem(h, '전세대출 이자').cat === '대출', '전체에서 적으면 이름으로 분류를 짐작해 저장 (전세대출 이자 → 대출)');
-  // 칸 눌러 고치기·펼치기는 그대로
+  // 칸 눌러 고치기는 '수정'을 켰을 때만, 펼치기는 그대로
+  await p.click('#editMode'); await sleep(p, 250);
   await p.click('#list .row.tr[data-name="티빙"] .tc.amc'); await sleep(p, 250);
   await p.fill('#list input.ci', '9,900'); await p.press('#list input.ci', 'Enter'); await h.idle(900);
-  ok(srvItem(h, '티빙').amount === 9900, '금액 칸을 눌러 그 자리에서 고치기 그대로 됨');
+  ok(srvItem(h, '티빙').amount === 9900, '수정을 켜면 금액 칸을 눌러 그 자리에서 고치기 됨');
+  await p.click('#editMode'); await sleep(p, 250);
   await p.click('#list .row.tr[data-name="티빙"] .tc.nmc'); await sleep(p, 300);
   ok(await p.evaluate(() => { const r2 = document.querySelector('#list .row.tr.open'); return !!r2 && /분류구독/.test(r2.querySelector('.tp').textContent.replace(/\s/g, '')); }), '이름을 누르면 펼쳐지고 분류가 보임');
   // 칸 제목이 화면 위에 붙어 있는지
@@ -1867,6 +1869,86 @@ t('home-today-pill', async () => {
     ok(!realErrors(h).length, tag + '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
     await h.close();
   }
+});
+
+/* ---------- 목록: 실수로 숫자가 안 바뀌게('수정'을 켜야 칸 고치기), 오른쪽으로 밀면 달력 탭 ---------- */
+t('list-edit-guard', async () => {
+  const h = await H.open({ seed: 'full', seedAt: '2026-10-02', now: '2026-11-25T21:00', viewport: VP, latency: 0 }); const p = h.page;
+  const cdp = await p.context().newCDPSession(p);
+  const swipe = async (sel, dx) => {
+    const b = await p.locator(sel).first().boundingBox();
+    const x = b.x + b.width / 2, y = b.y + b.height / 2, n = 8;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (let i = 1; i <= n; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * i / n, y }] }); await sleep(p, 16); }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await sleep(p, 500);
+  };
+  const tabNow = () => p.evaluate(() => document.querySelector('.tabbar [data-tab].on').getAttribute('data-tab'));
+  const st = () => p.evaluate(() => ({ input: !!document.querySelector('#list input.ci'), open: (document.querySelector('#list .row.tr.open') || {}).getAttribute ? document.querySelector('#list .row.tr.open').getAttribute('data-name') : '',
+    btn: document.getElementById('editMode').textContent, pressed: document.getElementById('editMode').getAttribute('aria-pressed'), editing: document.body.classList.contains('editing'),
+    hint: getComputedStyle(document.getElementById('edHint')).display, swiped: !!document.querySelector('#list .row.tr.swiped') }));
+  await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
+  const before = srvItem(h, '넷플릭스').amount;
+  let s = await st();
+  ok(s.btn === '수정' && s.pressed === 'false' && s.hint === 'none', '목록 위에 "수정" 단추, 처음엔 꺼져 있음');
+  for (const vp of [VP, SMALL]) {
+    await p.setViewportSize(vp); await sleep(p, 300);
+    const ov = await p.evaluate(() => {
+      const bx = (e) => e.getBoundingClientRect(), me = bx(document.getElementById('editMode'));
+      const hits = [...document.querySelectorAll('button, a, [data-act], .fc, input')].filter((e) => e.id !== 'editMode' && !e.closest('#editMode') && e.offsetParent && getComputedStyle(e).visibility !== 'hidden')
+        .filter((e) => { const o = bx(e); return Math.min(me.right, o.right) - Math.max(me.left, o.left) > 0 && Math.min(me.bottom, o.bottom) - Math.max(me.top, o.top) > 0; }).map((e) => e.id || e.className);
+      const t = document.getElementById('title');
+      return { hits, h: Math.round(me.height), titleCut: t.scrollWidth > t.clientWidth + 1 };
+    });
+    ok(!ov.hits.length && ov.h >= 44 && !ov.titleCut, '폭 ' + vp.width + ': 수정 단추가 다른 단추와 안 겹치고(누르는 곳 ' + ov.h + 'px), 제목도 안 잘림 ' + JSON.stringify(ov.hits));
+  }
+  await p.setViewportSize(VP); await sleep(p, 300);
+  await p.click('#list .row.tr[data-name="넷플릭스"] .tc.amc'); await sleep(p, 300);
+  s = await st();
+  ok(!s.input && s.open === '넷플릭스', '수정을 안 켜고 금액 칸을 누르면 입력칸 대신 줄이 펼쳐짐');
+  await p.click('#list .row.tr[data-name="넷플릭스"] .tc.dyc'); await sleep(p, 300);
+  s = await st();
+  ok(!s.input && s.open === '', '결제일 칸을 눌러도 입력칸 안 뜸(펼친 줄이 접힘)');
+  ok(srvItem(h, '넷플릭스').amount === before, '서버 금액 그대로');
+  // 펼친 줄의 수정 단추는 강조색으로 채움
+  await p.click('#list .row.tr[data-name="넷플릭스"] .tc.nmc'); await sleep(p, 300);
+  const eb = await p.evaluate(() => { const b = document.querySelector('#list .row.tr.open [data-act="edit"]'), probe = document.createElement('i'); probe.style.background = 'var(--accent)'; document.body.appendChild(probe); const a = getComputedStyle(probe).backgroundColor; probe.remove(); return b && getComputedStyle(b).backgroundColor === a; });
+  ok(eb, '펼친 줄의 "수정" 단추가 강조색으로 눈에 띔');
+  await p.click('#list .row.tr[data-name="넷플릭스"] .tc.nmc'); await sleep(p, 300);
+  // 수정 켜기 → 칸 고치기 → 완료
+  await p.click('#editMode'); await sleep(p, 300);
+  s = await st();
+  ok(s.btn === '완료' && s.pressed === 'true' && s.editing && s.hint === 'block', '수정을 누르면 "완료"로 바뀌고 안내 한 줄이 보임');
+  await p.click('#list .row.tr[data-name="넷플릭스"] .tc.amc'); await sleep(p, 300);
+  ok((await st()).input, '수정 중엔 금액 칸을 누르면 입력칸');
+  await p.fill('#list input.ci', '18,000'); await p.press('#list input.ci', 'Enter'); await h.idle(900);
+  ok(srvItem(h, '넷플릭스').amount === 18000, '고친 금액이 저장됨');
+  await p.click('#editMode'); await sleep(p, 300);
+  s = await st();
+  ok(s.btn === '수정' && !s.editing, '완료를 누르면 다시 잠김');
+  // 결제일 없는 줄의 '넣기'는 수정 안 켜도 날짜 넣는 창
+  await p.click('#list .row.tr[data-name="전기요금"] .tc.dyc'); await sleep(p, 500);
+  ok(await sheetOn(p) && !(await st()).input, '"넣기"를 누르면 날짜 넣는 창이 열림');
+  await p.click('#sheetClose'); await sleep(p, 500);
+  // 줄을 왼쪽으로 밀면 삭제 버튼(탭은 그대로)
+  await swipe('#list .row.tr[data-name="월세"] .tc.nmc', -150);
+  s = await st();
+  ok(s.swiped && (await tabNow()) === 'list', '줄을 왼쪽으로 밀면 삭제 버튼, 탭은 그대로');
+  // 삭제 버튼이 열린 채 오른쪽으로 밀면 닫히기만
+  await swipe('#list .row.tr[data-name="월세"] .tc.nmc', 150);
+  s = await st();
+  ok(!s.swiped && (await tabNow()) === 'list', '삭제 버튼이 열린 채 오른쪽으로 밀면 닫히기만 함');
+  // 줄 위에서 오른쪽으로 밀면 달력 탭
+  await swipe('#list .row.tr[data-name="관리비"] .tc.nmc', 150);
+  ok((await tabNow()) === 'cal', '줄 위에서 오른쪽으로 밀면 결제 달력 탭으로 넘어감');
+  ok(await p.evaluate(() => !document.getElementById('editMode').offsetParent), '달력 탭에선 수정 단추가 안 보임');
+  // 수정 켠 채 탭을 바꾸면 꺼짐
+  await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
+  await p.click('#editMode'); await sleep(p, 200);
+  await swipe('#list .row.tr[data-name="관리비"] .tc.nmc', 150);
+  ok((await tabNow()) === 'cal' && !(await st()).editing, '수정 켠 채 달력으로 가면 수정이 꺼짐');
+  ok(!realErrors(h).length, '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
+  await h.close();
 });
 
 (async () => {
