@@ -2036,6 +2036,137 @@ t('list-back', async () => {
   await h.close();
 });
 
+/* ---------- 되돌리기: 데이터를 바꾸는 동작마다 아래 알림에 5초쯤 '되돌리기' ---------- */
+t('undo-all', async () => {
+  const h = await H.open({ seed: 'full', seedAt: '2026-10-02', now: '2026-11-25T21:00', viewport: VP, latency: 0 }); const p = h.page;
+  const load = () => h.gas.call(h.email, 'api_load', [true]);
+  const has = (n) => load().items.some((i) => i.name === n);
+  const undo = async (re, what) => {
+    const ts = await toastState(p);
+    ok(ts.on && re.test(ts.txt) && ts.btn === '되돌리기', what + ' → 알림 "' + ts.txt.replace(/\n/g, ' / ') + '" + 되돌리기');
+    await p.click('#toastBtn'); await h.idle(900);
+  };
+  await h.idle(1500);
+  // 1) 납부 체크: 5초 동안 떠 있음
+  await p.click('#home .row[data-name="정수기 렌탈"] .chk'); await sleep(p, 4500);
+  ok((await toastState(p)).on && (await toastState(p)).btn === '되돌리기', '체크 알림이 4.5초 뒤에도 떠 있음');
+  await sleep(p, 1000);
+  ok(!(await toastState(p)).on, '5.5초 뒤엔 사라짐');
+  await h.idle(1500);
+  ok(srvItem(h, '정수기 렌탈').checked === true, '(체크는 저장됨)');
+  // 2) 목록 칸 바로 고치기 (금액, 결제일)
+  await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
+  const amt0 = srvItem(h, '넷플릭스').amount;
+  await p.click('#editMode'); await sleep(p, 300);
+  await p.click('#list .row.tr[data-name="넷플릭스"] .tc.amc'); await sleep(p, 300);
+  await p.fill('#list input.ci', '21,000'); await p.press('#list input.ci', 'Enter'); await h.idle(900);
+  ok(srvItem(h, '넷플릭스').amount === 21000, '(금액 21,000 저장됨)');
+  await h.shot('t-undo-toast');
+  await undo(/^넷플릭스 금액 저장했어요$/, '칸에서 금액 고침');
+  ok(srvItem(h, '넷플릭스').amount === amt0, '되돌리면 서버 금액이 원래대로 ' + amt0);
+  const shown = await p.evaluate(() => document.querySelector('#list .row.tr[data-name="넷플릭스"] .tc.amc').textContent);
+  ok(/17,000/.test(shown), '화면 금액도 원래대로: ' + shown);
+  let ts = await toastState(p);
+  ok(/되돌렸어요/.test(ts.txt) && ts.btn === '', '되돌린 뒤엔 "' + ts.txt + '" (되돌리기 단추 없음)');
+  await p.click('#list .row.tr[data-name="넷플릭스"] .tc.dyc'); await sleep(p, 300);
+  await p.fill('#list input.ci', '9'); await p.press('#list input.ci', 'Enter'); await h.idle(900);
+  ok(srvItem(h, '넷플릭스').day === 9, '(결제일 9일 저장됨)');
+  await undo(/^넷플릭스 결제일 저장했어요$/, '칸에서 결제일 고침');
+  ok(srvItem(h, '넷플릭스').day === 3, '되돌리면 결제일 3일로');
+  await p.click('#editMode'); await sleep(p, 300);
+  // 3) 맨 아래 빈 줄로 추가 → 되돌리면 없어짐
+  await p.fill('#nName', '수도요금'); await p.fill('#nAmt', '21000'); await p.fill('#nDay', '28');
+  await p.press('#nDay', 'Enter'); await h.idle(900);
+  ok(has('수도요금'), '(빈 줄로 수도요금 추가됨)');
+  await undo(/^수도요금 추가했어요/, '빈 줄로 추가');
+  ok(!has('수도요금') && !(await p.evaluate(() => !!document.querySelector('#list .row[data-name="수도요금"]'))), '되돌리면 서버·화면에서 빠짐');
+  ok(/수도요금 추가를 취소했어요/.test((await toastState(p)).txt), '"추가를 취소했어요" 알림');
+  // 4) 수정 창: 이름·금액 바꾸고 저장 → 되돌리면 둘 다 원래대로
+  await p.click('#list .row.tr[data-name="유튜브 프리미엄"] .tc.nmc'); await sleep(p, 300);
+  await p.click('#list .row.tr.open [data-act="edit"]'); await sleep(p, 500);
+  await p.fill('#f3', '유튜브 뮤직'); await p.fill('#f8', '11,990');
+  await p.click('#saveBtn'); await h.idle(900);
+  ok(has('유튜브 뮤직') && !has('유튜브 프리미엄') && srvItem(h, '유튜브 뮤직').amount === 11990, '(이름·금액 바꿔 저장됨)');
+  await undo(/^유튜브 프리미엄 저장했어요$/, '수정 창에서 저장');
+  const yt = srvItem(h, '유튜브 프리미엄');
+  ok(yt && !has('유튜브 뮤직') && yt.amount === 14900 && yt.day === 8 && yt.account === '신한 체크카드 1234', '되돌리면 이름·금액 원래대로, 다른 칸은 그대로: ' + JSON.stringify(yt && { a: yt.amount, d: yt.day, acc: yt.account }));
+  // 상위 항목 이름을 바꿨다 되돌리면 하위 항목도 같이 돌아옴
+  await p.click('#list .row.tr[data-name="통신비"] .tc.nmc'); await sleep(p, 300);
+  await p.click('#list .row.tr.open [data-act="edit"]'); await sleep(p, 500);
+  await p.fill('#f3', '통신'); await p.click('#saveBtn'); await h.idle(900);
+  ok(srvItem(h, '인터넷').parent === '통신', '(상위 이름 바꾸면 하위도 "통신")');
+  await undo(/^통신비 저장했어요$/, '상위 항목 이름 바꿈');
+  ok(srvItem(h, '통신비') && srvItem(h, '인터넷').parent === '통신비' && srvItem(h, '휴대폰 요금').parent === '통신비', '되돌리면 하위 항목도 다시 "통신비" 밑으로');
+  // 5) + 단추로 추가 → 되돌리기
+  await p.click('#addBtn'); await sleep(p, 450);
+  await p.click('.cgrid [data-cat="구독"]'); await sleep(p, 450);
+  await p.fill('#f3', '왓챠'); await p.fill('#f8', '7,900');
+  await p.click('#dayBtn'); await sleep(p, 400);
+  await p.click('.dayp .dg button[data-d="17"]'); await sleep(p, 400);
+  await p.click('#saveBtn'); await h.idle(900);
+  ok(has('왓챠'), '(+로 왓챠 추가됨)');
+  await undo(/^왓챠 추가했어요/, '+ 창에서 추가');
+  ok(!has('왓챠'), '되돌리면 왓챠가 빠짐');
+  // 6) 지우기 → 되돌리면 하위 항목도 다시 이어짐
+  const cdp = await p.context().newCDPSession(p);
+  await p.locator('#list .row.tr[data-name="통신비"]').scrollIntoViewIfNeeded(); await sleep(p, 400);
+  if (await p.evaluate(() => document.querySelector('#list .row.tr[data-name="통신비"]').classList.contains('open'))) { await p.click('#list .row.tr[data-name="통신비"] .tc.nmc'); await sleep(p, 400); }
+  const b0 = await p.locator('#list .row.tr[data-name="통신비"] .tc.nmc').boundingBox();
+  const x0 = b0.x + b0.width / 2, y0 = b0.y + b0.height / 2;
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x0, y: y0 }] });
+  for (let i = 1; i <= 8; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x0 - 150 * i / 8, y: y0 }] }); await sleep(p, 16); }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] }); await sleep(p, 500);
+  await p.click('#list .row.tr.swiped[data-name="통신비"] [data-act="del"]'); await h.idle(900);
+  ok(!has('통신비') && srvItem(h, '인터넷').parent === '', '(통신비 지움, 하위는 독립)');
+  await undo(/^통신비 지웠어요/, '지우기');
+  await h.idle(900);
+  ok(has('통신비') && srvItem(h, '인터넷').parent === '통신비' && srvItem(h, '휴대폰 요금').parent === '통신비', '되살리면 하위 항목도 다시 통신비 밑으로');
+  // 7) 결제일 넣기 창 (2건) → 되돌리면 둘 다 다시 비어 있음
+  await p.click('.tabbar [data-tab="cal"]'); await sleep(p, 500);
+  await p.click('#ndBtn'); await sleep(p, 500);
+  await p.fill('#sheetBody .qd:has-text("전기요금") [data-q]', '27'); await p.fill('#sheetBody .qd:has-text("도시가스") [data-q]', '14');
+  await p.click('#qdSave'); await h.idle(900);
+  ok(srvItem(h, '전기요금').day === 27 && srvItem(h, '도시가스').day === 14 && !!srvItem(h, '전기요금').start, '(결제일 2건 넣음, 시작일도 같이)');
+  await undo(/^2건 결제일 넣었어요$/, '결제일 넣기');
+  const e1 = srvItem(h, '전기요금'), e2 = srvItem(h, '도시가스');
+  ok(!e1.day && !e2.day && !e1.start && !e2.start, '되돌리면 결제일·시작일 다시 비어 있음');
+  ok(await p.evaluate(() => !!document.getElementById('ndBtn')), '첫 화면 "결제일 없는 항목" 줄도 다시 보임');
+  // 8) 결제 수단: 이름 바꾸기 → 되돌리기 (쓰던 항목도 같이)
+  await p.click('#menuBtn'); await sleep(p, 400);
+  await p.click('#mAcc'); await sleep(p, 400);
+  const idx = await p.evaluate(() => [...document.querySelectorAll('[data-acc]')].findIndex((b) => /토스뱅크/.test(b.textContent)));
+  await p.click('[data-acc="' + idx + '"]'); await sleep(p, 400);
+  await p.fill('#accNick', '월급 통장'); await p.click('#accSave'); await h.idle(900);
+  ok(srvItem(h, '월세').account === '월급 통장', '(결제 수단 이름 바꾸면 월세도 "월급 통장")');
+  await undo(/^결제 수단 저장했어요$/, '결제 수단 이름 바꿈');
+  ok(srvItem(h, '월세').account === '토스뱅크 4661' && load().accounts.some((a) => a.name === '토스뱅크 4661') && !load().accounts.some((a) => a.name === '월급 통장'), '되돌리면 결제 수단·월세 둘 다 "토스뱅크 4661"');
+  // 지우기 → 되돌리기 (비워졌던 항목 칸도 다시 채움)
+  const users = load().items.filter((i) => i.account === '현대 신용카드 5678').map((i) => i.name);
+  const idx2 = await p.evaluate(() => [...document.querySelectorAll('[data-acc]')].findIndex((b) => /현대/.test(b.textContent)));
+  await p.click('[data-acc="' + idx2 + '"]'); await sleep(p, 400);
+  await p.click('#accDel'); await sleep(p, 150); await p.click('#accDel'); await h.idle(900);
+  ok(users.length > 2 && users.every((n) => srvItem(h, n).account === ''), '(현대 카드 지우면 쓰던 ' + users.length + '개 항목 칸이 빔)');
+  await undo(/^결제 수단 지웠어요$/, '결제 수단 지우기');
+  await h.idle(900);
+  ok(load().accounts.some((a) => a.name === '현대 신용카드 5678' && /신용/.test(a.memo)) && users.every((n) => srvItem(h, n).account === '현대 신용카드 5678'), '되돌리면 결제 수단(메모까지)과 쓰던 항목 칸이 다시 채워짐');
+  ok(await p.evaluate(() => [...document.querySelectorAll('[data-acc]')].some((b) => /현대/.test(b.textContent))), '열려 있던 결제 수단 목록에도 다시 보임');
+  await p.click('#sheetClose'); await sleep(p, 400);
+  // 9) 알림이 탭 막대를 가리지 않고, 되돌리기 누르는 곳 44px 이상 (폭 360, 320)
+  for (const vp of [VP, SMALL]) {
+    await p.setViewportSize(vp); await sleep(p, 300);
+    await p.click('#home .row[data-name="실손보험"] .chk'); await sleep(p, 400);
+    const g = await p.evaluate(() => {
+      const t = document.getElementById('toast').getBoundingClientRect(), b = document.querySelector('.tabbar').getBoundingClientRect(), btn = document.getElementById('toastBtn').getBoundingClientRect();
+      return { gap: Math.round(b.top - t.bottom), in: t.left >= 0 && t.right <= innerWidth, bw: Math.round(btn.width), bh: Math.round(btn.height) };
+    });
+    ok(g.gap >= 0 && g.in && g.bw >= 44 && g.bh >= 44, '폭 ' + vp.width + ': 알림이 탭 막대 위, 화면 안, 되돌리기 누르는 곳 ' + g.bw + '×' + g.bh);
+    if (vp === SMALL) await h.shot('t-undo-320');
+    await p.click('#toastBtn'); await h.idle(900);
+  }
+  ok(!realErrors(h).length, '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+});
+
 (async () => {
   const only = process.argv.slice(2);
   const t0 = Date.now();

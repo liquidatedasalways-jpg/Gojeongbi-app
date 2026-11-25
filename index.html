@@ -433,6 +433,8 @@ body.editing #list .row.tr:not(.muted) .tc.amc::after, body.editing #list .row.t
 .toast span { flex: 1; min-width: 0; padding: 10px 0; }
 .toast button { flex: none; min-width: 44px; min-height: 44px; padding: 0 10px; font-weight: 700; color: var(--toast-act); text-align: center; white-space: nowrap; }
 .toast.error button { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+/* 다크: 바탕(카드 #1c1c21)과 거의 같은 색이라 알림이 묻혀서 한 단계 밝게 + 얇은 테두리 */
+@media (prefers-color-scheme: dark) { .toast { background: rgba(58,61,69,.98); box-shadow: 0 8px 24px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.07); } }
 /* 업데이트 알림 띠: 화면 위에서 살짝 내려옴. 앱 새 버전(모두) / 서버 새 버전(앱 주인에게만). 닫으면 같은 버전은 하루 동안 안 뜸 */
 .upb { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top)); z-index: 30; width: calc(100% - 24px); max-width: 560px; min-height: 52px; display: flex; align-items: center; padding: 4px 0 4px 18px; border-radius: 16px; background: var(--accent); color: var(--accent-ink); box-shadow: 0 8px 24px rgba(0,0,0,.2); font-size: 15px; font-weight: 700; line-height: 1.3; transform: translate(-50%, calc(-100% - 16px - env(safe-area-inset-top))); visibility: hidden; transition: transform .36s cubic-bezier(.2,.8,.2,1), visibility 0s .36s; }
 .upb.on { transform: translate(-50%, 0); visibility: visible; transition: transform .36s cubic-bezier(.2,.8,.2,1); }
@@ -596,7 +598,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 27, "slim": false, "verified": false};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 28, "slim": false, "verified": false};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -1245,6 +1247,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!opt.sticky) toastTimer = setTimeout(hideToast, opt.ms || Math.min(9000, 2600 + msg.length * 45));
   }
   function hideToast() { clearTimeout(toastTimer); $('toast').className = $('toast').className.replace(' on', '').replace(' sticky', ''); }
+  /** 데이터를 바꾼 뒤 아래에 잠깐 뜨는 '되돌리기' 알림 (기본 5초). 누르면 fn으로 바꾸기 전으로 돌림 */
+  var UNDO_MS = 5000;
+  function undoToast(msg, fn, ms) { toast(msg, { action: '되돌리기', ms: ms || UNDO_MS, onAction: fn }); }
 
   /* ================= 폰 뒤로 가기 =================
    * 창(아래에서 올라오는 창, 날짜 고르기)을 열거나 목록 탭으로 갈 때마다 방문 기록을 한 칸 쌓고,
@@ -2103,15 +2108,19 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       cell.innerHTML = '';
       if (save && kind === 'day' && v && (+v < 1 || +v > 31)) { toast('결제일은 1~31 사이 숫자로 적어주세요', { error: true }); save = false; }
       if (save && v !== (kind === 'amt' ? (it.amount != null ? String(it.amount) : '') : (it.day ? String(it.day) : ''))) {
-        var hadDay = !!it.day;
-        it.v[f.col] = v;
-        if (kind === 'amt') it.amount = v ? Number(v) : null; else it.day = Number(v) || 0;
         var vals = {}; vals[f.col] = v;
-        if (kind === 'day' && v && !hadDay && !it.start && (it.every || 1) === 1) {   // 결제일을 처음 넣음 → 시작일도 같이
+        if (kind === 'day' && v && !it.day && !it.start && (it.every || 1) === 1) {   // 결제일을 처음 넣음 → 시작일도 같이
           var sf0 = startFieldOf(), fd0 = firstDue(+v);
-          if (sf0 && fd0) { vals[sf0.col] = fd0.ds; it.start = fd0.ds; }
+          if (sf0 && fd0) vals[sf0.col] = fd0.ds;
         }
-        enqueue({ type: 'save', oldName: name, vals: vals, onDone: function (res) { if (res.ok) toast(name + ' ' + (kind === 'amt' ? '금액' : '결제일') + ' 저장했어요', { ms: 1800 }); } });
+        var old = prevVals(it, vals);   // 되돌리기용: 바꾸기 전 값
+        setLocal(it, vals);
+        var what = kind === 'amt' ? '금액' : '결제일';
+        enqueue({ type: 'save', oldName: name, vals: vals, onDone: function (res) {
+          if (!res.ok) return;
+          if (old) undoToast(name + ' ' + what + ' 저장했어요', function () { undoSaves([{ name: res.name, old: old }], name + ' ' + what + ' 되돌렸어요'); });
+          else toast(name + ' ' + what + ' 저장했어요', { ms: 1800 });
+        } });
       }
       renderList();
     }
@@ -2155,7 +2164,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       addGhost(ghost);
       enqueue({ type: 'save', oldName: '', vals: vals, ghost: ghost, onDone: function (res) {
         if (!res.ok) return;
-        toast(res.name + ' 추가했어요' + (d ? later : ' · 결제일은 나중에 넣어도 돼요'), { action: '자세히', onAction: function () { openEdit(res.name); } });
+        undoToast(res.name + ' 추가했어요' + (d ? later : ' · 결제일은 나중에 넣어도 돼요'), function () { undoAdd(res.name); });
         setTimeout(function () { flash(res.name); }, 400);
       } });
     }
@@ -2222,16 +2231,23 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
           vals[df.col] = v;
           if (!it.day && !it.start && sf && (it.every || 1) === 1) { var fd = firstDue(+v); if (fd) vals[sf.col] = fd.ds; }
         }
-        ops.push({ name: it.name, vals: vals });
+        ops.push({ name: it.name, vals: vals, old: prevVals(it, vals) });
       });
       if (bad) { toast(bad + ': 결제일은 1~31 사이 숫자로 적어주세요', { error: true }); return; }
       if (!ops.length) { closeSheet(); return; }
       closeSheet();
-      var left = ops.length;
+      var left = ops.length, back = [];
+      var say = ops.length > 1 ? ops.length + '건' : ops[0].name;
       ops.forEach(function (o) {
         var it = findItem(o.name);
-        if (it) { it.day = Number(o.vals[df.col]) || it.day; if (sf && o.vals[sf.col]) it.start = o.vals[sf.col]; }
-        enqueue({ type: 'save', oldName: o.name, vals: o.vals, onDone: function (res) { if (res.ok && --left === 0) toast(ops.length + '건 결제일 넣었어요'); } });
+        if (it) setLocal(it, o.vals);
+        enqueue({ type: 'save', oldName: o.name, vals: o.vals, onDone: function (res) {
+          if (!res.ok) return;
+          if (o.old) back.push({ name: res.name, old: o.old });
+          if (--left > 0) return;
+          if (back.length) undoToast(say + ' 결제일 넣었어요', function () { undoSaves(back, say + ' 결제일 되돌렸어요'); });
+          else toast(say + ' 결제일 넣었어요');
+        } });
       });
       renderAll();
     };
@@ -2501,7 +2517,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     m[name] = it.checked;
     enqueue({ type: 'checks', map: m });
     if (!quiet) {
-      toast(it.checked ? name + ' 냈다고 체크했어요' : name + ' 체크를 풀었어요', { action: '되돌리기', ms: 3800, onAction: function () { toggle(name, true); } });
+      undoToast(it.checked ? name + ' 냈다고 체크했어요' : name + ' 체크를 풀었어요', function () { toggle(name, true); });
     }
   }
   /** 방금 체크한 줄의 동그라미가 톡 튀게 */
@@ -2520,9 +2536,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!names.length) return;
     names.forEach(function (n) { toggle(n, true); });
     names.forEach(popCheck);
-    toast(names.length + '건 냈다고 체크했어요', { action: '되돌리기', ms: 6000, onAction: function () {
+    undoToast(names.length + '건 냈다고 체크했어요', function () {
       names.forEach(function (n) { var it = findItem(n); if (it && it.checked) toggle(n, true); });
-    } });
+    }, 6000);
   }
   function settle() {
     moveTimer = null;
@@ -2541,9 +2557,12 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
 
   /* ================= 삭제 ================= */
-  function removeItem(name) {
+  /** opt.say: 알림에 띄울 말 (방금 추가한 걸 되돌릴 때. 이땐 '되돌리기'를 또 붙이지 않음) */
+  function removeItem(name, opt) {
+    opt = opt || {};
     var it = findItem(name);
     if (!it) return;
+    var kids = items().filter(function (x) { return x.parent === name; }).map(function (x) { return x.name; });   // 되살릴 때 '상위 항목'도 다시 이어 줌
     buzz();
     var el = els['i:' + name];
     if (el) el.classList.add('gone');
@@ -2556,13 +2575,68 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       type: 'delete', name: name, ownNotes: true,
       onDone: function (res) {
         if (!res.ok) { toast(res.error || '못 지웠어요', { error: true }); return; }
+        if (opt.say) { toast(opt.say); return; }
         var extra = (res.notes || []).join('\n').split('\n').filter(function (l) { return l.indexOf('하위 항목') === 0; }).join('\n');
-        toast(name + ' 지웠어요' + (extra ? '\n' + extra : ''), { action: '되돌리기', ms: 8000, onAction: restore });
+        undoToast(name + ' 지웠어요' + (extra ? '\n' + extra : ''), function () { restore(name, kids); }, 8000);
       }
     });
   }
-  function restore() {
-    enqueue({ type: 'restore', onDone: function (r) { if (r.name) { toast(r.name + ' 되살렸어요'); setTimeout(function () { flash(r.name); }, 700); } } });
+  /** 방금 지운 항목 되살리기. name·kids를 주면(지운 직후 '되돌리기') 그 항목의 하위 항목도 다시 이어 줌 */
+  function restore(name, kids) {
+    enqueue({ type: 'restore', onDone: function (r) {
+      if (!r.name) return;
+      toast(r.name + ' 되살렸어요');
+      setTimeout(function () { flash(r.name); }, 700);
+      var pf = S.meta.fields.filter(function (f) { return f.kind === 'parent'; })[0];
+      if (!pf || r.name !== name || !kids || !kids.length) return;
+      var back = [];
+      kids.forEach(function (k) { if (findItem(k)) { var o = {}; o[pf.col] = name; back.push({ name: k, old: o }); } });
+      if (back.length) undoSaves(back, '', true);
+    } });
+  }
+
+  /* ================= 되돌리기 (수정·추가) =================
+   * 저장하기 전 값(it.v, 서버가 준 칸별 값)을 기억해 뒀다가, 알림의 '되돌리기'를 누르면 그 값으로 다시 저장함. */
+  /** vals 중 실제로 바뀌는 칸의 원래 값. 바뀌는 게 없으면 null */
+  function prevVals(it, vals) {
+    var o = null;
+    for (var col in vals) {
+      var a = it.v && it.v[col] != null ? it.v[col] : '', b = vals[col] != null ? vals[col] : '';
+      if (String(a) !== String(b)) { o = o || {}; o[col] = a; }
+    }
+    return o;
+  }
+  /** 서버 답을 기다리지 않고 화면부터 바꿀 칸 (금액·결제일·시작일·결제 수단·상위 항목). 나머지는 서버 답이 오면 바뀜 */
+  function setLocal(it, vals) {
+    var af = amtFieldOf(), df = dayFieldOf(), sf = startFieldOf();
+    for (var col in vals) {
+      var v = vals[col] == null ? '' : vals[col], c = Number(col);
+      if (it.v) it.v[col] = v;
+      if (af && c === af.col) it.amount = v === '' ? null : Number(v);
+      else if (df && c === df.col) it.day = Number(v) || 0;
+      else if (sf && c === sf.col) it.start = String(v);
+      else if (S.accCol && c === S.accCol) it.account = String(v);
+      else if (S.meta.fields.some(function (f) { return f.col === c && f.kind === 'parent'; })) it.parent = String(v);
+    }
+  }
+  /** list: [{ name: 지금 이름, old: 되돌릴 값 }]. 다 되면 say를 알림으로 (quiet면 안 띄움) */
+  function undoSaves(list, say, quiet) {
+    var left = list.length;
+    list.forEach(function (o) {
+      var it = findItem(o.name);
+      if (it) setLocal(it, o.old);
+      enqueue({ type: 'save', oldName: o.name, vals: o.old, onDone: function (res) {
+        if (!res.ok || --left > 0 || quiet) return;
+        toast(say || '되돌렸어요');
+        list.forEach(function (x) { var nm = x.old[S.meta.nameCol] || x.name; setTimeout(function () { flash(nm); }, 400); });
+      } });
+    });
+    renderAll();
+  }
+  /** 방금 추가한 항목 되돌리기 = 지우기 (구글 쪽 '삭제 기록'엔 남음) */
+  function undoAdd(name) {
+    if (!findItem(name)) return;
+    removeItem(name, { say: name + ' 추가를 취소했어요' });
   }
   function changeSort(mode) {
     if (!S || mode === S.sort) return;
@@ -3390,6 +3464,18 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       }
     });
   }
+  /** 되돌리기용: 바꾸기 전 결제 수단 목록 */
+  function accSnap() { return (S.accounts || []).map(function (a) { return { name: a.name, memo: a.memo }; }); }
+  /** 결제 수단 목록을 snap으로 되돌림. from(j, x): 서버에 지금 있는 이름 (방금 지운 건 ''). refill: 지울 때 비워진 항목들 칸 다시 채우기 */
+  function accUndo(snap, from, refill) {
+    if (sheetMode === 'accEdit') sheetUp();   // 다른 결제 수단을 고치던 중이면 목록으로 (순서가 바뀌어 엉뚱한 걸 고치지 않게)
+    var list = snap.map(function (x, j) { return { name: x.name, memo: x.memo, from: from(j, x) }; });
+    saveAccounts(list, { onDone: function () { if (!refill) toast('결제 수단 되돌렸어요'); } });
+    if (refill && S.accCol) {
+      undoSaves(refill.items.map(function (n) { var o = {}; o[S.accCol] = refill.name; return { name: n, old: o }; }), '결제 수단 되돌렸어요');
+    }
+    if (sheetMode === 'acc') openAccounts(true, sheetBackFn);
+  }
   function openAccounts(refresh, back) {
     if (!S || !S.accounts) { toast('결제 수단 목록을 못 찾았어요. 새로고침해주세요.'); return; }
     var list = S.accounts;
@@ -3551,19 +3637,24 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (!name) { showErr('이름을 적어주세요'); markBad($('accNick')); return; }
       if (S.accounts.some(function (x, j) { return x.name === name && j !== i; })) { showErr('"' + name + '"' + josa(name, '은', '는') + ' 이미 있어요. 이름을 조금 다르게 적어주세요.'); markBad($('accNick')); return; }
       var memo = accMemoOf({ type: st.type, org: st.org, kind: st.kind, last4: st.last4, link: st.link, note: $('accNote').value.trim() });
-      var list = accList();
+      var list = accList(), snap = accSnap();
       if (i == null) list.push({ name: name, memo: memo, from: '' });
       else { list[i].name = name; list[i].memo = memo; }
-      saveAccounts(list, { onDone: function () { toast(i == null ? '추가했어요' : '저장했어요'); } });
+      saveAccounts(list, { onDone: function () {
+        undoToast(i == null ? '결제 수단 추가했어요' : '결제 수단 저장했어요', function () { accUndo(snap, function (j, x) { return j === i ? name : x.name; }, null); });
+      } });
       sheetUp();
     };
     var sure = false;
     var del = $('accDel');
     if (del) del.onclick = function () {
       if (!sure) { sure = true; this.textContent = a.uses ? '한 번 더 누르면 삭제 (항목 ' + a.uses + '개의 결제 수단이 비어요)' : '한 번 더 누르면 삭제돼요'; return; }
-      var list = accList();
+      var list = accList(), snap = accSnap(), gone = a.name;
+      var users = items().filter(function (x) { return x.account === gone; }).map(function (x) { return x.name; });   // 지우면 이 항목들의 결제 수단 칸이 비어서, 되돌릴 때 다시 넣어 줌
       list.splice(i, 1);
-      saveAccounts(list, { onDone: function () { toast('지웠어요'); } });
+      saveAccounts(list, { onDone: function () {
+        undoToast('결제 수단 지웠어요', function () { accUndo(snap, function (j, x) { return j === i ? '' : x.name; }, users.length ? { name: gone, items: users } : null); });
+      } });
       sheetUp();
     };
   }
@@ -3635,13 +3726,16 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     btn.disabled = true;
     btn.innerHTML = '<span class="spin"></span>' + (it ? '저장 중' : '추가 중');
     var mode = sheetMode;
+    var old = it ? prevVals(it, r.vals) : null, was = it ? it.name : '';   // 되돌리기용: 바꾸기 전 값
     enqueue({
       type: 'save', oldName: it ? it.name : '', vals: r.vals,
       onDone: function (res) {
         if (!res.ok) return;
         dropDraft(it);
         if (sheetMode === mode) closeSheet();
-        toast(it ? '저장했어요' : res.name + ' 추가했어요' + later);
+        if (!it) undoToast(res.name + ' 추가했어요' + later, function () { undoAdd(res.name); });
+        else if (old) undoToast(was + ' 저장했어요', function () { undoSaves([{ name: res.name, old: old }], was + ' 수정 전으로 되돌렸어요'); });
+        else toast('저장했어요');
         var nm = res.name;
         setTimeout(function () { flash(nm); var el = els['i:' + nm]; if (tab === 'list' && el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }, 400);
       },
