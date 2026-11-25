@@ -325,6 +325,7 @@ t('legal-pages', async () => {
   }
   const pv = await (await p.request.get(h.base + 'privacy.html')).text();
   ok(/사용자별 저장 공간/.test(pv) && /내 구글 캘린더/.test(pv) && /GitHub Pages/.test(pv) && !/별도 서버에 사용자 정보를 저장하지 않아요/.test(pv), '처리방침이 실제 저장 방식대로 적혀 있음 (옛 틀린 문장 없음)');
+  ok(!/자기 구글 시트에 목록을 둘 수|시트 방식을 쓸 때만/.test(pv) && /구글 시트에 파일을 만들지도 읽지도 않아요/.test(pv), '처리방침: 구글 시트를 안 쓴다는 지금 사실대로 (주인 시트 방식 문장 없음)');
   await p.click('#fcLogin .legal a[href="privacy.html"]'); await p.waitForLoadState('load');
   ok(/privacy\.html$/.test(p.url()), '로그인 화면에서 눌러서 열림');
   await p.click('#back'); await p.waitForLoadState('load'); await sleep(p, 300);
@@ -574,7 +575,7 @@ t('auto-check-server', async () => {
   g.setNow('2026-09-02'); g.call(ME, 'api_setChecks', [{ '적금': true }]);
   g.setNow('2026-11-23T21:30');
   let r = g.call(ME, 'api_load', [false]);
-  ok(r.ver === 10 && r.opts && r.opts.auto === false && r.opts.remind === false, '서버 v10, 두 설정 모두 처음엔 꺼져 있음');
+  ok(r.ver === 11 && r.opts && r.opts.auto === false && r.opts.remind === false, '서버 v11, 두 설정 모두 처음엔 꺼져 있음');
   ok(sItem(g, '월세').paid === '2026-08-25' && !(r.notes || []).some((n) => /자동이체/.test(n)), '꺼져 있으면 아무것도 자동으로 체크 안 함');
 
   r = g.call(ME, 'api_opts', [{ auto: true }]);
@@ -758,7 +759,7 @@ t('opts-old-server', async () => {
   // 서버를 아직 안 올린 상태(v8): 새 화면이 그대로 동작하고, 서버에 없는 기능 줄은 안 보여줌
   const fs = require('fs'), os = require('os'), path = require('path');
   const v8 = fs.readFileSync(path.join(__dirname, '..', 'setup', 'Code.gs.txt'), 'utf8')
-    .replace('var SERVER_VER = 10;', 'var SERVER_VER = 8;').replace('res.opts = appOpts_();', '').replace('function api_opts(', 'function api_opts_gone_(');
+    .replace(/var SERVER_VER = \d+;/, 'var SERVER_VER = 8;').replace('res.opts = appOpts_();', '').replace('function api_opts(', 'function api_opts_gone_(');
   const f = path.join(os.tmpdir(), 'fc-code-v8-' + process.pid + '.txt'); fs.writeFileSync(f, v8);
   const gas = GAS.create({ code: f });
   const h = await H.open(Object.assign({}, LIFE, { gas })); const p = h.page;
@@ -1455,10 +1456,12 @@ t('rename', async () => {
 t('friend-first-open', async () => {
   const FRIEND = 'friend@example.com';
   const h = await H.open({ seed: 'empty', now: '2026-11-24T20:47', viewport: VP, latency: 50, loggedOut: true }); const p = h.page;
-  const OWNER_ID = await p.evaluate(() => window.FC_CONFIG.scriptId);
+  // 2026-11-25: 주인 서버 주소는 앱 설정에서 뺌. 모두용 서버가 아닌 곳으로 가는 호출은 전부 '주인 서버(옛 코드)'로 침
+  const cfg = await p.evaluate(() => ({ other: window.FC_CONFIG.otherId, owner: window.FC_CONFIG.scriptId || '', alt: (window.FC_CONFIG.altIds || []).length }));
+  ok(!cfg.owner && !cfg.alt && !!cfg.other, '앱 설정에 주인 서버 주소가 없음 (모두용 서버만)');
   const hits = { owner: 0, other: 0 };
   await h.ctx.route('https://script.googleapis.com/v1/scripts/**', async (route) => {
-    if (route.request().url().indexOf(encodeURIComponent(OWNER_ID)) >= 0) {
+    if (route.request().url().indexOf(encodeURIComponent(cfg.other)) < 0) {
       hits.owner++;
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ done: true, response: { result: { ok: true, needSetup: true, ready: false, email: FRIEND, notes: [] } } }) });
     }
@@ -1588,6 +1591,146 @@ t('login-inapp-browser', async () => {
     }
     await h.close();
   }
+});
+
+/* ---------- 판매 준비 (2026-11-25) ----------
+ * 서버 v11: 구글 시트 권한 없이 돎(권한 5개 → 3개). 가짜 구글(gas.js)이 서버 설정에 없는 권한을 쓰면 구글처럼 오류를 냄. */
+const SCOPE3 = ['https://www.googleapis.com/auth/calendar', 'https://www.googleapis.com/auth/script.scriptapp', 'https://www.googleapis.com/auth/userinfo.email'];
+t('sale-server-no-sheets', async () => {
+  const fs = require('fs'), path = require('path');
+  const code = fs.readFileSync(path.join(__dirname, '..', 'setup', 'Code.gs.txt'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+  const sw = fs.readFileSync(path.join(__dirname, '..', 'sw.js'), 'utf8');
+  const g = GAS.create();
+  ok(JSON.stringify(g.manifest.slice().sort()) === JSON.stringify(SCOPE3.slice().sort()), '서버 설정의 권한은 캘린더·예약 실행·이메일 3개뿐: ' + g.manifest.map((x) => x.split('/auth/')[1]).join(', '));
+  ok(code.indexOf('SpreadsheetApp') < 0 && code.indexOf('DriveApp') < 0 && code.indexOf('UrlFetchApp') < 0, '서버 코드가 구글 시트·드라이브·바깥 주소 기능을 한 번도 부르지 않음');
+  const cfg = JSON.parse(/window\.FC_CONFIG = (\{.*?\});<\/script>/.exec(html)[1]);
+  const sv = Number(/var SERVER_VER = (\d+);/.exec(code)[1]), swv = Number(/fc-shell-v(\d+)/.exec(sw)[1]);
+  ok(cfg.serverVer === sv, '앱이 아는 서버 버전 = 서버 코드 버전 (' + cfg.serverVer + ' / ' + sv + ')');
+  ok(cfg.build === swv, '설정에 보이는 앱 버전 = 캐시 버전 (' + cfg.build + ' / v' + swv + ')');
+  ok(!cfg.scriptId && !cfg.altIds, '앱 설정에 주인 서버 주소 없음');
+  // 한 사람이 쓰는 일 전부를 권한 3개로
+  g.setNow('2026-11-25T08:30');
+  let r = g.call(ME, 'api_load', [false]);
+  ok(r.ok && r.virtual && r.calOn === true && r.ver === 11 && !r.admin, '새 계정 첫 열기: 열리고 캘린더 연동 켜짐, 서버 v11, 관리자 아님');
+  add(g, { n: '월세', cat: '월세', amt: 650000, day: 25 }); add(g, { n: '넷플릭스', cat: '구독', amt: 17000, day: 3 });
+  r = g.call(ME, 'api_accounts', [[{ name: '토스뱅크 4661', memo: '', from: '' }]]); ok(r.ok, '결제 수단 저장');
+  r = g.call(ME, 'api_setChecks', [{ '월세': true }]); ok(r.ok && sItem(g, '월세').checked, '체크');
+  let n = 0, last; do { last = g.call(ME, 'api_sync', [true]); n++; } while (last.more && n < 60);
+  ok(!last.more && g.events(ME).length > 10, '캘린더 맞추기 (' + g.events(ME).length + '개)');
+  r = g.call(ME, 'api_opts', [{ remind: true, auto: true }]); ok(r.ok, '설정 바꾸기(전날 알림·자동 체크)');
+  r = g.call(ME, 'api_sort', ['금액 큰 순']); ok(r.ok, '정렬');
+  r = g.call(ME, 'api_delete', ['넷플릭스']); ok(r.ok, '삭제'); r = g.call(ME, 'api_restore', []); ok(r.ok && !!sItem(g, '넷플릭스'), '되살리기');
+  r = g.call(ME, 'api_calendar', ['off']); ok(r.ok && r.calOn === false, '캘린더 연동 끄기'); r = g.call(ME, 'api_calendar', ['on']); ok(r.ok && r.calOn === true, '다시 켜기');
+  g.setNow('2026-11-26T04:00'); g.call(ME, 'calendarDaily', []);
+  ok(sItem(g, '월세'), '매일 새벽 예약 실행');
+  let w = { more: true }, wn = 0; while (w && w.more && wn < 40) { w = g.call(ME, 'api_wipe', [{ events: true, at: w.at, gone: w.gone }]); wn++; }
+  ok(w && w.ok && !w.more && Object.keys(g.user(ME).props).length === 0, '내 자료 모두 지우기 (' + wn + '번)');
+  const noScope = g.state.log.filter((x) => /^NO_SCOPE/.test(x));
+  ok(noScope.length === 0, '그 사이 서버 설정에 없는 권한이 필요한 구글 기능을 한 번도 안 부름 ' + JSON.stringify(noScope.slice(0, 3)));
+
+  // 처음에 캘린더 연동을 못 켠 경우: 다음에 열 때 다시 켜 봄
+  const g2 = GAS.create(); g2.state.failTrigger = 1;
+  r = g2.call(ME, 'api_load', [false]);
+  ok(r.ok && r.calOn === false && r.notes.some((x) => /캘린더 연동은 못 켰어요/.test(x)), '구글이 잠깐 불안정해 못 켜면: 앱은 열리고 한 줄로 알림');
+  r = g2.call(ME, 'api_load', [false]);
+  ok(r.ok && r.calOn === true && !r.notes.length && !!g2.user(ME).props.vs_started && !g2.user(ME).props.vs_start_try, '다음에 열 때 다시 켜서 켜짐 (알림 없음)');
+  const g3 = GAS.create(); g3.state.failTrigger = 99;
+  const tries = []; for (let i = 0; i < 5; i++) { r = g3.call(ME, 'api_load', [false]); tries.push(r.notes.length); }
+  ok(tries.join() === '1,1,1,0,0' && !!g3.user(ME).props.vs_started, '계속 안 되면 3번까지만 해 보고 그만둠 (알림 ' + tries.join() + ')');
+  const g4 = GAS.create(); g4.state.failTrigger = 1; g4.call(ME, 'api_load', [false]);
+  g4.call(ME, 'api_calendar', ['on']); g4.call(ME, 'api_calendar', ['off']);
+  ok(g4.call(ME, 'api_load', [false]).calOn === false, '직접 끈 사람 것은 앱이 도로 켜지 않음');
+  // 권한을 덜 허용한 표가 서버까지 온 경우(앱이 미리 못 거른 옛 저장분): 서버가 '시작함'을 찍지 않아서, 다 허용하고 오면 켜짐
+  const g5 = GAS.create(); g5.grant(ME, SCOPE3[0] + ' ' + SCOPE3[2]);
+  r = g5.call(ME, 'api_load', [false]);
+  ok(!r.ok && /You do not have permission to call ScriptApp/.test(r.error) && /^목록을 못 읽었어요/.test(r.error) && !g5.user(ME).props.vs_started, '예약 실행 권한이 빠진 표: 권한 오류(앱이 "모두 허용" 안내로 바꿈), 시작함은 안 찍힘');
+  g5.grant(ME, null); r = g5.call(ME, 'api_load', [false]);
+  ok(r.ok && r.calOn === true, '다 허용하고 오면 캘린더 연동이 켜진 채 열림');
+});
+
+t('sale-new-account', async () => {
+  const NEW = 'newbie@example.com';
+  const visit = async (config, label, grant) => {
+    const h = await H.open({ now: '2026-11-25T08:30', viewport: VP, latency: 50, loggedOut: true, config }); const p = h.page;
+    h.google.pick = NEW; if (grant) h.google.grant = grant;
+    await p.waitForSelector('#fcLogin.on', { timeout: 8000 });
+    const fine = await p.evaluate(() => document.querySelector('#fcLogin .fine').textContent);
+    await p.click('#fcGo'); await p.waitForLoadState('load'); await h.idle(1500);
+    return { h, p, fine, label };
+  };
+  // 지금 배포 상태(권한 5개 요청) + 서버 v11
+  let v = await visit(null, '지금 설정');
+  let asked = v.h.oauth[0].scope.split(' ').map((x) => x.split('/auth/')[1]);
+  ok(asked.length === 5 && /확인되지 않은 앱/.test(v.fine), '지금 설정: 권한 5개 요청, 로그인 화면에 확인되지 않은 앱 안내 있음');
+  let st = await v.p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), w: (document.querySelector('#welcome .welcome') || {}).innerText || '', tab: !!document.querySelector('.tabbar') }));
+  ok(!st.login && st.tab && /첫 고정비 넣기/.test(st.w), '지금 설정: 새 계정이 바로 열리고 첫 화면이 보임');
+  ok(/내 구글 캘린더에도 자동으로 들어가요/.test(st.w), '첫 화면에 캘린더에도 들어간다는 한 줄: ' + st.w.replace(/\n/g, ' / '));
+  ok(v.h.gas.call(NEW, 'api_load', [true]).calOn === true && v.h.gas.state.log.filter((x) => /^NO_SCOPE/.test(x)).length === 0, '서버 v11이 권한 오류 없이 돎, 캘린더 연동 켜짐');
+  await v.p.click('#menuBtn'); await sleep(v.p, 600);
+  let menu = await v.p.evaluate(() => ({ ver: (document.getElementById('mVer') || {}).textContent || '', txt: document.getElementById('sheetBody').innerText }));
+  ok(/^버전 \d+\.11$/.test(menu.ver), '설정 맨 아래에 버전: ' + menu.ver);
+  ok(!/시트|서버 업데이트|드라이브/.test(menu.txt), '새 계정 설정 화면에 시트·드라이브·서버 업데이트 말이 없음');
+  await v.h.shot('sale-menu-foot');
+  await v.p.click('#mShare'); await sleep(v.p, 500);
+  let share = await v.p.evaluate(() => document.getElementById('sheetBody').innerText);
+  ok(!/시트|드라이브/.test(share) && /확인되지 않은 앱/.test(share), '알려주기 창: 시트·드라이브 말 없음, 심사 전이라 확인되지 않은 앱 안내는 있음');
+  ok(!v.h.errors.length, '화면 오류 없음 ' + JSON.stringify(v.h.errors));
+  await v.h.close();
+
+  // 서버 v11 확인 뒤 켤 설정(권한 3개) + 구글 심사 뒤 켤 설정(verified)
+  v = await visit({ slim: true, verified: true }, '권한 3개');
+  asked = v.h.oauth[0].scope.split(' ');
+  ok(JSON.stringify(asked.slice().sort()) === JSON.stringify(SCOPE3.slice().sort()), '권한 3개만 요청: ' + asked.map((x) => x.split('/auth/')[1]).join(', '));
+  ok(!/확인되지 않은 앱/.test(v.fine) && /모두 선택/.test(v.fine), '심사 뒤 설정: 로그인 화면에서 확인되지 않은 앱 안내가 빠짐 → ' + v.fine);
+  st = await v.p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), tab: !!document.querySelector('.tabbar'), w: (document.querySelector('#welcome .welcome') || {}).innerText || '' }));
+  ok(!st.login && st.tab && /첫 고정비 넣기/.test(st.w), '권한 3개로 새 계정이 바로 열림');
+  // 첫 고정비 넣고 캘린더까지
+  await v.p.click('#wAdd'); await sleep(v.p, 450); await v.p.click('.cgrid [data-cat="구독"]'); await sleep(v.p, 450);
+  await v.p.fill('#f3', '넷플릭스'); await v.p.click('#f8'); await v.p.keyboard.type('17000');
+  await v.p.click('#dayBtn'); await sleep(v.p, 350); await v.p.click('.dayp .dg button[data-d="27"]'); await sleep(v.p, 350);
+  await v.p.click('#saveBtn'); await v.h.idle(2500);
+  ok(!!v.h.gas.call(NEW, 'api_load', [true]).items.find((i) => i.name === '넷플릭스') && v.h.gas.events(NEW).length >= 1, '권한 3개로 첫 고정비 저장 + 구글 캘린더에 일정 (' + v.h.gas.events(NEW).length + '개)');
+  ok(v.h.gas.state.log.filter((x) => /^NO_SCOPE/.test(x)).length === 0 && v.h.calls.every((c) => c.who === NEW), '그 사이 권한 오류 없음');
+  await v.p.click('#menuBtn'); await sleep(v.p, 600); await v.p.click('#mShare'); await sleep(v.p, 500);
+  share = await v.p.evaluate(() => document.getElementById('sheetBody').innerText);
+  ok(!/확인되지 않은 앱|심사/.test(share), '심사 뒤 설정: 알려주기 창에서도 그 안내가 빠짐');
+  ok(!v.h.errors.length, '화면 오류 없음 ' + JSON.stringify(v.h.errors));
+  await v.h.close();
+
+  // 권한 3개일 때 체크를 하나 빼먹고 온 경우
+  v = await visit({ slim: true }, '일부만 허용', (a, prompt) => (prompt === 'consent' ? a : a.filter((x) => !/auth\/calendar$/.test(x))));
+  st = await v.p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), msg: document.getElementById('fcErr').textContent }));
+  ok(st.login && /모두 허용/.test(st.msg) && v.h.calls.length === 0, '권한 3개 중 캘린더를 빼고 오면: 서버를 부르지 않고 "모두 허용" 안내');
+  await v.p.click('#fcGo'); await v.p.waitForLoadState('load'); await v.h.idle(1500);
+  st = await v.p.evaluate(() => ({ login: document.getElementById('fcLogin').classList.contains('on'), tab: !!document.querySelector('.tabbar') }));
+  ok(!st.login && st.tab && v.h.gas.call(NEW, 'api_load', [true]).calOn === true, '다시 눌러 모두 허용하면 열리고 캘린더 연동 켜짐');
+  ok(!v.h.errors.length, '화면 오류 없음 ' + JSON.stringify(v.h.errors));
+  await v.h.close();
+});
+
+t('sale-ui-bits', async () => {
+  const h = await H.open({ seed: 'full', seedAt: '2026-10-01', now: '2026-11-25T08:30', viewport: VP, latency: 50 }); const p = h.page;
+  await p.click('.tabbar [data-tab="list"]'); await sleep(p, 600);
+  await p.click('#list .row.tr[data-name="청년 적금"] .tc.nmc'); await sleep(p, 500);
+  const per = await p.evaluate(() => { const k = Array.prototype.find.call(document.querySelectorAll('#list .tp .kl'), (x) => /기간/.test(x.textContent)); return k ? k.textContent : ''; });
+  ok(/2028년 6월 1일/.test(per) && !/2026년/.test(per), '여러 해에 걸친 기간: 올해가 아닌 쪽에 연도가 붙음 → ' + per);
+  await p.click('#list .row.tr[data-name="정수기 렌탈"] .tc.nmc'); await sleep(p, 500);
+  const per2 = await p.evaluate(() => { const k = Array.prototype.find.call(document.querySelectorAll('#list .tp .kl'), (x) => /기간/.test(x.textContent)); return k ? k.textContent : ''; });
+  ok(/12월 20일/.test(per2) && !/년/.test(per2), '올해 안에서 끝나는 기간은 그대로 → ' + per2);
+  // 알림 띠의 버튼 글자색: 주황(옛 강조색) 대신 지금 고른 색 계열
+  const want = { navy: 'rgb(179, 192, 255)', blue: 'rgb(141, 182, 255)', violet: 'rgb(189, 167, 255)' };
+  for (const tone of ['navy', 'blue', 'violet']) {
+    const c = await p.evaluate((t) => { if (t === 'navy') document.documentElement.removeAttribute('data-tone'); else document.documentElement.setAttribute('data-tone', t); return getComputedStyle(document.getElementById('toastBtn')).color; }, tone);
+    ok(c === want[tone], '알림 띠 버튼 색(' + tone + '): ' + c);
+  }
+  await p.evaluate(() => document.documentElement.removeAttribute('data-tone'));
+  await p.evaluate(() => { const r = document.querySelector('#list .row.tr[data-name="넷플릭스"]'); r.querySelector('.swdel').click(); });
+  await h.idle(900);
+  ok(/되돌리기|되살리기/.test(await p.evaluate(() => document.getElementById('toastBtn').textContent)), '지운 뒤 알림 띠에 되돌리기 버튼');
+  await h.shot('sale-toast');
+  ok(!h.errors.length, '화면 오류 없음 ' + JSON.stringify(h.errors));
+  await h.close();
 });
 
 (async () => {

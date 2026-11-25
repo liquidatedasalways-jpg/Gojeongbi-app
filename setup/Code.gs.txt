@@ -19,7 +19,22 @@
  * 설치: 확장 프로그램 → Apps Script → 기본 코드를 전부 지우고 이 내용을 붙여넣기 → 저장 → 시트 새로고침
  */
 
-var SERVER_VER = 10;    // 서버 코드 버전 (앱이 새 버전 있는지 볼 때 씀)
+var SERVER_VER = 11;    // 서버 코드 버전 (앱이 새 버전 있는지 볼 때 씀)
+
+/* v11부터 이 서버는 구글 시트를 쓰지 않아요 (목록은 사람마다 앱 저장 공간에, 일정은 그 사람 구글 캘린더에).
+ * 구글 시트 권한 없이 돌도록, 진짜 구글 시트 서비스는 어디서도 부르지 않고 아래 대역(SApp_)을 씀.
+ * 시트를 다루던 옛 코드가 불러도 아무 일도 안 하거나 '없음'으로 답해서, 모두 앱 저장 공간 쪽으로 흘러감. */
+var NO_SHEET_MSG_ = '이 앱은 구글 시트를 쓰지 않아요.';
+var SApp_ = {
+  flush: function () {},
+  getActive: function () { return null; },
+  openById: function () { throw new Error(NO_SHEET_MSG_); },
+  getUi: function () { throw new Error(NO_SHEET_MSG_); },
+  CopyPasteType: { PASTE_VALUES: 'PASTE_VALUES' },
+  DataValidationCriteria: { VALUE_IN_RANGE: 'VALUE_IN_RANGE', VALUE_IN_LIST: 'VALUE_IN_LIST', NUMBER_BETWEEN: 'NUMBER_BETWEEN',
+    NUMBER_GREATER_THAN_OR_EQUAL_TO: 'NUMBER_GREATER_THAN_OR_EQUAL_TO', DATE_IS_VALID_DATE: 'DATE_IS_VALID_DATE',
+    CUSTOM_FORMULA: 'CUSTOM_FORMULA', CHECKBOX: 'CHECKBOX' }
+};
 var SHEET = '고정비 목록';
 var FIRST = 8;          // 첫 항목 줄 (7줄은 '이번 달 낼 것' 제목)
 var ADD_ROW = 6;        // '새 항목 추가' 입력 줄 (5줄은 그 제목)
@@ -57,10 +72,10 @@ function ss_() {
   try { id = PropertiesService.getUserProperties().getProperty('sheet_id'); } catch (err) {}
   if (id === VS_ID) { SS_ = vsLoad_(); return SS_; }   // 시트 없이 쓰는 사람: 앱 저장 공간
   if (id) {
-    try { SS_ = SpreadsheetApp.openById(id); return SS_; } catch (err2) { if (WEB_) return null; }
+    try { SS_ = SApp_.openById(id); return SS_; } catch (err2) { if (WEB_) return null; }
   }
   if (WEB_) return null;
-  SS_ = SpreadsheetApp.getActive();
+  SS_ = SApp_.getActive();
   return SS_;
 }
 /** 이 스크립트가 붙은 시트(주인 시트)의 ID.
@@ -69,16 +84,16 @@ function homeId_() {
   var sp = PropertiesService.getScriptProperties(), saved = null;
   try { saved = sp.getProperty('home_id'); } catch (err) {}
   try {
-    var a = SpreadsheetApp.getActive();
+    var a = SApp_.getActive();
     if (a) { var id = a.getId(); if (id !== saved) { try { sp.setProperty('home_id', id); } catch (e2) {} } return id; }
   } catch (err) {}
   return saved;
 }
 function homeSS_() {
-  try { var a = SpreadsheetApp.getActive(); if (a) return a; } catch (err) {}
+  try { var a = SApp_.getActive(); if (a) return a; } catch (err) {}
   var id = homeId_();
   if (!id) return null;
-  try { return SpreadsheetApp.openById(id); } catch (err) { return null; }
+  try { return SApp_.openById(id); } catch (err) { return null; }
 }
 function isHome_() {
   if (HOME_ !== null) return HOME_;
@@ -202,11 +217,11 @@ function autoRun_(sh, c, end) {
   if (!autoOn_()) return [];
   var out = [], seen = {};
   for (var pass = 0; pass < 14; pass++) {
-    SpreadsheetApp.flush();
+    SApp_.flush();
     var got = autoPay_(sh, c, end);
     if (!got.length) break;
     applyChecks_(sh, c, end);
-    SpreadsheetApp.flush();
+    SApp_.flush();
     resetForNewMonth_(sh, c, end);
     got.forEach(function (nm) { if (!seen[nm]) { seen[nm] = 1; out.push(nm); } });
   }
@@ -214,13 +229,13 @@ function autoRun_(sh, c, end) {
 }
 /** 시트 메뉴에서 누른 경우: 지금 열려 있는 시트를 다룸. */
 function menu_() {
-  try { SS_ = SpreadsheetApp.getActive(); HOME_ = null; } catch (err) {}
+  try { SS_ = SApp_.getActive(); HOME_ = null; } catch (err) {}
 }
 
 function onOpen(e) {
   if (e && e.source) SS_ = e.source;
   try { homeId_(); } catch (err) {}
-  SpreadsheetApp.getUi()
+  SApp_.getUi()
     .createMenu('고정비')
     .addItem('줄 정리하기', 'tidyFromMenu')
     .addItem('방금 지운 항목 되살리기', 'restoreLast')
@@ -318,7 +333,7 @@ function run_(isOpen, pre) {
       return;
     }
     console.log('run_: lock ' + (Date.now() - t0) + 'ms');
-    SpreadsheetApp.flush();   // 앞 실행이 바꾼 내용을 새로 읽게
+    SApp_.flush();   // 앞 실행이 바꾼 내용을 새로 읽게
   } catch (err) {
     lock = null;
   }
@@ -332,7 +347,7 @@ function run_(isOpen, pre) {
     var end = findEnd_(sh, c);
     if (!end || end <= FIRST) return;
     var blocked = applyChecks_(sh, c, end);
-    SpreadsheetApp.flush();
+    SApp_.flush();
     var back = resetForNewMonth_(sh, c, end);
     var autoPaid = autoRun_(sh, c, end);
     autoSkipSave_();
@@ -447,7 +462,7 @@ function addItem_(sh, c) {
   cache.put('lastAdd', name, 60);
   inRange.clearContent();
   sh.getRange(ADD_ROW, c.CHECK).setValue(false);
-  SpreadsheetApp.flush();
+  SApp_.flush();
   var row = newRow_(sh, c, end);
   if (!row) { inRange.setValues([v]); toast_('새 줄을 만들 본보기 줄이 없어요.'); return false; }
   var vals = {};
@@ -455,7 +470,7 @@ function addItem_(sh, c) {
   vals[c.CHECK] = false;
   vals[c.NAME] = name;
   fillRow_(sh, c, row, vals);
-  SpreadsheetApp.flush();
+  SApp_.flush();
   toast_('추가했어요: ' + name);
 }
 
@@ -520,7 +535,7 @@ function deleteChecked_(sh, c) {
       fillRow_(sh, c, row, {});
     }
   }
-  SpreadsheetApp.flush();
+  SApp_.flush();
   var msg = names.length ? '지웠어요: ' + names.join(', ') + "\n('삭제 기록' 탭에 남겨뒀어요)" : '빈 줄을 정리했어요.';
   if (orphans.length) msg += '\n하위 항목은 남겨뒀어요: ' + orphans.join(', ');
   toast_(msg);
@@ -658,7 +673,7 @@ function applyChecks_(sh, c, end) {
 
 /** 날짜 숫자를 시간대 영향 없이 그대로 복사 (값만). */
 function copyValue_(sh, row, fromCol, toCol) {
-  sh.getRange(row, fromCol).copyTo(sh.getRange(row, toCol), SpreadsheetApp.CopyPasteType.PASTE_VALUES, false);
+  sh.getRange(row, fromCol).copyTo(sh.getRange(row, toCol), SApp_.CopyPasteType.PASTE_VALUES, false);
 }
 
 /** 체크돼 있지만 이번 달 결제가 또 남은 항목('체크 풀기' TRUE)은 체크를 풀어 이번 달 칸으로 돌려보낸다. */
@@ -699,14 +714,14 @@ function refreshIndent_(sh, c, end) {
  * 이미 제자리인 줄은 건드리지 않아서 보통 한두 줄만 움직인다.
  */
 function tidy_(sh, c, end) {
-  SpreadsheetApp.flush();
+  SApp_.flush();
   var n = end - FIRST;
   var keys = sh.getRange(FIRST, c.KEY, n, 1).getDisplayValues().map(function (r) { return String(r[0]); });
   var plan = planMoves_(keys);
   for (var i = 0; i < plan.length; i++) {
     sh.moveRows(sh.getRange(FIRST + plan[i][0], 1), FIRST + plan[i][1]);
   }
-  if (plan.length) SpreadsheetApp.flush();
+  if (plan.length) SApp_.flush();
   return plan.length;
 }
 
@@ -858,7 +873,7 @@ function calendarOnEdit(e) {
     var dl = lock_();
     if (dl.tryLock(60000)) dl.releaseLock();
   } catch (err) {}
-  SpreadsheetApp.flush();
+  SApp_.flush();
   syncCalendar_();
 }
 
@@ -1239,7 +1254,13 @@ function appBind_() {
   SS_ = null; HOME_ = null; WEB_ = true; VS_ = null;
   var ss = ss_();
   if (ss) {
-    try { if (ss.getSheetByName(SHEET)) return ss; } catch (err) {}
+    var has = false;
+    try { has = !!ss.getSheetByName(SHEET); } catch (err) {}
+    if (has) {
+      // 처음에 캘린더 연동을 못 켠 사람(구글이 잠깐 불안정했던 경우 등): 다음에 열 때 다시 켜 봄
+      if (VS_ && VS_.started === false && !START_RAN_) { try { appVirtualStart_(); } catch (err0) {} }
+      return ss;
+    }
     SS_ = null; HOME_ = null;   // 지웠거나 권한이 없어진 시트 → 다시 설정
   }
   // 이 시트 주인이면 이 시트를 그대로 씀
@@ -1260,13 +1281,26 @@ function appBind_() {
   return SS_;
 }
 
-/** 앱 저장 공간을 처음 쓰는 사람: 캘린더 연동 켜기 (한 번만). */
+/** 앱 저장 공간을 처음 쓰는 사람: 캘린더 연동 켜기.
+ *  켜지면 '시작함(vs_started)'을 적고 다시 안 함. 못 켜면 다음에 열 때 다시 해 보고(모두 3번), 그래도 안 되면 그만둠 (설정에서 직접 켬).
+ *  사람이 설정에서 직접 켜거나 끄면 그때도 '시작함'으로 적음 (api_calendar) → 끈 걸 앱이 도로 켜지 않음. */
+var START_TRIES_ = 3;
+var START_FAIL_ = false;   // 이번 실행에서 캘린더 연동을 못 켰음 (앱에 한 줄로 알림)
+var START_RAN_ = false;    // 한 번 실행에 한 번만 해 봄
 function appVirtualStart_() {
+  if (START_RAN_) return;
+  START_RAN_ = true;
   var up = PropertiesService.getUserProperties();
   if (up.getProperty('vs_started')) return;
-  up.setProperty('vs_started', String(Date.now()));
-  try { calendarOn_(true); } catch (err) {   // 빈 목록으로 맞추면 이미 있는 일정을 지울 수 있어서 켜기만 함 (앱이 바로 맞추기를 부름)
-    if (NOTES_) NOTES_.push('캘린더 연동은 못 켰어요. 오른쪽 위 ⋯에서 다시 켜주세요.');
+  var n = (Number(up.getProperty('vs_start_try')) || 0) + 1;
+  try {
+    calendarOn_(true);   // 빈 목록으로 맞추면 이미 있는 일정을 지울 수 있어서 켜기만 함 (앱이 바로 맞추기를 부름)
+    up.setProperty('vs_started', String(Date.now()));
+    if (n > 1) up.deleteProperty('vs_start_try');
+  } catch (err) {
+    START_FAIL_ = true;
+    if (n >= START_TRIES_) { up.setProperty('vs_started', String(Date.now())); up.deleteProperty('vs_start_try'); }
+    else up.setProperty('vs_start_try', String(n));
   }
 }
 
@@ -1294,7 +1328,7 @@ function appIsOwner_(home) {
 /** 스크립트 편집기에서 한 번 실행(▷)하면 새로 필요한 권한 허용 창이 떠요. 앱에 계정 이메일이 안 보일 때. */
 function authorize() {
   var e = Session.getEffectiveUser().getEmail();
-  try { var act = SpreadsheetApp.getActive(); if (act) act.getName(); } catch (err) {}
+  try { var act = SApp_.getActive(); if (act) act.getName(); } catch (err) {}
   try { CalendarApp.getDefaultCalendar().getName(); } catch (err) {}
   homeId_();   // 앱(구글 로그인 방식)이 주인 시트를 찾을 수 있게 ID 적어둠
   console.log('권한 확인 완료: ' + (e || '(이메일 없음)'));
@@ -1337,7 +1371,7 @@ function api_setup(opt) {
   try {
     if (appBind_()) return api_load(false);   // 그 사이 다른 창에서 만들었으면 그걸 씀
     var tpl;
-    try { tpl = SpreadsheetApp.openById(tplId); } catch (err) {
+    try { tpl = SApp_.openById(tplId); } catch (err) {
       return appSetupInfo_({ ok: false, error: '템플릿 시트를 못 열었어요. 앱 주소를 알려준 사람에게 템플릿 공유(링크가 있는 모든 사용자 · 뷰어)를 부탁해주세요.' });
     }
     var copy = tpl.copy('고정비 결제 달력');
@@ -1367,7 +1401,7 @@ function makeTemplate() {
   menu_();
   var r = makeTemplate_(ss_());
   try {
-    var ui = SpreadsheetApp.getUi();
+    var ui = SApp_.getUi();
     ui.alert('친구용 템플릿', r.msg, ui.ButtonSet.OK);
   } catch (err) { console.log(r.msg); }
   return r;
@@ -1406,7 +1440,7 @@ function makeTemplate_(home) {
     [['승훈 ', ''], ['블리스인', '월세']].forEach(function (p) {
       try { tpl.createTextFinder(p[0]).matchCase(true).replaceAllWith(p[1]); } catch (err) {}
     });
-    SpreadsheetApp.flush();
+    SApp_.flush();
     run_(false);
   } catch (err2) {
     SS_ = home; HOME_ = null;
@@ -1545,7 +1579,7 @@ function api_sort(mode) {
       var col = appSortCol_(sh);
       if (!col) return { error: "1번 줄에서 '정렬 기준' 칸을 못 찾았어요." };
       sh.getRange(SORT_ROW, col).setValue(String(mode));
-      SpreadsheetApp.flush();
+      SApp_.flush();
       return {};
     });
   });
@@ -1583,6 +1617,8 @@ function api_sync(step) {
 function api_calendar(action) {
   if (!appBind_()) return appSetupInfo_();
   var msg = action === 'on' ? calendarOn_() : calendarOff_();
+  // 직접 켜거나 껐으면 '처음 시작'은 끝난 것으로 (앱이 나중에 도로 켜지 않게)
+  try { var upc = PropertiesService.getUserProperties(); if (!upc.getProperty('vs_started')) upc.setProperty('vs_started', String(Date.now())); } catch (err) {}
   vsSave_();
   return { ok: true, msg: String(msg), calOn: calIsOn_() };
 }
@@ -1694,7 +1730,7 @@ function api_import(data, force) {
       });
       var sc = appSortCol_(sh);
       if (sc && data.sort && APP_SORTS.indexOf(data.sort) >= 0) sh.getRange(SORT_ROW, sc).setValue(data.sort);
-      SpreadsheetApp.flush();
+      SApp_.flush();
       return {};
     });
     if (data.ack) stProps_().setProperty('app_missed_ack', JSON.stringify(data.ack));
@@ -1745,7 +1781,7 @@ function api_accounts(list) {
           else if (gone[v]) { sh.getRange(FIRST + k, acc.itemCol).clearContent(); cleared++; }
         }
       }
-      SpreadsheetApp.flush();
+      SApp_.flush();
       return { changed: changed, cleared: cleared };
     });
   }, true);
@@ -1815,6 +1851,7 @@ function appCallIn_(fn, forceMeta) {
   if (!appBind_()) return appSetupInfo_();
   NOTES_ = [];
   APP_BUSY_ = false;
+  if (START_FAIL_) { START_FAIL_ = false; NOTES_.push('캘린더 연동은 못 켰어요. 오른쪽 위 ⋯에서 다시 켜주세요.'); }
   if (VS_ && VS_.fromBak) NOTES_.push('저장된 목록이 깨져 있어서 바로 전에 저장한 내용으로 되돌렸어요. 마지막에 바꾼 게 빠졌는지 확인해주세요.');
   var res = { ok: true };
   try {
@@ -1832,7 +1869,7 @@ function appCallIn_(fn, forceMeta) {
     st = appState_(forceMeta);
   } catch (err2) {
     res.ok = false;
-    res.error = (res.error ? res.error + '\n' : '') + '시트를 못 읽었어요: ' + (err2 && err2.message ? err2.message : err2);
+    res.error = (res.error ? res.error + '\n' : '') + '목록을 못 읽었어요: ' + (err2 && err2.message ? err2.message : err2);
   }
   try { vsSave_(); } catch (err3) {
     res.ok = false;
@@ -1995,7 +2032,7 @@ function appMeta_(sh, c, force) {
 /** 드롭다운·검사 규칙 종류 이름. */
 function dvType_(dv) {
   var t = dv.getCriteriaType();
-  var E = SpreadsheetApp.DataValidationCriteria;
+  var E = SApp_.DataValidationCriteria;
   var names = ['VALUE_IN_RANGE', 'VALUE_IN_LIST', 'NUMBER_BETWEEN', 'NUMBER_GREATER_THAN_OR_EQUAL_TO',
     'DATE_IS_VALID_DATE', 'CUSTOM_FORMULA', 'CHECKBOX'];
   for (var i = 0; i < names.length; i++) if (E[names[i]] !== undefined && t === E[names[i]]) return names[i];
@@ -2067,7 +2104,7 @@ function appSave_(sh, c, oldName, vals) {
     if (!row) return { error: '새 줄을 만들 본보기 줄이 없어요.' };
     out[c.CHECK] = false;
     fillRow_(sh, c, row, out);
-    SpreadsheetApp.flush();
+    SApp_.flush();
     return { name: name };
   }
 
@@ -2086,7 +2123,7 @@ function appSave_(sh, c, oldName, vals) {
       if (String(ps[k][0]).trim() === oldName) sh.getRange(FIRST + k, c.PARENT).setValue(name);
     }
   }
-  SpreadsheetApp.flush();
+  SApp_.flush();
   return { name: name };
 }
 
@@ -2601,7 +2638,7 @@ function VS_RECALC_(sh) {
 function vsDVs_(book) {
   var set = book.sheets['설정'];
   var R = function (r, c, n) { return set.getRange(r, c, n, 1); };
-  var T = SpreadsheetApp.DataValidationCriteria;
+  var T = SApp_.DataValidationCriteria;
   var d = {};
   d[VSC.A] = new VsDV_(T.CHECKBOX, [], '', false);
   d[VSC.CAT] = new VsDV_(T.VALUE_IN_RANGE, [R(5, 1, 20), true], '', true);
@@ -2631,7 +2668,7 @@ function vsDecorate_(book) {
     for (var f in VS_FMT) if (!row[f - 1].fmt) row[f - 1].fmt = VS_FMT[f];
   });
   while (main.rows[0].length < 7) main.rows[0].push({ v: '' });
-  main.rows[0][6].dv = new VsDV_(SpreadsheetApp.DataValidationCriteria.VALUE_IN_LIST, [['결제일순', '금액 큰 순', '금액 작은 순', '내가 정한 순서'], true], '', false);
+  main.rows[0][6].dv = new VsDV_(SApp_.DataValidationCriteria.VALUE_IN_LIST, [['결제일순', '금액 큰 순', '금액 작은 순', '내가 정한 순서'], true], '', false);
   while (main.rows[5].length < VS_W) main.rows[5].push({ v: '' });
   main.rows[5][0].dv = dvs[VSC.A];
   for (var c2 in dvs) if (Number(c2) !== VSC.A) main.rows[5][c2 - 1].dv = dvs[c2];
@@ -2763,6 +2800,7 @@ function vsLoad_() {
   VS_.n = Number(all[VS_KEY + '_n'] || 0) || 0;
   VS_.bn = Number(all[VS_BAK + '_n'] || 0) || 0;
   VS_.fromBak = fromBak;
+  VS_.started = !!all['vs_started'];   // 처음 시작(캘린더 연동 켜기)을 끝냈는지
   if (!got || fromBak) VS_.changed = true;
   return VS_.ss;
 }
