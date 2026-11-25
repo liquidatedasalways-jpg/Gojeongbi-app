@@ -212,6 +212,14 @@ body.on-cal .calnav { display: flex; }
 .bar2 { display: flex; align-items: center; min-height: 28px; padding: 0 8px 4px; font-size: 13px; color: var(--sub); }
 .bar2 #countTxt { flex: 1; min-width: 0; }
 .bar2 b { font-weight: 700; color: var(--ink); white-space: nowrap; }
+/* 목록 '수정' 단추: 눌러야만 금액·결제일 칸을 그 자리에서 고칠 수 있음(실수로 숫자가 바뀌지 않게). 켜면 '완료'(채운 색) */
+.bar2 .edt { flex: none; height: 44px; margin: -8px -4px -8px 0; padding: 0 4px; display: flex; align-items: center; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.bar2 .edt span { display: block; height: 34px; line-height: 34px; padding: 0 14px; border-radius: 17px; background: var(--sel); color: var(--accent-text); }
+.bar2 .edt[aria-pressed="true"] span { background: var(--accent); color: var(--accent-ink); }
+.edhint { display: none; margin: 0 8px 8px; font-size: 13px; font-weight: 600; color: var(--accent-text); }
+body.editing .edhint { display: block; }
+body.editing #list .row.tr:not(.muted) .tc.amc, body.editing #list .row.tr:not(.muted) .tc.dyc { position: relative; }
+body.editing #list .row.tr:not(.muted) .tc.amc::after, body.editing #list .row.tr:not(.muted) .tc.dyc::after { content: ""; position: absolute; inset: 6px 2px; border-radius: 10px; box-shadow: inset 0 0 0 1.5px var(--accent); opacity: .45; pointer-events: none; }
 .fchips { display: flex; gap: 6px; margin: -4px -12px 0; padding: 0 12px 4px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
 .fchips::-webkit-scrollbar { display: none; }
 .fchips:empty { display: none; }
@@ -572,6 +580,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .tp .kl b { flex: 1; min-width: 0; font-weight: 500; color: var(--ink2); }
 .tp .tb { display: flex; gap: 8px; margin-top: 8px; }
 .tp .tb button { height: 44px; padding: 0 16px; border-radius: 12px; background: var(--card); font-size: 13px; font-weight: 600; color: var(--ink2); }
+.tp .tb button[data-act="edit"] { padding: 0 20px; background: var(--accent); color: var(--accent-ink); font-weight: 700; }
 .row.tr.ghost { pointer-events: none; }
 .row.tr.ghost .tc { opacity: .55; }
 .row.tr.ghost .icc .spin { width: 14px; height: 14px; color: var(--muted); }
@@ -586,7 +595,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 25, "slim": false, "verified": false};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 26, "slim": false, "verified": false};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -1017,8 +1026,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 </main>
 <main class="tab" id="tab-setup"></main>
 <main class="tab" id="tab-list">
-  <div class="bar2"><span id="countTxt"></span></div>
+  <div class="bar2"><span id="countTxt"></span><button class="edt" type="button" id="editMode" aria-pressed="false" hidden><span>수정</span></button></div>
   <div class="fchips" id="catFilter"></div>
+  <div class="edhint" id="edHint">금액이나 결제일을 눌러 바로 고쳐요. 다 했으면 완료.</div>
   <div class="lcard">
     <div class="th" id="lhead"><span></span><button type="button" data-sort="name">항목<i></i></button><button type="button" data-sort="amt">금액<i></i></button><button type="button" data-sort="day">결제일<i></i></button></div>
     <div class="grp tbl" id="list"><div class="skel"></div><div class="skel"></div><div class="skel"></div></div>
@@ -1957,6 +1967,14 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 
   /* ---------- 표 한 줄 ---------- */
   var openRow = null;      // 펼친 줄 이름
+  var listEditing = false; // 목록 '수정' 단추를 켰는지 (켰을 때만 금액·결제일 칸을 그 자리에서 고침)
+  function setListEditing(on) {
+    listEditing = !!on;
+    document.body.classList.toggle('editing', listEditing);
+    var b = document.getElementById('editMode');
+    if (b) { b.firstChild.textContent = listEditing ? '완료' : '수정'; b.setAttribute('aria-pressed', listEditing ? 'true' : 'false'); }
+    if (!listEditing) { var ae = document.activeElement; if (ae && ae.classList && ae.classList.contains('ci')) ae.blur(); }
+  }
   function amtFieldOf() { return S.meta.fields.filter(isAmtField)[0]; }
   function dayFieldOf() { return S.meta.fields.filter(isDayField)[0]; }
   function startFieldOf() { return S.meta.fields.filter(function (f) { return /^시작일/.test(f.label); })[0]; }
@@ -2280,6 +2298,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (typeof it.monthly === 'number' && (!it.status || it.status === '진행중')) avg += it.monthly;
     });
     var ct = (lv.cat ? esc(lv.cat) + ' ' : '') + n2 + '개' + (avg > 0 ? ' · 한 달 평균 <b>' + won(avg) + '</b>' : '');
+    var eb = $('editMode');
+    if (eb) { eb.hidden = !rows.length; if (!rows.length && listEditing) setListEditing(false); }
     var cEl = $('countTxt');
     if (cEl._html !== ct) { cEl.innerHTML = ct; cEl._html = ct; }
     // 분류 알약: 두 가지 넘게 있을 때만
@@ -3985,6 +4005,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function setTab(t, from) {
     if (t === tab) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     tab = t;
+    if (t !== 'list' && listEditing) setListEditing(false);
     if (!popping) { if (t === 'list') hPush('tab'); else if (hTop() === 'tab') hDrop(1); }
     var el = $('tab-' + t);
     if (el) { el.classList.remove('in-l', 'in-r'); void el.offsetWidth; el.classList.add(from === 'r' ? 'in-r' : 'in-l'); }
@@ -4009,7 +4030,12 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (act === 'toggle') toggle(name);
     else if (act === 'del') { if (openRow === name) openRow = null; swipeOpen = null; removeItem(name); }
     else if (act === 'expand') { openRow = openRow === name ? null : name; renderList(); }
-    else if (act === 'cell') editCell(b, name, b.getAttribute('data-f'));
+    else if (act === 'cell') {
+      var ci = findItem(name);
+      if (ci && b.getAttribute('data-f') === 'day' && needsDate(ci)) { openNoDate([name]); return; }
+      if (listEditing && ci && ci.section !== 5) editCell(b, name, b.getAttribute('data-f'));
+      else { openRow = openRow === name ? null : name; renderList(); }
+    }
     else if (act === 'edit') openEdit(name);
     else {
       var it = findItem(name);
@@ -4017,6 +4043,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }
   }
   $('list').addEventListener('click', onRowClick);
+  $('editMode').addEventListener('click', function () { setListEditing(!listEditing); if (listEditing) { openRow = null; renderList(); } });
   $('lhead').addEventListener('click', function (e) {
     var b = e.target.closest('[data-sort]');
     if (b && S) sortBy(b.getAttribute('data-sort'));
@@ -4097,7 +4124,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }, true);
   })();
   (function () {   // 화면을 옆으로 밀어서 탭 넘기기 (달력 칸 안에서는 달 넘기기)
-    var x0 = null, y0 = 0, onRow = false;
+    var x0 = null, y0 = 0, onRow = false, hadOpen = false;
+    document.addEventListener('pointerdown', function () { hadOpen = !!swipeOpen; }, true);   // 줄 삭제 버튼이 열려 있었는지 (밀면 닫히기만 함)
     document.addEventListener('touchstart', function (e) {
       x0 = null;
       if (sheetMode || document.body.classList.contains('setup-on') || e.touches.length !== 1) return;
@@ -4111,7 +4139,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
       x0 = null;
       if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.8) return;
-      if (onRow || swipeOpen || swipeJust) return;   // 줄을 밀면 삭제 버튼만
+      // 줄을 왼쪽으로 밀면 삭제 버튼만. 오른쪽으로 밀면(줄 위라도) 달력 탭으로, 단 열린 삭제 버튼이 있었으면 닫기만
+      if (dx < 0 && (onRow || swipeOpen || swipeJust)) return;
+      if (dx > 0 && (swipeOpen || hadOpen)) return;
       if (dx < 0 && tab === 'cal') setTab('list', 'l');
       else if (dx > 0 && tab === 'list') setTab('cal', 'r');
     }, { passive: true });
