@@ -596,7 +596,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 26, "slim": false, "verified": false};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 27, "slim": false, "verified": false};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -1250,7 +1250,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
    * 창(아래에서 올라오는 창, 날짜 고르기)을 열거나 목록 탭으로 갈 때마다 방문 기록을 한 칸 쌓고,
    * 폰 뒤로 가기를 누르면 그 한 칸만 되돌림 → 앱이 꺼지지 않고 창이 닫히거나 달력 탭으로 돌아감.
    * 기록은 화면을 누른 순간에만 쌓음 (누르지 않았는데 쌓은 기록은 크롬이 뒤로 가기 때 건너뛰어서 소용없음). */
-  var hist = [];           // 쌓아 둔 기록: 'tab' | 'sheet' | 'dp'
+  var hist = [];           // 쌓아 둔 기록: 'tab' | 'sheet' | 'dp' | 'ui'(목록의 수정 켬·펼친 줄·열린 삭제 버튼, 하나에 한 칸)
   var hSkip = 0;           // 우리가 직접 되돌려서 오는 신호 개수 (뒤로 가기로 치지 않음)
   var hWait = [];          // 되돌리기가 끝난 뒤에 할 일
   var hTimer = null;
@@ -1287,6 +1287,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (kind === 'dp') closePickers();
       else if (kind === 'sheet') { if (sheetMode && sheetBackFn) sheetBackFn(); else closeSheet(); }
       else if (kind === 'tab') { if (tab === 'list' && !document.body.classList.contains('setup-on')) setTab('cal', 'r'); }
+      else if (kind === 'ui') listBack();
     } finally { popping = false; }
   }
   window.addEventListener('popstate', function (e) {
@@ -1970,12 +1971,29 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   /* ---------- 표 한 줄 ---------- */
   var openRow = null;      // 펼친 줄 이름
   var listEditing = false; // 목록 '수정' 단추를 켰는지 (켰을 때만 금액·결제일 칸을 그 자리에서 고침)
-  function setListEditing(on) {
+  function setListEditing(on, cancel) {
     listEditing = !!on;
     document.body.classList.toggle('editing', listEditing);
     var b = document.getElementById('editMode');
     if (b) { b.firstChild.textContent = listEditing ? '완료' : '수정'; b.setAttribute('aria-pressed', listEditing ? 'true' : 'false'); }
-    if (!listEditing) { var ae = document.activeElement; if (ae && ae.classList && ae.classList.contains('ci')) ae.blur(); }
+    if (!listEditing) {   // 쓰던 칸: '완료'면 저장, 뒤로 가기면 취소
+      var ae = document.activeElement;
+      if (ae && ae.classList && ae.classList.contains('ci')) { if (cancel) ae.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })); else ae.blur(); }
+    }
+  }
+  /** 목록에서 연 것(수정 켬·펼친 줄·열린 삭제 버튼) 수만큼 방문 기록을 맞춤 → 폰 뒤로 가기를 누르면 방금 연 것부터 하나씩 닫힘 */
+  function listHist() {
+    if (popping) return;
+    if (hSkip > 0) { afterHist(listHist); return; }
+    var want = (listEditing ? 1 : 0) + (openRow ? 1 : 0) + (swipeOpen ? 1 : 0), have = hCount(['ui']);
+    if (have > want) hDrop(have - want);
+    else for (var i = have; i < want; i++) hPush('ui');
+  }
+  /** 폰 뒤로 가기: 열린 삭제 버튼 → 펼친 줄 → 수정 켬 순서로 하나만 닫음 */
+  function listBack() {
+    if (swipeOpen) closeSwipe();
+    else if (openRow) { openRow = null; renderList(); }
+    else if (listEditing) setListEditing(false, true);
   }
   function amtFieldOf() { return S.meta.fields.filter(isAmtField)[0]; }
   function dayFieldOf() { return S.meta.fields.filter(isDayField)[0]; }
@@ -2301,7 +2319,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     });
     var ct = (lv.cat ? esc(lv.cat) + ' ' : '') + n2 + '개' + (avg > 0 ? ' · 한 달 평균 <b>' + won(avg) + '</b>' : '');
     var eb = $('editMode');
-    if (eb) { eb.hidden = !rows.length; if (!rows.length && listEditing) setListEditing(false); }
+    if (eb) { eb.hidden = !rows.length; if (!rows.length && listEditing) { setListEditing(false); listHist(); } }
     var cEl = $('countTxt');
     if (cEl._html !== ct) { cEl.innerHTML = ct; cEl._html = ct; }
     // 분류 알약: 두 가지 넘게 있을 때만
@@ -2326,6 +2344,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     store('fc_list', { sort: lv.sort, dir: lv.dir });
     openRow = null;
     renderList();
+    listHist();
   }
 
   function renderAll() {
@@ -4007,8 +4026,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   function setTab(t, from) {
     if (t === tab) { window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
     tab = t;
-    if (t !== 'list' && listEditing) setListEditing(false);
-    if (!popping) { if (t === 'list') hPush('tab'); else if (hTop() === 'tab') hDrop(1); }
+    if (t !== 'list') { if (listEditing) setListEditing(false); closeSwipe(); if (openRow) { openRow = null; if (S) renderList(); } }   // 목록에서 열어 둔 것은 닫고 떠남
+    if (!popping) {
+      if (t === 'list') hPush('tab');
+      else { var hn = hCount(['ui']); if (hist[hist.length - 1 - hn] === 'tab') hn++; hDrop(hn); }
+    }
     var el = $('tab-' + t);
     if (el) { el.classList.remove('in-l', 'in-r'); void el.offsetWidth; el.classList.add(from === 'r' ? 'in-r' : 'in-l'); }
     document.body.classList.toggle('on-cal', t === 'cal');
@@ -4030,13 +4052,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!row) return;
     var name = row.getAttribute('data-name');
     if (act === 'toggle') toggle(name);
-    else if (act === 'del') { if (openRow === name) openRow = null; swipeOpen = null; removeItem(name); }
-    else if (act === 'expand') { openRow = openRow === name ? null : name; renderList(); }
+    else if (act === 'del') { if (openRow === name) openRow = null; swipeOpen = null; removeItem(name); listHist(); }
+    else if (act === 'expand') { openRow = openRow === name ? null : name; renderList(); listHist(); }
     else if (act === 'cell') {
       var ci = findItem(name);
       if (ci && b.getAttribute('data-f') === 'day' && needsDate(ci)) { openNoDate([name]); return; }
       if (listEditing && ci && ci.section !== 5) editCell(b, name, b.getAttribute('data-f'));
-      else { openRow = openRow === name ? null : name; renderList(); }
+      else { openRow = openRow === name ? null : name; renderList(); listHist(); }
     }
     else if (act === 'edit') openEdit(name);
     else {
@@ -4045,7 +4067,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     }
   }
   $('list').addEventListener('click', onRowClick);
-  $('editMode').addEventListener('click', function () { setListEditing(!listEditing); if (listEditing) { openRow = null; renderList(); } });
+  $('editMode').addEventListener('click', function () { setListEditing(!listEditing); if (listEditing) { openRow = null; renderList(); } listHist(); });
   $('lhead').addEventListener('click', function (e) {
     var b = e.target.closest('[data-sort]');
     if (b && S) sortBy(b.getAttribute('data-sort'));
@@ -4056,6 +4078,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     lv.cat = b.getAttribute('data-cat');
     openRow = null;
     renderList();
+    listHist();
     window.scrollTo(0, 0);
   });
   $('home').addEventListener('click', onRowClick);
@@ -4091,7 +4114,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       var r = e.target.closest('.row.tr');
       if (!r || r.classList.contains('newr') || r.classList.contains('grey') || r.classList.contains('ghost') || e.target.closest('input, .swdel')) { row = null; return; }
-      if (swipeOpen && swipeOpen !== r) closeSwipe();
+      if (swipeOpen && swipeOpen !== r) { closeSwipe(); listHist(); }
       row = r; x0 = e.clientX; y0 = e.clientY; dx = 0; mode = ''; pid = e.pointerId;
     });
     list.addEventListener('pointermove', function (e) {
@@ -4116,13 +4139,14 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       swipeJust = true; setTimeout(function () { swipeJust = false; }, 350);
       if (dx < -38) { r.classList.add('swiped'); swipeOpen = r; buzz(); }
       else { r.classList.remove('swiped'); if (swipeOpen === r) swipeOpen = null; }
+      listHist();
     }
     list.addEventListener('pointerup', end);
     list.addEventListener('pointercancel', end);
     // 밀고 난 직후 클릭은 무시, 열린 상태에서 다른 곳 누르면 닫기
     document.addEventListener('click', function (e) {
       if (swipeJust) { e.stopPropagation(); e.preventDefault(); return; }
-      if (swipeOpen && !e.target.closest('.swdel')) { e.stopPropagation(); e.preventDefault(); closeSwipe(); }
+      if (swipeOpen && !e.target.closest('.swdel')) { e.stopPropagation(); e.preventDefault(); closeSwipe(); listHist(); }
     }, true);
   })();
   (function () {   // 화면을 옆으로 밀어서 탭 넘기기 (달력 칸 안에서는 달 넘기기)

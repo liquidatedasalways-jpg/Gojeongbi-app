@@ -1210,7 +1210,9 @@ t('layout-old-categories', async () => {
   await p.click('#saveBtn'); await h.idle(900);
   ok(srvItem(h, '월세').cat === '대출', '저장하면 서버 분류도 바뀜: ' + srvItem(h, '월세').cat);
   await back(p);
-  ok((await tabNow(p)) === 'tab-cal', '저장 뒤 뒤로 가기 한 번 → 달력 탭 (기록이 안 남음)');
+  ok((await tabNow(p)) === 'tab-list' && await p.evaluate(() => !document.querySelector('#list .row.tr.open')), '저장 뒤 뒤로 가기 → 펼쳐 둔 줄이 먼저 접힘 (창 기록은 안 남음)');
+  await back(p);
+  ok((await tabNow(p)) === 'tab-cal', '한 번 더 뒤로 → 달력 탭');
   // 이름은 저축처럼 보여도 일부러 '기타'를 고르면 그 선택이 남아야 함 (다시 열어도 기타)
   ok(srvItem(h, '청년 적금').cat === '기타', '(준비) 청년 적금은 서버에 옛 분류 "기타"로 저장돼 있음');
   await p.click('.tabbar [data-tab="list"]'); await sleep(p, 400);
@@ -1947,6 +1949,89 @@ t('list-edit-guard', async () => {
   await p.click('#editMode'); await sleep(p, 200);
   await swipe('#list .row.tr[data-name="관리비"] .tc.nmc', 150);
   ok((await tabNow()) === 'cal' && !(await st()).editing, '수정 켠 채 달력으로 가면 수정이 꺼짐');
+  ok(!realErrors(h).length, '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+});
+
+/* ---------- 목록: 폰 뒤로 가기를 누르면 방금 연 것(수정 켬·펼친 줄·삭제 버튼)부터 하나씩 닫힘 ---------- */
+t('list-back', async () => {
+  const h = await H.open({ seed: 'full', seedAt: '2026-10-02', now: '2026-11-25T21:00', viewport: VP, latency: 0 }); const p = h.page;
+  const cdp = await p.context().newCDPSession(p);
+  const swipe = async (sel, dx) => {
+    const b = await p.locator(sel).first().boundingBox();
+    const x = b.x + b.width / 2, y = b.y + b.height / 2, n = 8;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+    for (let i = 1; i <= n; i++) { await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x + dx * i / n, y }] }); await sleep(p, 16); }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await sleep(p, 500);
+  };
+  const back = async () => { await p.evaluate(() => history.back()); await sleep(p, 500); };
+  const st = () => p.evaluate(() => ({ tab: document.querySelector('.tabbar [data-tab].on').getAttribute('data-tab'), editing: document.body.classList.contains('editing'),
+    open: (document.querySelector('#list .row.tr.open') || { getAttribute: () => '' }).getAttribute('data-name'), swiped: !!document.querySelector('#list .row.tr.swiped'),
+    input: !!document.querySelector('#list input.ci'), depth: (history.state && history.state.fcd) || 0 }));
+  const toList = async () => { await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500); };
+  await toList();
+  // 1) 수정 켬 → 뒤로: 수정만 꺼지고 목록 그대로
+  await p.click('#editMode'); await sleep(p, 300);
+  await back();
+  let s = await st();
+  ok(!s.editing && s.tab === 'list', '수정 켜고 뒤로 가기 → 수정만 꺼짐, 목록 그대로: ' + JSON.stringify(s));
+  await back();
+  ok((await st()).tab === 'cal', '한 번 더 뒤로 → 결제 달력 탭');
+  // 2) 수정 중 칸에 쓰다가 뒤로: 쓰던 것 취소
+  await toList();
+  const before = srvItem(h, '넷플릭스').amount;
+  await p.click('#editMode'); await sleep(p, 300);
+  await p.click('#list .row.tr[data-name="넷플릭스"] .tc.amc'); await sleep(p, 300);
+  await p.fill('#list input.ci', '99,999'); await sleep(p, 100);
+  await back(); await h.idle(600);
+  s = await st();
+  ok(!s.editing && !s.input && s.tab === 'list', '칸에 쓰다가 뒤로 가기 → 입력칸 닫히고 수정 꺼짐');
+  ok(srvItem(h, '넷플릭스').amount === before && !(await p.evaluate(() => /99,999/.test(document.getElementById('list').textContent))), '쓰던 숫자는 저장 안 됨(취소)');
+  // 3) 줄 펼침 → 뒤로: 접힘
+  await p.click('#list .row.tr[data-name="월세"] .tc.nmc'); await sleep(p, 300);
+  ok((await st()).open === '월세', '(준비) 월세 줄 펼침');
+  await back();
+  s = await st();
+  ok(s.open === '' && s.tab === 'list', '펼친 줄에서 뒤로 가기 → 줄만 접힘');
+  // 4) 다른 줄로 바꿔 펼쳐도 뒤로 한 번이면 접힘
+  await p.click('#list .row.tr[data-name="월세"] .tc.nmc'); await sleep(p, 300);
+  await p.click('#list .row.tr[data-name="관리비"] .tc.nmc'); await sleep(p, 300);
+  await back();
+  s = await st();
+  ok(s.open === '' && s.tab === 'list', '펼친 줄을 다른 줄로 바꾼 뒤 뒤로 → 한 번에 접힘');
+  // 5) 삭제 버튼 → 뒤로: 닫힘
+  await swipe('#list .row.tr[data-name="월세"] .tc.nmc', -150);
+  ok((await st()).swiped, '(준비) 삭제 버튼 열림');
+  await back();
+  s = await st();
+  ok(!s.swiped && s.tab === 'list', '삭제 버튼 열고 뒤로 → 버튼만 닫힘');
+  ok(srvItem(h, '월세'), '월세는 그대로 있음');
+  // 6) 겹쳐 연 순서 거꾸로: 수정 켬 → 줄 펼침 → 뒤로(접힘) → 뒤로(수정 꺼짐) → 뒤로(달력)
+  await p.click('#editMode'); await sleep(p, 300);
+  await p.click('#list .row.tr[data-name="월세"] .tc.nmc'); await sleep(p, 300);
+  await back(); s = await st();
+  ok(s.open === '' && s.editing, '수정 켬 + 줄 펼침 → 뒤로: 줄부터 접힘');
+  await back(); s = await st();
+  ok(!s.editing && s.tab === 'list', '또 뒤로: 수정 꺼짐');
+  await back(); s = await st();
+  ok(s.tab === 'cal', '또 뒤로: 결제 달력 탭');
+  // 7) 화면 단추로 닫으면 기록도 같이 정리 (뒤로 한 번에 달력으로)
+  await toList();
+  await p.click('#editMode'); await sleep(p, 300);
+  await p.click('#editMode'); await sleep(p, 600);
+  await p.click('#list .row.tr[data-name="월세"] .tc.nmc'); await sleep(p, 300);
+  await p.click('#list .row.tr[data-name="월세"] .tc.nmc'); await sleep(p, 600);
+  ok((await st()).depth === 1, '완료·다시 눌러 접기로 닫으면 쌓인 기록도 빠짐(목록 탭 1칸만): ' + (await st()).depth);
+  await back();
+  ok((await st()).tab === 'cal', '그 상태에서 뒤로 한 번이면 결제 달력 탭');
+  // 8) 연 채로 탭을 바꾸면 기록이 다 빠짐
+  await toList();
+  await p.click('#editMode'); await sleep(p, 300);
+  await p.click('#list .row.tr[data-name="월세"] .tc.nmc'); await sleep(p, 300);
+  await p.click('.tabbar [data-tab="cal"]'); await sleep(p, 800);
+  s = await st();
+  ok(s.tab === 'cal' && s.depth === 0 && !s.editing && s.open === '', '수정·펼친 줄을 연 채 달력 탭을 누르면 다 닫히고 기록도 비움: ' + JSON.stringify(s));
   ok(!realErrors(h).length, '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
   await h.close();
 });
