@@ -1891,6 +1891,18 @@ t('list-edit-guard', async () => {
   const before = srvItem(h, '넷플릭스').amount;
   let s = await st();
   ok(s.btn === '수정' && s.pressed === 'false' && s.hint === 'none', '목록 위에 "수정" 단추, 처음엔 꺼져 있음');
+  for (const vp of [VP, SMALL]) {
+    await p.setViewportSize(vp); await sleep(p, 300);
+    const ov = await p.evaluate(() => {
+      const bx = (e) => e.getBoundingClientRect(), me = bx(document.getElementById('editMode'));
+      const hits = [...document.querySelectorAll('button, a, [data-act], .fc, input')].filter((e) => e.id !== 'editMode' && !e.closest('#editMode') && e.offsetParent && getComputedStyle(e).visibility !== 'hidden')
+        .filter((e) => { const o = bx(e); return Math.min(me.right, o.right) - Math.max(me.left, o.left) > 0 && Math.min(me.bottom, o.bottom) - Math.max(me.top, o.top) > 0; }).map((e) => e.id || e.className);
+      const t = document.getElementById('title');
+      return { hits, h: Math.round(me.height), titleCut: t.scrollWidth > t.clientWidth + 1 };
+    });
+    ok(!ov.hits.length && ov.h >= 44 && !ov.titleCut, '폭 ' + vp.width + ': 수정 단추가 다른 단추와 안 겹치고(누르는 곳 ' + ov.h + 'px), 제목도 안 잘림 ' + JSON.stringify(ov.hits));
+  }
+  await p.setViewportSize(VP); await sleep(p, 300);
   await p.click('#list .row.tr[data-name="넷플릭스"] .tc.amc'); await sleep(p, 300);
   s = await st();
   ok(!s.input && s.open === '넷플릭스', '수정을 안 켜고 금액 칸을 누르면 입력칸 대신 줄이 펼쳐짐');
@@ -1929,6 +1941,7 @@ t('list-edit-guard', async () => {
   // 줄 위에서 오른쪽으로 밀면 달력 탭
   await swipe('#list .row.tr[data-name="관리비"] .tc.nmc', 150);
   ok((await tabNow()) === 'cal', '줄 위에서 오른쪽으로 밀면 결제 달력 탭으로 넘어감');
+  ok(await p.evaluate(() => !document.getElementById('editMode').offsetParent), '달력 탭에선 수정 단추가 안 보임');
   // 수정 켠 채 탭을 바꾸면 꺼짐
   await p.click('.tabbar [data-tab="list"]'); await sleep(p, 500);
   await p.click('#editMode'); await sleep(p, 200);

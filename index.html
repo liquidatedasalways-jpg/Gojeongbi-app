@@ -212,10 +212,11 @@ body.on-cal .calnav { display: flex; }
 .bar2 { display: flex; align-items: center; min-height: 28px; padding: 0 8px 4px; font-size: 13px; color: var(--sub); }
 .bar2 #countTxt { flex: 1; min-width: 0; }
 .bar2 b { font-weight: 700; color: var(--ink); white-space: nowrap; }
-/* 목록 '수정' 단추: 눌러야만 금액·결제일 칸을 그 자리에서 고칠 수 있음(실수로 숫자가 바뀌지 않게). 켜면 '완료'(채운 색) */
-.bar2 .edt { flex: none; height: 44px; margin: -8px -4px -8px 0; padding: 0 4px; display: flex; align-items: center; font-size: 13px; font-weight: 700; white-space: nowrap; }
-.bar2 .edt span { display: block; height: 34px; line-height: 34px; padding: 0 14px; border-radius: 17px; background: var(--sel); color: var(--accent-text); }
-.bar2 .edt[aria-pressed="true"] span { background: var(--accent); color: var(--accent-ink); }
+/* 목록 '수정' 단추(위 막대, 목록 탭에서만): 눌러야만 금액·결제일 칸을 그 자리에서 고칠 수 있음(실수로 숫자가 바뀌지 않게). 켜면 '완료'(채운 색) */
+.top .edt { flex: none; height: 44px; padding: 0 4px; display: flex; align-items: center; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.top .edt[hidden], body.on-cal .top .edt, body.setup-on .top .edt { display: none; }
+.top .edt span { display: block; height: 32px; line-height: 32px; padding: 0 14px; border-radius: 16px; background: var(--sel); color: var(--accent-text); }
+.top .edt[aria-pressed="true"] span { background: var(--accent); color: var(--accent-ink); }
 .edhint { display: none; margin: 0 8px 8px; font-size: 13px; font-weight: 600; color: var(--accent-text); }
 body.editing .edhint { display: block; }
 body.editing #list .row.tr:not(.muted) .tc.amc, body.editing #list .row.tr:not(.muted) .tc.dyc { position: relative; }
@@ -1008,6 +1009,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   <div class="top-in">
     <h1 id="title">결제 달력</h1>
     <button class="sync" id="sync" type="button"><span class="sp"></span><span id="syncTxt"></span></button>
+    <button class="edt" type="button" id="editMode" aria-pressed="false" hidden><span>수정</span></button>
     <div class="calnav" id="calNav">
       <button class="today-btn" type="button" id="calToday" hidden><span>오늘</span></button>
       <button class="nav" type="button" id="calPrev" aria-label="이전 달"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
@@ -1026,7 +1028,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 </main>
 <main class="tab" id="tab-setup"></main>
 <main class="tab" id="tab-list">
-  <div class="bar2"><span id="countTxt"></span><button class="edt" type="button" id="editMode" aria-pressed="false" hidden><span>수정</span></button></div>
+  <div class="bar2"><span id="countTxt"></span></div>
   <div class="fchips" id="catFilter"></div>
   <div class="edhint" id="edHint">금액이나 결제일을 눌러 바로 고쳐요. 다 했으면 완료.</div>
   <div class="lcard">
