@@ -421,6 +421,15 @@ body.on-cal .calnav { display: flex; }
 .toast span { flex: 1; min-width: 0; padding: 10px 0; }
 .toast button { flex: none; min-width: 44px; min-height: 44px; padding: 0 10px; font-weight: 700; color: var(--toast-act); text-align: center; white-space: nowrap; }
 .toast.error button { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
+/* 업데이트 알림 띠: 화면 위에서 살짝 내려옴. 앱 새 버전(모두) / 서버 새 버전(앱 주인에게만). 닫으면 같은 버전은 하루 동안 안 뜸 */
+.upb { position: fixed; left: 50%; top: calc(8px + env(safe-area-inset-top)); z-index: 30; width: calc(100% - 24px); max-width: 560px; min-height: 52px; display: flex; align-items: center; padding: 4px 0 4px 18px; border-radius: 16px; background: var(--accent); color: var(--accent-ink); box-shadow: 0 8px 24px rgba(0,0,0,.2); font-size: 15px; font-weight: 700; line-height: 1.3; transform: translate(-50%, calc(-100% - 16px - env(safe-area-inset-top))); visibility: hidden; transition: transform .36s cubic-bezier(.2,.8,.2,1), visibility 0s .36s; }
+.upb.on { transform: translate(-50%, 0); visibility: visible; transition: transform .36s cubic-bezier(.2,.8,.2,1); }
+.upb .t { flex: 1; min-width: 0; padding: 8px 0; }
+.upb .go { flex: none; min-height: 44px; padding: 0 0 0 10px; display: flex; align-items: center; }
+.upb .go span { display: block; padding: 8px 14px; border-radius: 999px; background: var(--accent-ink); color: var(--accent); font-size: 13px; font-weight: 800; white-space: nowrap; }
+.upb .x { flex: none; width: 44px; height: 44px; display: grid; place-items: center; opacity: .82; }
+.upb .x svg { width: 18px; height: 18px; }
+@media (prefers-reduced-motion: reduce) { .upb, .upb.on { transition: none; } }
 
 @keyframes tabInL { from { opacity: .3; transform: translateX(28px); } to { opacity: 1; transform: none; } }
 @keyframes tabInR { from { opacity: .3; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
@@ -574,7 +583,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 22, "slim": false, "verified": false};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 23, "slim": false, "verified": false};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -1032,6 +1041,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
 </div>
 
 <div class="toast" id="toast"><span id="toastTxt"></span><button id="toastBtn" type="button"></button></div>
+<div class="upb" id="upb" role="status" aria-live="polite"><span class="t" id="upbTxt"></span><button class="go" id="upbGo" type="button"><span id="upbGoTxt"></span></button><button class="x" id="upbX" type="button" aria-label="닫기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
 
 <script>
 (function () {
@@ -2321,14 +2331,64 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     try { return !!me && localStorage.getItem('fc_admin') === me; } catch (e) { return false; }
   }
   function needUpdate() { return isAdmin() && (Number(S.ver) || 0) < window.FC_AUTH.serverVer; }
-  function checkServerUpdate() {
-    if (updAsked || updating || !needUpdate()) return;
-    updAsked = true;
-    toast('새 버전이 있어요.', { action: '업데이트', ms: 12000, onAction: function () { leave(runServerUpdate); } });
+  function checkServerUpdate() { refreshUpb(); }
+  /* ---------- 업데이트 알림 띠 (화면 위에서 내려옴) ----------
+   *  - 앱 새 버전(모두): 앱을 켜 둔 채 오래 쓰면 옛 화면이 남음. 배포된 sw.js의 버전 번호가 지금 화면(build)보다 크면 '새로고침'을 권함.
+   *    안 눌러도 다음에 앱을 새로 열면 새 화면이 자동으로 옴.
+   *  - 서버 새 버전(앱 주인에게만): 누르면 서버 업데이트. 주인이 아닌 계정에는 안 뜸 (isAdmin).
+   *  닫기(✕)를 누르면 같은 버전은 하루 동안 다시 안 뜸. 기록은 이 기기에만 (fc_upb: { 'app23': 다시 뜰 시각 }) */
+  var UPB_DAY = 24 * 3600000, newBuild = 0, appChecked = 0, upbNow = '';
+  function upbMap() { try { var o = JSON.parse(localStorage.getItem('fc_upb') || '{}'); return (o && typeof o === 'object') ? o : {}; } catch (e) { return {}; } }
+  function upbHeld(key) { return Number(upbMap()[key]) > Date.now(); }
+  function upbHold(key, ms) {
+    var o = upbMap(), now = Date.now(), n = {};
+    for (var k in o) if (Number(o[k]) > now) n[k] = o[k];   // 지난 기록은 버림
+    n[key] = now + ms;
+    try { localStorage.setItem('fc_upb', JSON.stringify(n)); } catch (e) {}
   }
+  function refreshUpb() {
+    var W = window.FC_AUTH, el = $('upb');
+    if (!el || !W) return;
+    var key = '';
+    if (newBuild > (W.build || 0)) key = 'app' + newBuild;
+    else if (!updating && needUpdate()) key = 'srv' + W.serverVer;
+    if (key && upbHeld(key)) key = '';
+    upbNow = key;
+    if (!key) { el.classList.remove('on'); return; }
+    var app = key.indexOf('app') === 0;
+    $('upbTxt').textContent = app ? '새 버전이 나왔어요' : '서버 새 버전이 있어요';
+    $('upbGoTxt').textContent = app ? '새로고침' : '업데이트';
+    el.classList.add('on');
+  }
+  /** 배포된 앱 버전을 확인 (열 때 한 번, 그 뒤로는 앱으로 돌아올 때 10분에 한 번까지) */
+  function checkAppUpdate() {
+    var W = window.FC_AUTH;
+    if (!W || !W.build || Date.now() - appChecked < 10 * 60000) return;
+    appChecked = Date.now();
+    try {
+      fetch('sw.js?v=' + appChecked, { cache: 'no-store' }).then(function (r) { return r.ok ? r.text() : ''; }).then(function (t) {
+        var m = /fc-shell-v(\d+)/.exec(t || '');
+        if (m && Number(m[1]) > newBuild) { newBuild = Number(m[1]); refreshUpb(); }
+      }, function () {});
+    } catch (e) {}
+  }
+  function upbGo() {
+    var key = upbNow;
+    if (!key) return;
+    if (key.indexOf('app') === 0) {
+      upbHold(key, 10 * 60000);   // 새로 열었는데도 옛 화면이 오는 경우(중간 저장소가 아직 옛것)에 띠가 맴돌지 않게 10분 쉼
+      $('upb').classList.remove('on');
+      leave(function () { location.reload(); });
+      return;
+    }
+    $('upb').classList.remove('on');
+    leave(runServerUpdate);
+  }
+  function upbClose() { if (upbNow) upbHold(upbNow, UPB_DAY); upbNow = ''; $('upb').classList.remove('on'); }
   function runServerUpdate() {
     if (updating) return;
     updating = true;
+    refreshUpb();
     toast('업데이트하는 중… (10초쯤)', { ms: 30000 });
     var p = window.FC_AUTH.updateServer();
     p && p.then(updDone, updFail);
@@ -2340,6 +2400,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function updFail(e) {
     updating = false;
+    refreshUpb();
     var m = String((e && e.message) || e);
     if (/usersettings/.test(m)) {
       updAsked = false;
@@ -4070,7 +4131,10 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hiddenAt = Date.now(); return; }
     if (hiddenAt && Date.now() - hiddenAt > 30000 && !sheetMode) enqueue({ type: 'load', light: true });
+    checkAppUpdate();
   });
+  $('upbGo').onclick = upbGo;
+  $('upbX').onclick = upbClose;
   (function () {   // 아래로 끌어서 닫기
     var sh = $('sheet'), y0 = null, dy = 0;
     sh.addEventListener('touchstart', function (e) {
@@ -4134,6 +4198,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var p = window.FC_AUTH && window.FC_AUTH.resumeUpdate && window.FC_AUTH.resumeUpdate();
     if (p) { updating = true; updAsked = true; toast('업데이트하는 중… (10초쯤)', { ms: 30000 }); p.then(updDone, updFail); }
   })();
+  checkAppUpdate();
 })();
 </script>
 <script>

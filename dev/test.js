@@ -1733,6 +1733,91 @@ t('sale-ui-bits', async () => {
   await h.close();
 });
 
+/* ---------- 업데이트 알림 띠 (2026-11-25): 화면 위에서 내려옴 ----------
+ * 앱 새 버전(모두): 배포된 sw.js 번호가 지금 화면보다 크면 '새로고침'. 서버 새 버전: 앱 주인에게만 '업데이트'. */
+const upbOf = (p) => p.evaluate(() => {
+  const e = document.getElementById('upb'), r = e.getBoundingClientRect(), cs = getComputedStyle(e);
+  const box = (id) => { const b = document.getElementById(id).getBoundingClientRect(); return { w: Math.round(b.width), h: Math.round(b.height) }; };
+  return { on: e.classList.contains('on'), vis: cs.visibility === 'visible' && r.bottom > 0, top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left), right: Math.round(r.right),
+    txt: document.getElementById('upbTxt').textContent, go: document.getElementById('upbGoTxt').textContent, goBox: box('upbGo'), xBox: box('upbX'), vw: innerWidth };
+});
+t('update-banner', async () => {
+  const fs = require('fs'), os = require('os'), path = require('path');
+  // 1) 평소(배포된 버전 = 지금 화면): 안 뜸
+  let h = await H.open({ seed: 'full', now: '2026-11-25T10:40', viewport: VP, latency: 50 }); let p = h.page;
+  await sleep(p, 1500);
+  let b = await upbOf(p);
+  ok(!b.on && !b.vis, '새 버전이 없으면 띠가 안 보임 (화면 밖에 숨어 있음, top ' + b.top + ')');
+  await h.close();
+
+  // 2) 앱 새 버전: 모두에게
+  h = await H.open({ seed: 'full', now: '2026-11-25T10:40', viewport: VP, latency: 50, noGo: true }); p = h.page;
+  let swHits = 0;
+  await h.ctx.route('**/sw.js*', (route) => { swHits++; route.fulfill({ status: 200, contentType: 'text/javascript', body: "var C = 'fc-shell-v99';" }); });
+  await h.go(); await sleep(p, 1500);
+  b = await upbOf(p);
+  ok(b.on && b.vis && b.txt === '새 버전이 나왔어요' && b.go === '새로고침', '배포된 버전이 더 높으면 위에서 띠가 내려옴: ' + b.txt + ' [' + b.go + ']');
+  ok(b.top >= 0 && b.top <= 16 && b.left >= 8 && b.right <= b.vw - 8 && b.bottom - b.top <= 64, '띠가 화면 맨 위에, 양옆 여백 안에 있음 ' + JSON.stringify({ t: b.top, b: b.bottom, l: b.left, r: b.right }));
+  ok(b.goBox.h >= 44 && b.xBox.h >= 44 && b.xBox.w >= 44, '누르는 곳 44px 이상 ' + JSON.stringify([b.goBox, b.xBox]));
+  await h.shot('update-banner-app');
+  await p.click('#upbX'); await sleep(p, 600);
+  b = await upbOf(p);
+  ok(!b.on && !b.vis, '닫기(✕)를 누르면 올라가 사라짐');
+  await p.reload(); await h.idle(1200); await sleep(p, 800);
+  ok(!(await upbOf(p)).on, '닫은 버전은 다시 열어도 안 뜸 (하루 동안)');
+  await p.evaluate(() => { const o = JSON.parse(localStorage.getItem('fc_upb')); o.app99 = Date.now() - 1000; localStorage.setItem('fc_upb', JSON.stringify(o)); });
+  await p.reload(); await h.idle(1200); await sleep(p, 800);
+  ok((await upbOf(p)).on, '하루가 지나면 다시 뜸');
+  await p.evaluate(() => { window.__mark = 1; });
+  await p.click('#upbGo'); await p.waitForFunction(() => !window.__mark, null, { timeout: 8000 }).catch(() => {}); await h.idle(1200); await sleep(p, 800);
+  ok(await p.evaluate(() => !window.__mark), '새로고침을 누르면 화면을 새로 받아 옴');
+  b = await upbOf(p);
+  ok(!b.on, '새로 받았는데도 옛 화면이면(중간 저장소가 아직 옛것) 띠가 바로 또 뜨며 맴돌지 않음');
+  ok(await homeHas(p, '넷플릭스') && !realErrors(h).length, '새로 연 뒤 화면 정상, 오류 없음 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+
+  // 3) 서버 새 버전: 앱 주인에게만
+  const old = fs.readFileSync(path.join(__dirname, '..', 'setup', 'Code.gs.txt'), 'utf8').replace(/var SERVER_VER = \d+;/, 'var SERVER_VER = 10;');
+  const f = path.join(os.tmpdir(), 'fc-code-v10-' + process.pid + '.txt'); fs.writeFileSync(f, old);
+  const OWNER = 'owner@example.com', GUEST = 'guest@example.com';
+  for (const who of [GUEST, OWNER]) {
+    const gas = GAS.create({ code: f });
+    h = await H.open({ gas, email: who, seed: 'full', now: '2026-11-25T10:40', viewport: VP, latency: 50, noGo: true }); p = h.page;
+    if (who === OWNER) gas.user(who).props.vs_admin = '1';
+    const api = [];
+    await h.ctx.route('https://script.googleapis.com/v1/projects/**', (route) => {
+      const u = route.request().url(), m = route.request().method();
+      api.push(m + ' ' + u.replace(/^.*\/v1\/projects\/[^/]+\//, ''));
+      route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(/versions$/.test(u) ? { versionNumber: 7 } : {}) });
+    });
+    await h.go(); await sleep(p, 1500);
+    b = await upbOf(p);
+    if (who === GUEST) {
+      ok(gas.call(who, 'api_load', [true]).ver === 10 && !b.on && !b.vis, '서버가 옛 버전이어도 주인이 아닌 계정에는 띠가 안 뜸');
+      ok(!(await toastState(p)).on, '주인이 아닌 계정에는 업데이트 알림도 없음');
+      ok(!realErrors(h).length, '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
+      await h.close(); continue;
+    }
+    ok(b.on && b.vis && b.txt === '서버 새 버전이 있어요' && b.go === '업데이트', '앱 주인에게는 띠가 내려옴: ' + b.txt + ' [' + b.go + ']');
+    await h.shot('update-banner-server');
+    await p.click('#upbX'); await sleep(p, 500);
+    await p.reload(); await h.idle(1200); await sleep(p, 600);
+    ok(!(await upbOf(p)).on, '닫으면 같은 서버 버전은 다시 열어도 안 뜸');
+    await p.click('#menuBtn'); await sleep(p, 600);
+    ok(await p.evaluate(() => /새 버전 있음/.test((document.getElementById('mUpd') || {}).textContent || '')), '닫아도 설정의 서버 업데이트 줄에는 "새 버전 있음"이 남아 있음');
+    await p.click('#sheetClose'); await sleep(p, 400);
+    await p.evaluate(() => localStorage.removeItem('fc_upb'));
+    await p.reload(); await h.idle(1200); await sleep(p, 600);
+    ok((await upbOf(p)).on, '(준비) 띠가 다시 뜸');
+    await p.click('#upbGo'); await p.waitForLoadState('load').catch(() => {}); await h.idle(2500); await sleep(p, 1200);
+    const last = h.oauth[h.oauth.length - 1] || {};
+    ok(last.prompt === 'consent' && /script\.projects/.test(last.scope) && /script\.deployments/.test(last.scope), '업데이트를 누르면 서버를 바꿀 권한을 구글에서 받아 옴 (처음 한 번)');
+    ok(api.length === 3 && /^PUT content/.test(api[0]) && /^POST versions/.test(api[1]) && /^PUT deployments\//.test(api[2]), '새 코드 올리기 → 새 버전 → 배포 주소에 연결 순서로 부름: ' + api.join(' | '));
+    ok(!realErrors(h).length, '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
+    await h.close();
+  }
+});
+
 (async () => {
   const only = process.argv.slice(2);
   const t0 = Date.now();
