@@ -187,6 +187,23 @@ body.on-cal .calnav { display: flex; }
 .nl { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .nl .nm { min-width: 0; }
 .bdg { flex: none; display: inline-flex; align-items: center; height: 15px; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: .04em; background: var(--sel); color: var(--accent-text); }
+/* 직접 이체(자동으로 안 나가서 내가 보내야 하는 것): 이름 옆 테두리 '직접', 아래 줄 '직접 이체', 진한 체크 동그라미, 달력 날짜 점 */
+.bdg.man { height: 16px; padding: 0 4px; font-size: 11px; letter-spacing: -.01em; background: none; box-shadow: inset 0 0 0 1px var(--accent-text); color: var(--accent-text); }
+.manl { color: var(--accent-text); font-weight: 700; }
+.row.man:not(.checked) .chk i { border-color: var(--accent); border-width: 2px; }
+.cd.man .n::after { content: ""; position: absolute; top: 1px; right: -3px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1.5px var(--card); }
+.cd.today.man .n::after { right: -5px; }
+.seg.two { display: grid; grid-template-columns: 1fr 1fr; }
+.duo { display: flex; gap: 8px; align-items: flex-end; }
+.duo > .fld { min-width: 0; padding-bottom: 0; }
+.duo > .fld:first-child { flex: 1; }
+.duo > .fld + .fld { flex: none; }
+.duo + .hint { padding: 6px 0 0; }
+.duo + .hint:empty { display: block; height: 8px; padding: 0; }
+.seg.pay { padding: 2px; }
+.seg.pay button { padding: 0 16px; }
+.pm .qd .seg { flex: none; }
+.pm .qd .seg button { padding: 0 12px; }
 .bdg.last { background: var(--fill); background: color-mix(in srgb, var(--grape) 14%, transparent); color: var(--grape); }
 .checked .bdg, .row.muted .bdg { opacity: .55; }
 .checked .nm, .checked .am, .checked .av, .checked .dv, .row.muted .nm, .row.muted .av, .row.muted .dv { color: var(--muted); font-weight: 500; }
@@ -598,7 +615,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 28, "slim": false, "verified": false};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 29, "slim": false, "verified": false};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
@@ -1729,9 +1746,43 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   var BDG_NEW = '<span class="bdg new" title="새로 넣은 항목">NEW</span>', BDG_LAST = '<span class="bdg last" title="마지막 결제">LAST</span>';
   /** 이름 옆 작은 표시. due를 주면 그 날짜의 결제에 해당할 때만 (달력 아래 줄), 안 주면 항목 기준 (목록) */
+  /** 내는 방법: 'auto'(자동으로 나감) / 'manual'(직접 이체) / ''(모름).
+   *  자동이체 칸(O/X)이 먼저. 비어 있으면 결제 방식 글자, 그다음 결제 수단 종류로 짐작 (짐작한 값은 저장 안 함) */
+  function payMode(it) {
+    var a = String(it.auto || '').trim().toUpperCase();
+    if (a === 'O') return 'auto';
+    if (a === 'X') return 'manual';
+    var m = String(it.method || '');
+    if (/자동이체|자동결제|정기결제|CMS/i.test(m)) return 'auto';
+    if (/수동|직접|지로|고지서|현금|무통장/.test(m)) return 'manual';
+    if (/카드|페이|간편결제/.test(m)) return 'auto';
+    var t = accTypeOf(it.account);
+    return t === '카드' || t === '간편결제' ? 'auto' : t === '현금' ? 'manual' : '';
+  }
+  function isManual(it) { return payMode(it) === 'manual'; }
+  function accTypeOf(name) {
+    name = String(name || '').trim();
+    if (!name || name === '?') return '';
+    var a = (S.accounts || []).filter(function (o) { return o.name === name; })[0];
+    return parseAcc(a || { name: name, memo: '' }).type;
+  }
+  /** 자동이체 칸 (O/X 두 가지만 고르는 칸일 때만) */
+  function autoFieldOf() {
+    return S && S.meta ? S.meta.fields.filter(isAutoField)[0] : null;
+  }
+  function isAutoField(f) {
+    var o = f.options || [];
+    return f.kind === 'select' && /^자동이체/.test(f.label) && o.length === 2 && o.indexOf('O') >= 0 && o.indexOf('X') >= 0;
+  }
+  var BDG_MAN = '<span class="bdg man" title="직접 이체하는 항목">직접</span>';
+  /** 첫 화면 줄의 아래 줄: 직접 이체면 앞에 '직접 이체', 그다음 결제 수단 */
+  function homeLine2(it) {
+    var a = acctTxt(it);
+    return isManual(it) ? '<span class="manl">직접 이체</span>' + (a ? ' · ' + a : '') : a;
+  }
   function bdgHtml(it, due) {
     if (it.section === 5) return '';
-    var h = '';
+    var h = isManual(it) ? BDG_MAN : '';
     if (due ? (isNew(it) && isFirstDue(it, due)) : isNew(it)) h += BDG_NEW;
     if (it.last && (!due || due === it.next)) h += BDG_LAST;
     return h;
@@ -1808,10 +1859,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var ds = ymd(y, m, d);
       var list = byDay[ds] || [];
       var sum = 0, missed = false, allPaid = list.length > 0;
-      list.forEach(function (o) { if (o.amt != null) sum += o.amt; if (o.st === 'missed') missed = true; if (o.st !== 'paid') allPaid = false; });
+      var manDay = false;   // 아직 안 낸 직접 이체가 있는 날: 숫자 옆에 점
+      list.forEach(function (o) { if (o.amt != null) sum += o.amt; if (o.st === 'missed') missed = true; if (o.st !== 'paid') { allPaid = false; if (isManual(o.it)) manDay = true; } });
       var dow = (first + d - 1) % 7;
       var cls = 'cd' + (dow === 0 ? ' sun' : dow === 6 ? ' sat' : '') + (hol[ds] ? ' hol' : '') + (ds < ts ? ' past' : '') +
-        (ds === ts ? ' today' : '') + (ds === view.sel ? ' sel' : '') + (list.length ? ' has' : '');
+        (ds === ts ? ' today' : '') + (ds === view.sel ? ' sel' : '') + (list.length ? ' has' : '') + (manDay ? ' man' : '');
       h += '<div class="' + cls + '"' + (list.length ? ' data-day="' + ds + '"' : '') + '><span class="n">' + d + '</span>' +
         (SHOW_AMT && list.length ? '<span class="a' + (allPaid ? ' paid' : missed ? ' over' : '') + '">' + (allPaid ? CHECK_SVG : '') + (sum ? man(sum) : list.length + '건') + '</span>' : '') + '</div>';
     }
@@ -1841,7 +1893,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var grpHtml = function (rows, empty) {
       var g = '<div class="grp">';
       if (!rows.length) g += '<div class="empty">' + esc(empty) + '</div>';
-      rows.forEach(function (r) { g += '<div class="row' + (r.cls ? ' ' + r.cls : '') + '" data-name="' + esc(r.it.name) + '">' + rowHtml(r) + '</div>'; });
+      rows.forEach(function (r) { g += '<div class="row' + (r.cls ? ' ' + r.cls : '') + (isManual(r.it) ? ' man' : '') + '" data-name="' + esc(r.it.name) + '">' + rowHtml(r) + '</div>'; });
       return g + '</div>';
     };
     var sumOf = function (list) { var n = 0; list.forEach(function (o) { if (o.amt != null) n += o.amt; }); return n; };
@@ -1859,13 +1911,13 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       un.sort(function (a, b) { var x = nextOf(a), z = nextOf(b); return x < z ? -1 : x > z ? 1 : (b.amount || 0) - (a.amount || 0); });
       var past = [], soon = [], pastN = 0, pastSum = 0, soonN = 0, soonSum = 0, canAll = 0;
       rem.forEach(function (r) {
-        past.push({ key: 'r:' + r.key, it: r.it, cls: '', check: 'ack', ackKey: r.key, line2: acctTxt(r.it), st: pm.m + '월 기록 없음', stc: 'over' });
+        past.push({ key: 'r:' + r.key, it: r.it, cls: '', check: 'ack', ackKey: r.key, line2: homeLine2(r.it), st: pm.m + '월 기록 없음', stc: 'over' });
         pastN++; pastSum += r.it.amount || 0;
       });
       un.forEach(function (it) {
         var nx = nextOf(it), s = stOf(nx, !it.checked), late = nx < ts;
         (late ? past : soon).push({ key: 'i:' + it.name, it: it, cls: it.checked ? 'checked' : '', check: 'toggle', st: s.t, stc: it.checked ? '' : s.c,
-          bdg: bdgHtml(it, nx), line2: acctTxt(it) });
+          bdg: bdgHtml(it, nx), line2: homeLine2(it) });
         if (it.checked) return;
         if (late) { pastN++; pastSum += it.amount || 0; if (it.canCheck) canAll++; }
         else { soonN++; soonSum += it.amount || 0; }
@@ -1916,7 +1968,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     else if (dd === 0) s = { t: '오늘', c: 'today' };
     else if (dd > 0 && dd <= 3) s = { t: relDay(o.due) + (view.sel ? '' : ' · ' + p.d + '일'), c: '' };
     return { key: 'o:' + it.name + o.due, it: it, cls: o.st === 'paid' ? 'checked' : '', check: canToggle ? 'toggle' : 'open', st: s.t, stc: s.c,
-      bdg: bdgHtml(it, o.due), line2: acctTxt(it) };
+      bdg: bdgHtml(it, o.due), line2: homeLine2(it) };
   }
   function moveMonth(k) {
     var n = view.off + k;
@@ -2195,6 +2247,65 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     box._on = mark;
     box.innerHTML = '<div class="welcome"><h2>매달 나가는 돈,<br>한 번만 적어두세요</h2><p>종류를 고르고 금액과 결제일만 적으면 달력에 나와요.' + (S.calOn ? '<br>내 구글 캘린더에도 자동으로 들어가요.' : '') + '</p>' +
       '<button class="btn primary" type="button" id="wAdd">' + PLUS_SVG + '첫 고정비 넣기</button></div>';
+  }
+  /** 상세의 '내는 방법' 줄. 자동이체 칸이 비어서 짐작한 거면 작게 알려줌 */
+  function payKv(it) {
+    var pm = payMode(it), a = String(it.auto || '').trim().toUpperCase(), m = String(it.method || '').trim();
+    // 전처럼 '결제 방식'이나 '자동이체'를 적어 둔 항목, 또는 직접 이체인 항목만 한 줄 (상세 창 높이가 안 늘게)
+    if (!m && a !== 'O' && a !== 'X' && pm !== 'manual') return '';
+    var t = pm === 'manual' ? '직접 이체' : pm === 'auto' ? '자동' : '안 정함';
+    return kv('내는 방법', esc(t + (m && m !== t ? ' · ' + m : '')));
+  }
+  /* 자동·직접 한 번에 정하기 (설정 > 관리). 끝나지 않은 항목 전부, 고른 것만 저장 */
+  function openPayModes() {
+    var af = autoFieldOf();
+    if (!af) return;
+    var list = items().filter(function (it) { return it.section !== 5; });
+    var h = '<div class="tip">직접 이체로 정하면 첫 화면에 \'직접 이체\'로 표시되고, 달력 날짜에 점이 찍혀요.</div><div class="grp pm">';
+    list.forEach(function (it, i) {
+      var a = String(it.auto || '').trim().toUpperCase(), g = payMode(it);
+      h += '<div class="qd"><div class="l"><b>' + esc(it.name) + '</b><small>' + joinDot([it.amount != null ? won(it.amount) : '금액 없음', acctTxt(it),
+          a === 'O' || a === 'X' ? '' : (g ? '짐작: ' + (g === 'manual' ? '직접' : '자동') : '안 정함')]) + '</small></div>' +
+        '<span class="seg two" data-pm="' + i + '" data-v="' + a + '"><button type="button" data-v="O"' + (a === 'O' ? ' class="on"' : '') + '>자동</button>' +
+        '<button type="button" data-v="X"' + (a === 'X' ? ' class="on"' : '') + '>직접</button></span></div>';
+    });
+    h += '</div>';
+    openSheet('자동·직접 정하기', h, 'paymode', null, '<button class="btn primary" type="button" id="pmSave">저장</button>');
+    var segs = $('sheetBody').querySelectorAll('[data-pm]');
+    segs.forEach(function (seg) {
+      seg.onclick = function (e) {
+        var b = e.target.closest('button');
+        if (!b) return;
+        var v = b.getAttribute('data-v');
+        if (seg.getAttribute('data-v') === v) v = '';   // 고른 걸 한 번 더 누르면 '안 정함'
+        seg.setAttribute('data-v', v);
+        seg.querySelectorAll('button').forEach(function (x) { x.className = x.getAttribute('data-v') === v ? 'on' : ''; });
+      };
+    });
+    $('pmSave').onclick = function () {
+      var ops = [];
+      segs.forEach(function (seg) {
+        var it = list[+seg.getAttribute('data-pm')], v = seg.getAttribute('data-v');
+        if (v === String(it.auto || '').trim().toUpperCase()) return;
+        var vals = {}; vals[af.col] = v;
+        ops.push({ name: it.name, vals: vals, old: prevVals(it, vals) });
+      });
+      closeSheet();
+      if (!ops.length) return;
+      var left = ops.length, back = [], say = ops.length > 1 ? ops.length + '건' : ops[0].name;
+      ops.forEach(function (o) {
+        var it = findItem(o.name);
+        if (it) setLocal(it, o.vals);
+        enqueue({ type: 'save', oldName: o.name, vals: o.vals, onDone: function (res) {
+          if (!res.ok) return;
+          if (o.old) back.push({ name: res.name, old: o.old });
+          if (--left > 0) return;
+          if (back.length) undoToast(say + ' 내는 방법을 정했어요', function () { undoSaves(back, say + ' 되돌렸어요'); });
+          else toast(say + ' 내는 방법을 정했어요');
+        } });
+      });
+      renderAll();
+    };
   }
   function openNoDate(only) {
     var list = items().filter(function (it) { return only ? only.indexOf(it.name) >= 0 : needsDate(it); });
@@ -2616,6 +2727,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       else if (df && c === df.col) it.day = Number(v) || 0;
       else if (sf && c === sf.col) it.start = String(v);
       else if (S.accCol && c === S.accCol) it.account = String(v);
+      else if (S.meta.fields.some(function (f) { return f.col === c && isAutoField(f); })) it.auto = String(v);
       else if (S.meta.fields.some(function (f) { return f.col === c && f.kind === 'parent'; })) it.parent = String(v);
     }
   }
@@ -2710,7 +2822,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var meta = joinDot([when, esc(cycleShort(it)), it.amtType === '변동' ? '변동 금액' : '', it.last ? '<span class="lastp">마지막 결제</span>' : '']);
     var h = (it.amount != null ? '<div class="dnum">' + esc(num(it.amount)) + '<small>원</small></div>' : '<div class="dnum none">금액 없음</div>') +
       '<div class="dmeta">' + pill + (meta ? '<span>' + meta + '</span>' : '') + '</div>';
-    if (it.next && !it.checked && /자동이체|이체/.test(String(it.method) + ' ' + (it.auto === 'O' ? '자동이체' : ''))) {
+    if (it.next && !it.checked && payMode(it) === 'auto' && /자동이체/.test(String(it.method) + ' ' + (it.auto === 'O' ? '자동이체' : ''))) {
       var nd = parse(it.next), dw = new Date(nd.y, nd.m - 1, nd.d).getDay();
       var hn = S.holidays && S.holidays[it.next];
       if (dw === 0 || dw === 6 || hn) h += '<div class="tipline">' + esc(fmtDate(it.next)) + '은 ' + esc(hn || (dw === 0 ? '일요일' : '토요일')) + '이라 실제 출금은 다음 영업일일 수 있어요.</div>';
@@ -2729,8 +2841,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var rows = [
       kv('결제 수단', esc(acct === '?' ? '? (확인 필요)' : (acct || '-')), linked ? esc(linked) : ''),
       kv('결제일', esc(dayLabel(it) || '-')),
-      it.method ? kv('결제 방식', esc(it.method)) : '',
-      it.auto ? kv('자동이체', esc(it.auto === 'O' ? '예' : it.auto === 'X' ? '아니요' : it.auto)) : '',
+      payKv(it),
       it.vendor ? kv('결제처', esc(it.vendor)) : '',
       kv('분류', esc(catText(it))),
       it.parent ? kv('상위 항목', esc(it.parent)) : '',
@@ -2879,7 +2990,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       (stack ? control(f, val, it ? it.name : '') : '<span class="ctl' + (f.kind === 'dateOrForever' ? ' wrapc' : '') + '">' + control(f, val, it ? it.name : '') + '</span>') + '</div>';
   }
   function isMainField(f) {
-    return f.col === S.meta.nameCol || isAmtField(f) || isDayField(f) || isCycleField(f) || isAcctField(f);
+    return f.col === S.meta.nameCol || isAmtField(f) || isDayField(f) || isCycleField(f) || isAcctField(f) || isAutoField(f);
   }
   /* 꼭 적는 칸 다섯 개: 이름·금액은 크게, 주기는 5칸 버튼, 결제일은 숫자판, 결제 수단은 알약 */
   var CYC = [['매월', '매월'], ['2개월', '2개월'], ['분기(3개월)', '3개월'], ['반기(6개월)', '6개월'], ['매년', '매년']];
@@ -2904,16 +3015,25 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
         CYC.map(function (c) { return '<button type="button" data-v="' + esc(c[0]) + '"' + (c[0] === v ? ' class="on"' : '') + '>' + c[1] + '</button>'; }).join('') +
         '</div><input type="hidden" id="' + id + '" value="' + esc(v) + '"></div>';
     }
+    if (isAutoField(f)) {   // 내는 방법: 자동(O) / 직접 이체(X). 결제일 옆에 붙어 나옴. 고른 걸 다시 누르면 '안 정함'
+      return open + '<label>내는 방법</label><div class="seg two pay" data-auto="' + id + '">' +
+        '<button type="button" data-v="O"' + (v === 'O' ? ' class="on"' : '') + '>자동</button>' +
+        '<button type="button" data-v="X"' + (v === 'X' ? ' class="on"' : '') + '>직접</button></div>' +
+        '<input type="hidden" id="' + id + '" value="' + esc(v) + '"></div>';
+    }
     if (isDayField(f)) {
       return open + '<label id="dayLbl">결제일</label><button type="button" class="selb empty" id="dayBtn"><span id="dayTxt">며칠에 나가요?</span>' + DOWN_SVG + '</button>' +
-        '<input type="hidden" id="' + id + '" value="' + esc(v) + '"><div class="hint" id="dayHint"></div></div>';
+        '<input type="hidden" id="' + id + '" value="' + esc(v) + '">' + (autoFieldOf() ? '' : '<div class="hint" id="dayHint"></div>') + '</div>';
     }
     return open + '<div class="lrow"><label>결제 수단</label><button class="lnk" type="button" data-accmgr="1">관리</button></div>' + control(f, v, '') +
       ((S.accounts || []).length ? '' : '<div class="hint">한 번 저장하면 다음부터 눌러서 골라요</div>') + '</div>';
   }
   function formHtml(it, cat) {
-    var main = '', more = '', names = [], filled = [];
+    var main = '', more = '', names = [], filled = [], af = autoFieldOf();
     orderedFields(it).forEach(function (f) {
+      // 결제일과 내는 방법은 한 줄에 나란히 (창 높이가 안 늘게)
+      if (af && isDayField(f)) { main += '<div class="duo">' + mainFieldHtml(f, it, cat) + mainFieldHtml(af, it, cat) + '</div><div class="hint" id="dayHint"></div>'; return; }
+      if (af && f.col === af.col) return;
       if (isMainField(f)) { main += mainFieldHtml(f, it, cat); return; }
       more += fieldHtml(f, it, cat);
       names.push(shortLabel(f));
@@ -3086,7 +3206,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       var show = stEl.value, it = FS.it;
       // 고치는 중이고 날짜를 새로 안 골랐으면, 시작일이 아니라 실제 다음 결제일을 보여줌
       if (!FS.picked && it && it.next && (it.every || 1) === ev && show === (it.start || '')) show = it.next;
-      if (show && d) { txt = fmtDateY(show); FS.shown = show; hint = (ev === 12 ? '매년' : ev + '개월마다') + ' 이 날짜에 나가요'; }
+      if (show && d) { txt = autoFieldOf() ? fmtDate(show) : fmtDateY(show); FS.shown = show; hint = (ev === 12 ? '매년' : ev + '개월마다') + ' 이 날짜에 나가요'; }
     } else if (d) {
       txt = '매월 ' + (d >= 31 ? '말일' : d + '일');
     }
@@ -3102,6 +3222,8 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     if (!el) return;
     var cyc = document.querySelector('[data-cyc="' + id + '"]');
     if (cyc) cyc.querySelectorAll('button').forEach(function (b) { b.className = b.getAttribute('data-v') === el.value ? 'on' : ''; });
+    var aseg = document.querySelector('[data-auto="' + id + '"]');
+    if (aseg) aseg.querySelectorAll('button').forEach(function (b) { b.className = b.getAttribute('data-v') === el.value ? 'on' : ''; });
     if (el.hasAttribute('data-money')) { var mir = el.parentNode.querySelector('.mir'); if (mir) mir.textContent = el.value || '0'; }
     if (el.type === 'hidden') syncDateBtn(id);
     syncDay();
@@ -3168,6 +3290,18 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
         var b = e.target.closest('button');
         if (!b || !seg.contains(b)) return;
         inp.value = b.getAttribute('data-v');
+        syncCtl(inp.id);
+        fire(inp);
+      };
+    });
+    // 내는 방법: 두 칸. 고른 걸 다시 누르면 비움
+    body.querySelectorAll('[data-auto]').forEach(function (seg) {
+      var inp = $(seg.getAttribute('data-auto'));
+      seg.onclick = function (e) {
+        var b = e.target.closest('button');
+        if (!b || !seg.contains(b)) return;
+        var v = b.getAttribute('data-v');
+        inp.value = inp.value === v ? '' : v;
         syncCtl(inp.id);
         fire(inp);
       };
@@ -3823,6 +3957,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       enqueue({ type: 'load' });
     };
   }
+  function payModeSummary() {
+    var act = items().filter(function (it) { return it.section !== 5; });
+    var man = act.filter(isManual).length, none = act.filter(function (it) { return !payMode(it); }).length;
+    return joinDot([man ? '직접 ' + man + '개' : '', none ? '안 정함 ' + none + '개' : '']);
+  }
   function openMenu(refresh) {
     if (!S) { if (!refresh) openMiniMenu(); return; }
     var WEB = window.FC_AUTH || null;   // 설치용 앱(구글 로그인 방식)으로 열렸을 때
@@ -3836,10 +3975,11 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
       (S.calOn ? '<div class="tip">캘린더에서 직접 지운 날짜는 다시 안 만들어요.</div>' : '') +
       (optsReady() && S.virtual ? '<div class="glabel">자동이체</div><div class="grp">' +
         '<button class="li" type="button" id="mAuto"><span class="tx"><b>자동이체 자동 체크</b><small>자동이체 항목은 결제일 다음 날 낸 걸로 체크해요</small></span><span class="switch' + (opt('auto') ? ' on' : '') + '"></span></button>' +
-        '</div>' + (opt('auto') ? '<div class="tip">결제일이 주말·공휴일이면 다음 영업일까지 기다려요. 대상은 자동이체가 "O"이거나 결제 방식이 자동이체인 항목이에요. ' +
+        '</div>' + (opt('auto') ? '<div class="tip">결제일이 주말·공휴일이면 다음 영업일까지 기다려요. 대상은 내는 방법이 \'자동으로 나가요\'이거나, 비어 있고 결제 방식이 자동이체인 항목이에요. ' +
         '돈이 안 나갔으면 체크를 풀어 주세요. 푼 건 다시 체크하지 않아요.</div>' : '') : '') +
       '<div class="glabel">관리</div><div class="grp">' +
       '<button class="li" type="button" id="mAcc"><span>결제 수단</span><span class="r">' + (S.accounts ? (S.accounts.length ? esc(S.accounts.length + '개') : '아직 없음') : '') + '</span>' + CV + '</button>' +
+      (autoFieldOf() && items().length ? '<button class="li" type="button" id="mPay"><span>자동·직접 정하기</span><span class="r">' + esc(payModeSummary()) + '</span>' + CV + '</button>' : '') +
       (S.virtual || !S.url ? '' : '<a class="li" href="' + esc(S.url) + '" target="_blank" rel="noopener"><span>구글 시트 열기</span><span class="r">' + esc(S.sheetName || '') + '</span>' + CV + '</a>') +
       '<button class="li" type="button" id="mReload"><span>다시 불러오기</span></button>' +
       '<button class="li" type="button" id="mRestore"><span>방금 지운 항목 되살리기</span></button>' +
@@ -3875,6 +4015,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     $('mReload').onclick = function () { closeSheet(); toast('다시 불러오는 중'); enqueue({ type: 'load' }); };
     $('mRestore').onclick = function () { closeSheet(); restore(); };
     $('mAcc').onclick = function () { openAccounts(false, function () { openMenu(false); }); };
+    var mp = $('mPay'); if (mp) mp.onclick = openPayModes;
     var ms = $('mShare'); if (ms) ms.onclick = function () { openShare(false); };
     var mv = $('mMove'); if (mv) mv.onclick = function () { moveToApp(mv); };
     var mu = $('mUpd'); if (mu) mu.onclick = function () { leave(runServerUpdate); };
