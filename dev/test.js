@@ -1327,7 +1327,7 @@ t('badge-new-last', async () => {
     const ls = await bd('#list .row.tr[data-name]');
     ok(ls['티빙'] === 'NEW' && ls['웨이브'] === 'NEW' && ls['노트북 할부'] === 'LAST', tag + '목록: 티빙·웨이브(첫 결제가 다음 달) NEW, 노트북 할부 LAST ' + JSON.stringify(ls));
     ok(!ls['월세'] && !ls['넷플릭스'] && !ls['자동차보험'] && !ls['헬스장'], tag + '목록: 전부터 내던 항목엔 표시 없음');
-    const fit = await p.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#list .bdg'), (b) => { const r = b.getBoundingClientRect(), c = b.closest('.tc.nmc').getBoundingClientRect(), n = b.parentNode.querySelector('.nm').getBoundingClientRect(); return { in: r.right <= c.right + 0.5 && r.left >= n.right - 0.5, h: Math.round(r.height), fs: getComputedStyle(b).fontSize, row: Math.round(b.closest('.tg').getBoundingClientRect().height) }; }));
+    const fit = await p.evaluate(() => Array.prototype.map.call(document.querySelectorAll('#list .bdg:not(.man)'), (b) => { const r = b.getBoundingClientRect(), c = b.closest('.tc.nmc').getBoundingClientRect(), n = b.parentNode.querySelector('.nm').getBoundingClientRect(); return { in: r.right <= c.right + 0.5 && r.left >= n.right - 0.5, h: Math.round(r.height), fs: getComputedStyle(b).fontSize, row: Math.round(b.closest('.tg').getBoundingClientRect().height) }; }));
     ok(fit.length >= 3 && fit.every((x) => x.in && x.h <= 16 && x.fs === '10px' && x.row === 48), tag + '목록: 표시는 이름 옆 칸 안에 작게(10px), 줄 높이 48px 그대로 ' + JSON.stringify(fit[0]));
     // 다음 달 달력: 티빙의 두 번째 결제엔 NEW 없음, 웨이브 첫 결제엔 NEW
     await p.click('.tabbar [data-tab="cal"]'); await sleep(p, 300);
@@ -2217,19 +2217,20 @@ t('manual-pay', async () => {
   // 상세: 내는 방법
   await p.click('#home .row[data-name="관리비"] .rb'); await h.idle(400);
   const kvTxt = await p.evaluate(() => document.getElementById('sheetBody').textContent);
-  ok(/내는 방법직접 이체결제 방식·수단으로 짐작했어요/.test(kvTxt.replace(/\s+/g, '')) || /내는 방법\s*직접 이체/.test(kvTxt), '상세에 "내는 방법 직접 이체" + 짐작 안내');
-  ok(!/자동이체아니요|자동이체예/.test(kvTxt.replace(/\s+/g, '')), '옛 "자동이체 예/아니요" 줄은 없음');
+  const kvs = kvTxt.replace(/\s+/g, '');
+  ok(/내는방법직접이체·수동이체/.test(kvs), '상세: "내는 방법 직접 이체 · 수동이체" 한 줄');
+  ok(!/자동이체아니요|자동이체예|결제방식수동이체/.test(kvs), '옛 "결제 방식"·"자동이체 예/아니요" 줄은 없음 (한 줄로 합침)');
 
-  // 수정 창: 결제 수단 아래 '내는 방법' 두 칸, 더 적기 안에는 없음
+  // 수정 창: 결제일 옆에 '내는 방법' 두 칸 (창 높이 그대로), 더 적기 안에는 없음
   await p.click('#dEdit'); await h.idle(500);
   const f = await p.evaluate(() => {
     const seg = document.querySelector('[data-auto]');
-    const fld = seg && seg.closest('.fld'), prev = fld && fld.previousElementSibling;
-    return { seg: !!seg, on: seg ? [...seg.querySelectorAll('button.on')].length : -1, afterAcc: !!(prev && prev.querySelector('[data-chips]')), inMore: !!document.querySelector('#moreBox [data-auto], #moreBox select[id="f14"]'),
-      hint: (document.getElementById('autoHint') || {}).textContent || '', h: seg ? Math.round(seg.querySelector('button').getBoundingClientRect().height) : 0 };
+    const duo = seg && seg.closest('.duo'), day = duo && duo.querySelector('#dayBtn');
+    const a = seg && seg.getBoundingClientRect(), d = day && day.getBoundingClientRect();
+    return { seg: !!seg, on: seg ? [...seg.querySelectorAll('button.on')].length : -1, sameRow: !!(a && d && Math.abs(a.top - d.top) <= 2 && Math.abs(a.bottom - d.bottom) <= 2 && a.left > d.right),
+      inMore: !!document.querySelector('#moreBox [data-auto], #moreBox select[id="f14"]'), h: seg ? Math.round(seg.querySelector('button').getBoundingClientRect().height) : 0, right: a ? Math.round(innerWidth - a.right) : -1 };
   });
-  ok(f.seg && f.on === 0 && f.afterAcc && !f.inMore && f.h >= 44, '수정 창: 결제 수단 바로 아래 "내는 방법" 두 칸(44px 이상), 비어 있으면 아무것도 안 골라짐, 더 적기 안엔 없음: ' + JSON.stringify(f));
-  ok(/지금은 직접 이체로 봐요/.test(f.hint), '비어 있으면 짐작 결과를 안내: ' + f.hint);
+  ok(f.seg && f.on === 0 && f.sameRow && !f.inMore && f.h >= 44 && f.right >= 16, '수정 창: 결제일 오른쪽에 "내는 방법" 두 칸(44px 이상, 같은 높이), 비어 있으면 아무것도 안 골라짐, 더 적기 안엔 없음: ' + JSON.stringify(f));
   await p.click('#saveBtn'); await h.idle(900);
   ok(srvItem(h, '관리비').auto === '', '안 누르고 저장하면 그대로 비어 있음 (자동 체크 대상이 몰래 안 바뀜)');
 
@@ -2237,7 +2238,7 @@ t('manual-pay', async () => {
   await p.click('#home .row[data-name="헬스장"] .rb'); await h.idle(400);
   await p.click('#dEdit'); await h.idle(500);
   await p.click('[data-auto] button[data-v="X"]'); await sleep(p, 150);
-  ok(/첫 화면에 '직접 이체'로 표시/.test(await p.textContent('#autoHint')), '직접을 누르면 어디에 보이는지 안내');
+  ok(await p.evaluate(() => document.querySelector('[data-auto] button[data-v="X"]').classList.contains('on') && document.getElementById('f14').value === 'X'), '직접을 누르면 골라짐');
   await h.shot('t-manual-form');
   await p.click('#saveBtn'); await sleep(p, 300);
   const now = await row('헬스장');
