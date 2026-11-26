@@ -2167,6 +2167,119 @@ t('undo-all', async () => {
   await h.close();
 });
 
+/* ---------- 직접 이체 표시: 자동으로 안 나가서 내가 보내야 하는 것 ---------- */
+const MANUAL = {
+  now: '2026-11-24', seedAt: '2026-11-01', viewport: VP, latency: 40,
+  seed: {
+    accounts: [
+      { name: '현대 신용카드 5678', memo: '[카드·현대·신용·5678]', from: '' },
+      { name: '토스뱅크 4661', memo: '[계좌·토스뱅크·4661]', from: '' }
+    ],
+    items: [
+      { n: '모임 회비', start: '2025-01-01', amt: 30000, day: 20, method: '수동이체', acc: '토스뱅크 4661', auto: 'X' },
+      { n: '정수기 렌탈', start: '2025-01-01', amt: 29900, day: 20, method: '자동이체', acc: '토스뱅크 4661', auto: 'O' },
+      { n: '부모님 용돈', start: '2025-01-01', amt: 300000, day: 24, acc: '토스뱅크 4661', auto: 'X' },
+      { n: '통신비', start: '2025-01-01', amt: 69000, day: 24, method: '신용카드', acc: '현대 신용카드 5678' },
+      { n: '월세', start: '2025-01-01', amt: 650000, day: 25, acc: '토스뱅크 4661', auto: 'X' },
+      { n: '넷플릭스', start: '2025-01-01', amt: 17000, day: 26, acc: '현대 신용카드 5678' },
+      { n: '관리비', start: '2025-01-01', amt: 120000, day: 30, method: '수동이체', acc: '토스뱅크 4661' },
+      { n: '헬스장', start: '2025-01-01', amt: 60000, day: 28, acc: '토스뱅크 4661' }
+    ]
+  }
+};
+t('manual-pay', async () => {
+  const h = await H.open(MANUAL); const p = h.page;
+  await sleep(p, 800);
+  const row = (n) => p.evaluate((n) => {
+    const r = document.querySelector('#home .row[data-name="' + n + '"]');
+    if (!r) return null;
+    const ring = getComputedStyle(r.querySelector('.chk i')).borderTopWidth;
+    return { man: r.classList.contains('man'), bdg: !!r.querySelector('.bdg.man'), l2: (r.querySelector('.t2') || {}).textContent || '', ring };
+  }, n);
+  const m = await row('모임 회비');
+  ok(m && m.man && m.bdg && /^직접 이체 · 토스뱅크 4661$/.test(m.l2) && m.ring === '2px', '자동이체 X → 진한 동그라미 + 이름 옆 "직접" + 아래 "직접 이체": ' + JSON.stringify(m));
+  const a = await row('정수기 렌탈');
+  ok(a && !a.man && !a.bdg && a.l2 === '토스뱅크 4661' && a.ring !== '2px', '자동이체 O → 표시 없음: ' + JSON.stringify(a));
+  const g = await row('관리비');
+  ok(g && g.man && g.bdg, '자동이체 칸이 비고 결제 방식이 수동이체 → 직접으로 짐작');
+  const c = await row('넷플릭스');
+  ok(c && !c.man, '자동이체 칸이 비고 결제 수단이 카드 → 자동으로 짐작 (표시 없음)');
+  const u = await row('헬스장');
+  ok(u && !u.man, '계좌만 있고 결제 방식 없음 → 모름 (표시 없음)');
+  ok(srvItem(h, '관리비').auto === '' && srvItem(h, '넷플릭스').auto === '', '짐작한 값은 서버에 저장 안 함');
+
+  const dot = (d) => p.evaluate((d) => { const c = document.querySelector('.cd[data-day="' + d + '"]'); return c ? c.classList.contains('man') : null; }, d);
+  ok(await dot('2026-11-25') === true && await dot('2026-11-26') === false && await dot('2026-11-24') === true, '달력: 안 낸 직접 이체가 있는 날에만 점 (25일 O, 26일 X, 24일 O)');
+  await p.click('#home .row[data-name="부모님 용돈"] .chk'); await h.idle(900);
+  ok(await dot('2026-11-24') === false, '그날 직접 이체를 다 내면 점이 사라짐 (자동이체 통신비는 남아 있어도)');
+  await h.shot('t-manual-home');
+
+  // 상세: 내는 방법
+  await p.click('#home .row[data-name="관리비"] .rb'); await h.idle(400);
+  const kvTxt = await p.evaluate(() => document.getElementById('sheetBody').textContent);
+  ok(/내는 방법직접 이체결제 방식·수단으로 짐작했어요/.test(kvTxt.replace(/\s+/g, '')) || /내는 방법\s*직접 이체/.test(kvTxt), '상세에 "내는 방법 직접 이체" + 짐작 안내');
+  ok(!/자동이체아니요|자동이체예/.test(kvTxt.replace(/\s+/g, '')), '옛 "자동이체 예/아니요" 줄은 없음');
+
+  // 수정 창: 결제 수단 아래 '내는 방법' 두 칸, 더 적기 안에는 없음
+  await p.click('#dEdit'); await h.idle(500);
+  const f = await p.evaluate(() => {
+    const seg = document.querySelector('[data-auto]');
+    const fld = seg && seg.closest('.fld'), prev = fld && fld.previousElementSibling;
+    return { seg: !!seg, on: seg ? [...seg.querySelectorAll('button.on')].length : -1, afterAcc: !!(prev && prev.querySelector('[data-chips]')), inMore: !!document.querySelector('#moreBox [data-auto], #moreBox select[id="f14"]'),
+      hint: (document.getElementById('autoHint') || {}).textContent || '', h: seg ? Math.round(seg.querySelector('button').getBoundingClientRect().height) : 0 };
+  });
+  ok(f.seg && f.on === 0 && f.afterAcc && !f.inMore && f.h >= 44, '수정 창: 결제 수단 바로 아래 "내는 방법" 두 칸(44px 이상), 비어 있으면 아무것도 안 골라짐, 더 적기 안엔 없음: ' + JSON.stringify(f));
+  ok(/지금은 직접 이체로 봐요/.test(f.hint), '비어 있으면 짐작 결과를 안내: ' + f.hint);
+  await p.click('#saveBtn'); await h.idle(900);
+  ok(srvItem(h, '관리비').auto === '', '안 누르고 저장하면 그대로 비어 있음 (자동 체크 대상이 몰래 안 바뀜)');
+
+  // 헬스장(모름)을 직접으로
+  await p.click('#home .row[data-name="헬스장"] .rb'); await h.idle(400);
+  await p.click('#dEdit'); await h.idle(500);
+  await p.click('[data-auto] button[data-v="X"]'); await sleep(p, 150);
+  ok(/첫 화면에 '직접 이체'로 표시/.test(await p.textContent('#autoHint')), '직접을 누르면 어디에 보이는지 안내');
+  await h.shot('t-manual-form');
+  await p.click('#saveBtn'); await sleep(p, 300);
+  const now = await row('헬스장');
+  ok(now && now.man, '저장 누르면 서버 답을 기다리지 않고 바로 직접 표시');
+  await h.idle(900);
+  ok(srvItem(h, '헬스장').auto === 'X', '서버에 자동이체 X로 저장');
+  // 다시 열어 같은 칸을 한 번 더 누르면 비움
+  await p.click('#home .row[data-name="헬스장"] .rb'); await h.idle(400);
+  await p.click('#dEdit'); await h.idle(500);
+  ok(await p.evaluate(() => document.querySelector('[data-auto] button[data-v="X"]').classList.contains('on')), '다시 열면 직접이 골라져 있음');
+  await p.click('[data-auto] button[data-v="X"]'); await sleep(p, 150);
+  ok(await p.evaluate(() => !document.querySelector('[data-auto] button.on') && document.getElementById('f14').value === ''), '고른 걸 한 번 더 누르면 안 정함');
+  await p.click('#saveBtn'); await h.idle(900);
+  ok(srvItem(h, '헬스장').auto === '', '안 정함으로 저장');
+
+  // 고정비 목록 탭: 이름 옆 '직접'
+  await p.click('.tabbar [data-tab="list"]'); await h.idle(500);
+  const lt = await p.evaluate(() => [...document.querySelectorAll('#list .bdg.man')].map((b) => b.closest('[data-name]') && b.closest('[data-name]').getAttribute('data-name')).sort());
+  ok(JSON.stringify(lt) === JSON.stringify(['관리비', '모임 회비', '부모님 용돈', '월세']), '목록 탭에도 이름 옆 "직접": ' + JSON.stringify(lt));
+  await p.click('.tabbar [data-tab="cal"]'); await h.idle(400);
+
+  // 설정 > 자동·직접 정하기
+  await p.click('#menuBtn'); await h.idle(500);
+  ok(/직접 4개 · 안 정함 1개/.test(await p.textContent('#mPay')), '설정에 "자동·직접 정하기" + 개수: ' + await p.textContent('#mPay'));
+  await p.click('#mPay'); await h.idle(500);
+  const rows = await p.evaluate(() => [...document.querySelectorAll('[data-pm]')].map((s) => s.getAttribute('data-v')));
+  ok(rows.length === 8 && rows.filter((v) => v === 'X').length === 3 && rows.filter((v) => v === 'O').length === 1, '정하기 창: 항목 8개, 저장된 값만 골라져 있음 ' + JSON.stringify(rows));
+  await p.click('.qd:has(b:text-is("넷플릭스")) [data-v="X"]');
+  await p.click('.qd:has(b:text-is("관리비")) [data-v="X"]');
+  await h.shot('t-manual-modes');
+  await p.click('#pmSave'); await h.idle(1200);
+  ok(srvItem(h, '넷플릭스').auto === 'X' && srvItem(h, '관리비').auto === 'X' && srvItem(h, '정수기 렌탈').auto === 'O', '고른 것만 저장 (안 건드린 건 그대로)');
+  ok((await row('넷플릭스') || {}).man === true, '정한 뒤 첫 화면에 바로 직접 표시');
+  const ts = await toastState(p);
+  ok(/2건 내는 방법을 정했어요/.test(ts.txt) && ts.btn === '되돌리기', '알림 + 되돌리기: ' + ts.txt);
+  await p.click('#toastBtn'); await h.idle(1200);
+  ok(srvItem(h, '넷플릭스').auto === '' && srvItem(h, '관리비').auto === '', '되돌리기 → 원래대로 비움');
+
+  ok(!realErrors(h).length, '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+});
+
 (async () => {
   const only = process.argv.slice(2);
   const t0 = Date.now();
