@@ -2281,6 +2281,70 @@ t('manual-pay', async () => {
   await h.close();
 });
 
+const COPY = {
+  now: '2026-11-24', seedAt: '2026-11-01', viewport: VP, latency: 40,
+  seed: {
+    accounts: [{ name: '토스뱅크 4661', memo: '[계좌·토스뱅크·4661]', from: '' }],
+    items: [
+      { n: '월세', start: '2025-01-01', amt: 650000, day: 25, acc: '토스뱅크 4661', auto: 'X', vendor: '집주인 김민수', memo: '신한 110-123-456789 김민수\n문의 010-1234-5678' },
+      { n: '관리비', start: '2025-01-01', amt: 120000, day: 30, acc: '토스뱅크 4661', auto: 'X', vendor: '국민 12345678901234', memo: '계약 만료 2027-08-24' },
+      { n: '넷플릭스', start: '2025-01-01', amt: 17000, day: 26, acc: '토스뱅크 4661', memo: '13,500원 → 17,000원' }
+    ]
+  }
+};
+t('copy-num', async () => {
+  const h = await H.open(COPY); const p = h.page;
+  await p.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {});
+  await sleep(p, 800);
+  const chips = () => p.evaluate(() => [...document.querySelectorAll('#sheetBody .cpy')].map((b) => ({ t: b.textContent, d: b.getAttribute('data-copy'), k: b.getAttribute('data-kind'), w: Math.round(b.getBoundingClientRect().width), hh: Math.round(b.getBoundingClientRect().height) })));
+  await p.click('#home .row[data-name="월세"] .rb'); await h.idle(400);
+  const c = await chips();
+  ok(c.length === 2 && c[0].d === '110123456789' && c[0].k === '계좌번호' && c[0].t === '110-123-456789' && c[1].d === '01012345678' && c[1].k === '전화번호', '상세 메모: 계좌·전화번호가 복사 단추로 ' + JSON.stringify(c));
+  const order = await p.evaluate(() => [...document.querySelectorAll('#sheetBody .kv .k')].map((k) => k.textContent));
+  ok(order.indexOf('메모') >= 0 && order.indexOf('메모') < order.indexOf('결제처') && order.indexOf('메모') <= 3, '번호 있는 메모는 위쪽(내는 방법 바로 아래)으로: ' + JSON.stringify(order));
+  const memoTxt = await p.evaluate(() => document.querySelector('#sheetBody .kv.memo .v').textContent);
+  ok(/^신한 110-123-456789 김민수\n문의 010-1234-5678$/.test(memoTxt), '메모 글은 그대로 보임: ' + JSON.stringify(memoTxt));
+  await h.shot('t-copy-detail');
+  await p.click('#sheetBody .cpy[data-copy="110123456789"]'); await sleep(p, 300);
+  const clip = await p.evaluate(() => navigator.clipboard.readText().catch((e) => 'ERR ' + e));
+  ok(clip === '110123456789', '누르면 숫자만 복사: ' + clip);
+  const ts = await toastState(p);
+  ok(ts.on && ts.txt === '계좌번호를 복사했어요', '알림 "계좌번호를 복사했어요": ' + ts.txt);
+  ok(await sheetOn(p), '복사해도 창은 그대로');
+  ok(await p.evaluate(() => document.querySelector('#sheetBody .cpy[data-copy="110123456789"]').classList.contains('done')), '누른 단추는 잠깐 초록');
+  await h.shot('t-copy-done');
+  await back(p);
+  ok(!(await sheetOn(p)), '복사는 뒤로 가기 기록을 안 남김 (뒤로 한 번에 창 닫힘)');
+
+  await p.click('#home .row[data-name="관리비"] .rb'); await h.idle(400);
+  const c2 = await chips();
+  ok(c2.length === 1 && c2[0].d === '12345678901234' && c2[0].k === '계좌번호', '결제처 안 계좌도 복사 단추, 메모 날짜(2027-08-24)는 아님 ' + JSON.stringify(c2));
+  await back(p);
+  await p.click('#home .row[data-name="넷플릭스"] .rb'); await h.idle(400);
+  ok((await chips()).length === 0, '금액(13,500원)은 번호로 안 봄');
+  await back(p);
+
+  // 목록 탭: 줄 펼치면 같은 단추, 눌러도 줄이 안 접힘
+  await p.click('.tabbar [data-tab="list"]'); await h.idle(500);
+  await p.click('#list .row.tr[data-name="월세"] [data-act="expand"], #list .row.tr[data-name="월세"] .tc'); await h.idle(300);
+  const lc = await p.evaluate(() => [...document.querySelectorAll('#list .cpy')].map((b) => b.getAttribute('data-copy')));
+  ok(lc.length === 2, '목록 펼친 줄에도 복사 단추 ' + JSON.stringify(lc));
+  await p.evaluate(() => navigator.clipboard.writeText(''));
+  await p.click('#list .cpy[data-copy="01012345678"]'); await sleep(p, 300);
+  ok(await p.evaluate(() => navigator.clipboard.readText()) === '01012345678' && (await toastState(p)).txt === '전화번호를 복사했어요', '목록에서 눌러도 복사');
+  ok(await p.evaluate(() => document.querySelectorAll('#list .cpy').length) === 2, '복사 눌러도 줄이 안 접힘');
+  await h.shot('t-copy-list');
+  // 입력 창 메모 예시
+  await p.click('.tabbar [data-tab="cal"]'); await h.idle(300);
+  await p.click('#home .row[data-name="넷플릭스"] .rb'); await h.idle(400);
+  await p.click('#dEdit'); await h.idle(500);
+  const ph = await p.evaluate(() => [...document.querySelectorAll('input,textarea')].map((i) => i.placeholder).filter((x) => /계좌/.test(x)));
+  ok(ph.length === 1 && ph[0] === '받는 계좌, 고객센터 번호 등', '수정 창 메모 칸 예시에 "받는 계좌": ' + JSON.stringify(ph));
+  await back(p); await back(p);
+  ok(!realErrors(h).length, '화면 오류 없음 ' + JSON.stringify(realErrors(h)));
+  await h.close();
+});
+
 (async () => {
   const only = process.argv.slice(2);
   const t0 = Date.now();
