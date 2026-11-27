@@ -2304,7 +2304,7 @@ t('copy-num', async () => {
   const order = await p.evaluate(() => [...document.querySelectorAll('#sheetBody .kv .k')].map((k) => k.textContent));
   ok(order.indexOf('메모') >= 0 && order.indexOf('메모') < order.indexOf('결제처') && order.indexOf('메모') <= 3, '번호 있는 메모는 위쪽(내는 방법 바로 아래)으로: ' + JSON.stringify(order));
   const memoTxt = await p.evaluate(() => document.querySelector('#sheetBody .kv.memo .v').textContent);
-  ok(/^신한 110-123-456789 김민수\n문의 010-1234-5678$/.test(memoTxt), '메모 글은 그대로 보임: ' + JSON.stringify(memoTxt));
+  ok(/^신한 계좌110-123-456789 김민수\n문의 전화010-1234-5678$/.test(memoTxt), '메모 글은 그대로 보임: ' + JSON.stringify(memoTxt));
   await h.shot('t-copy-detail');
   await p.click('#sheetBody .cpy[data-copy="110123456789"]'); await sleep(p, 300);
   const clip = await p.evaluate(() => navigator.clipboard.readText().catch((e) => 'ERR ' + e));
@@ -2329,16 +2329,13 @@ t('copy-num', async () => {
   await p.click('#home .row[data-name="자동차보험"] .rb'); await h.idle(400);
   const c3 = await chips();
   ok(c3.length === 2 && c3[0].d === '3010000111121' && c3[0].k === '계좌번호' && c3[1].d === '5400111122223333' && c3[1].k === '카드번호', '결제 수단 이름의 계좌번호, 설명의 카드번호도 단추 ' + JSON.stringify(c3));
-  const fit = await p.evaluate(() => { const r = document.querySelector('#sheetBody .kv').getBoundingClientRect(); return [...document.querySelectorAll('#sheetBody .kv .cpy')].every((b) => { const x = b.getBoundingClientRect(); return x.left >= r.left - 1 && x.right <= r.right + 1; }); });
+  const fit = await p.evaluate(() => { const r = document.querySelector('#sheetBody .kv').getBoundingClientRect(); return [...document.querySelectorAll('#sheetBody .kv:first-child .cpy')].every((b) => { const x = b.getBoundingClientRect(); return x.left >= r.left - 1 && x.right <= r.right + 1; }); });
   ok(fit, '결제 수단 줄 단추가 줄 밖으로 안 나감');
-  const box = await p.evaluate(() => ({ acc: document.querySelector('#sheetBody .kv .v').textContent, lines: [...document.querySelectorAll('#sheetBody .nbox .nl')].map((l) => (l.classList.contains('ch') ? 'ch:' : '') + l.querySelector('.nk').textContent + '=' + l.querySelector('.nv').textContent),
-    after: document.querySelector('#sheetBody .nbox').previousElementSibling.querySelector('.k').textContent }));
-  ok(box.acc === '농협 메인' && box.after === '결제 수단' && JSON.stringify(box.lines) === JSON.stringify(['계좌=301-0000-1111-21', 'ch:└카드=5400-1111-2222-3333농협 올리포인트 체크카드']), 'B안: 결제 수단 밑 상자에 계좌, 그 밑에 딸린 "└ 카드" + 카드 이름 ' + JSON.stringify(box));
-  const ali = await p.evaluate(() => [...document.querySelectorAll('#sheetBody .nbox .cpy svg')].map((e) => Math.round(e.getBoundingClientRect().right)));
-  ok(ali.length === 2 && ali[0] === ali[1], '두 줄의 복사 아이콘이 오른쪽에 나란히 ' + JSON.stringify(ali));
-  const calm = await p.evaluate(() => { const b = document.querySelector('#sheetBody .cpy'); const cs = getComputedStyle(b); return { bg: cs.backgroundColor, ink: cs.color === getComputedStyle(b.closest('.v, .nv')).color, ic: getComputedStyle(b.querySelector('svg')).color !== cs.color }; });
-  ok(calm.bg === 'rgba(0, 0, 0, 0)' && calm.ink && calm.ic, '번호는 바탕색 없이 글자색 그대로, 아이콘만 회색 ' + JSON.stringify(calm));
-
+  ok(c3[0].ck === '계좌' && !c3[0].card && c3[1].ck === '카드' && c3[1].card, '계좌는 "계좌" 표시·강조색, 카드는 "카드" 표시·회색 단추로 구분 ' + JSON.stringify(c3.map((x) => [x.ck, x.card])));
+  const bg = await p.evaluate(() => [...document.querySelectorAll('#sheetBody .kv:first-child .cpy')].map((b) => getComputedStyle(b).backgroundColor));
+  ok(bg.length === 2 && bg[0] !== bg[1], '두 단추 바탕색이 다름 ' + JSON.stringify(bg));
+  const accTxt = await p.evaluate(() => document.querySelector('#sheetBody .kv .v').textContent);
+  ok(!/[()]/.test(accTxt) && /농협 메인 계좌301-0000-1111-21/.test(accTxt), '괄호로 싼 번호는 괄호를 떼고 단추만: ' + accTxt);
   await h.shot('t-copy-acc');
   await p.click('#sheetBody .cpy[data-copy="5400111122223333"]'); await sleep(p, 300);
   ok(await p.evaluate(() => navigator.clipboard.readText()) === '5400111122223333' && (await toastState(p)).txt === '카드번호를 복사했어요', '카드번호 복사 + 알림');
@@ -2375,16 +2372,14 @@ t('copy-num-320', async () => {
     await p.click('#home .row[data-name="자동차보험"] .rb'); await h.idle(400);
     const out = await inside('#sheetBody .cpy');
     ok(out.length === 0 && await p.evaluate(() => document.querySelectorAll('#sheetBody .cpy').length) === 2, (dark ? '다크 ' : '') + '폭 320 상세: 계좌·카드 단추가 화면 안(오른쪽 16px 여백) ' + JSON.stringify(out));
-    const inBox = await p.evaluate(() => { const bx = document.querySelector('#sheetBody .nbox').getBoundingClientRect(); return [...document.querySelectorAll('#sheetBody .nbox .cpy svg')].every((e) => e.getBoundingClientRect().right <= bx.right - 8); });
-    ok(inBox, (dark ? '다크 ' : '') + '폭 320: 복사 아이콘이 회색 상자 안');
     if (!dark) await h.shot('t-copy-320');
     await back(p);
     await p.click('.tabbar [data-tab="list"]'); await h.idle(500);
     await p.click('#list .row.tr[data-name="자동차보험"] .tc'); await h.idle(300);
     const lo = await inside('#list .cpy');
     ok(lo.length === 0 && await p.evaluate(() => document.querySelectorAll('#list .cpy').length) === 2, (dark ? '다크 ' : '') + '폭 320 목록 펼친 줄: 단추가 화면 안 ' + JSON.stringify(lo));
-    const lk = await p.evaluate(() => [...document.querySelectorAll('#list .row.tr[data-name="자동차보험"] .kl')].map((k) => k.firstElementChild.textContent + '=' + k.lastElementChild.textContent).slice(1, 4));
-    ok(JSON.stringify(lk) === JSON.stringify(['결제 수단=농협 메인', '계좌=301-0000-1111-21', '└ 카드=5400-1111-2222-3333농협 올리포인트 체크카드']), (dark ? '다크 ' : '') + '목록 펼친 줄도 계좌 밑에 └ 카드 ' + JSON.stringify(lk));
+    const ckw = await p.evaluate(() => [...document.querySelectorAll('#list .cpy .ck')].map((e) => Math.round(e.getBoundingClientRect().width)));
+    ok(ckw.length === 2 && ckw.every((w) => w < 40), (dark ? '다크 ' : '') + '목록의 "계좌"/"카드" 표시가 작은 알약 그대로 (칸 이름 폭 규칙에 안 걸림) ' + JSON.stringify(ckw));
     if (!dark) await h.shot('t-copy-320-list');
     ok(!realErrors(h).length, '화면 오류 없음');
     await h.close();
