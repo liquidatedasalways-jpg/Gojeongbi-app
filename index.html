@@ -311,13 +311,17 @@ body.editing #list .row.tr:not(.muted) .tc.amc::after, body.editing #list .row.t
 .cpy { display: inline-flex; align-items: center; gap: 4px; position: relative; margin: 1px 0; padding: 3px 7px; border: 0; border-radius: 7px; background: var(--sel); color: var(--accent-text); font: inherit; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.35; white-space: nowrap; cursor: pointer; vertical-align: baseline; -webkit-tap-highlight-color: transparent; }
 .cpy::before { content: ''; position: absolute; inset: -7px -3px; }
 .cpy svg { width: 14px; height: 14px; flex: none; }
-.cpy:active { filter: brightness(.94); }
-.cpy.done { background: var(--ok-soft); color: var(--ok-text); }
+.cpy:active { filter: brightness(.9); }
 /* 번호 앞 종류 표시: 계좌는 강조색, 카드는 회색 단추로 한눈에 나눔 */
 .cpy .ck { flex: none; padding: 1px 5px; border-radius: 5px; background: var(--accent-text); color: var(--card); font-size: 11px; font-weight: 700; line-height: 1.4; }
 .cpy.card { background: var(--fill2); color: var(--ink); }
 .cpy.card .ck { background: var(--sub); }
+/* 누르면 1.6초 표시: 계좌·전화는 초록, 카드는 진한 회색 (회색 규칙보다 뒤에 둬야 덮임) */
+.cpy.done { background: var(--ok-soft); color: var(--ok-text); }
 .cpy.done .ck { background: var(--ok-text); }
+.cpy.card.done { background: var(--faint); color: var(--ink); }   /* 카드는 초록 대신 한 톤 진한 회색 */
+.cpy.card.done .ck { background: var(--ink2); }
+.cpy { transition: background-color .15s, color .15s; }
 /* 작은 폰(폭 360 미만): 번호 단추가 든 줄은 이름 아래로 내려 폭을 다 씀 (긴 카드번호가 화면 밖으로 안 나가게) */
 @media (max-width: 359px) {
   .kv.cp { flex-direction: column; align-items: stretch; gap: 4px; }
@@ -633,7 +637,7 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .newr .din { text-align: center; font-weight: 600; }
 .newr input:focus { background: var(--sel); }
 </style>
-<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 32, "slim": false, "verified": false};</script>
+<script>window.FC_CONFIG = {"clientId": "76112709299-kid2h4v9f7rbobkdic0mgt10spn10nks.apps.googleusercontent.com", "otherId": "AKfycbw49wcEFbA4R8JTMQ7So3EEFL-BiuPxfQ-nFh1Ma9MnrNLhSV-SdVAHEp89Zb3qIAAE", "otherScript": "1KVUTRXm8_9ud3ma7Fn3rJKy1jl4CaCmbdtlTV_SwVYKYUd6fLujeE9Ek", "serverVer": 11, "contact": "liquidatedasalways@gmail.com", "build": 33, "slim": false, "verified": false};</script>
 <script>
 /* 설치용 앱: 구글 로그인(계정 고르기) + 고른 계정으로 Apps Script 함수 실행.
  * 앱 화면은 google.script.run 으로 서버를 부르는데, 여기서 그걸 'Apps Script API(scripts.run)' 호출로 바꿔 끼움.
