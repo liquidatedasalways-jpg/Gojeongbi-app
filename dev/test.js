@@ -2284,8 +2284,9 @@ t('manual-pay', async () => {
 const COPY = {
   now: '2026-11-24', seedAt: '2026-11-01', viewport: VP, latency: 40,
   seed: {
-    accounts: [{ name: '토스뱅크 4661', memo: '[계좌·토스뱅크·4661]', from: '' }],
+    accounts: [{ name: '토스뱅크 4661', memo: '[계좌·토스뱅크·4661]', from: '' }, { name: '농협 메인 (301-0000-1111-21)', memo: '[계좌·NH농협·4661] 농협 올리포인트 체크카드 (5400-1111-2222-3333)', from: '' }],
     items: [
+      { n: '자동차보험', start: '2025-01-01', amt: 19400, day: 27, acc: '농협 메인 (301-0000-1111-21)', auto: 'O', vendor: '현대해상화재보험' },
       { n: '월세', start: '2025-01-01', amt: 650000, day: 25, acc: '토스뱅크 4661', auto: 'X', vendor: '집주인 김민수', memo: '신한 110-123-456789 김민수\n문의 010-1234-5678' },
       { n: '관리비', start: '2025-01-01', amt: 120000, day: 30, acc: '토스뱅크 4661', auto: 'X', vendor: '국민 12345678901234', memo: '계약 만료 2027-08-24' },
       { n: '넷플릭스', start: '2025-01-01', amt: 17000, day: 26, acc: '토스뱅크 4661', memo: '13,500원 → 17,000원' }
@@ -2324,11 +2325,26 @@ t('copy-num', async () => {
   ok((await chips()).length === 0, '금액(13,500원)은 번호로 안 봄');
   await back(p);
 
+  // 결제 수단 이름·설명 안 계좌·카드번호도 (사용자 실제 사례)
+  await p.click('#home .row[data-name="자동차보험"] .rb'); await h.idle(400);
+  const c3 = await chips();
+  ok(c3.length === 2 && c3[0].d === '3010000111121' && c3[0].k === '계좌번호' && c3[1].d === '5400111122223333' && c3[1].k === '카드번호', '결제 수단 이름의 계좌번호, 설명의 카드번호도 단추 ' + JSON.stringify(c3));
+  const fit = await p.evaluate(() => { const r = document.querySelector('#sheetBody .kv').getBoundingClientRect(); return [...document.querySelectorAll('#sheetBody .kv:first-child .cpy')].every((b) => { const x = b.getBoundingClientRect(); return x.left >= r.left - 1 && x.right <= r.right + 1; }); });
+  ok(fit, '결제 수단 줄 단추가 줄 밖으로 안 나감');
+  const accTxt = await p.evaluate(() => document.querySelector('#sheetBody .kv .v').textContent);
+  ok(!/[()]/.test(accTxt) && /농협 메인 301-0000-1111-21/.test(accTxt), '괄호로 싼 번호는 괄호를 떼고 단추만: ' + accTxt);
+  await h.shot('t-copy-acc');
+  await p.click('#sheetBody .cpy[data-copy="5400111122223333"]'); await sleep(p, 300);
+  ok(await p.evaluate(() => navigator.clipboard.readText()) === '5400111122223333' && (await toastState(p)).txt === '카드번호를 복사했어요', '카드번호 복사 + 알림');
+  await back(p);
+
   // 목록 탭: 줄 펼치면 같은 단추, 눌러도 줄이 안 접힘
   await p.click('.tabbar [data-tab="list"]'); await h.idle(500);
   await p.click('#list .row.tr[data-name="월세"] [data-act="expand"], #list .row.tr[data-name="월세"] .tc'); await h.idle(300);
   const lc = await p.evaluate(() => [...document.querySelectorAll('#list .cpy')].map((b) => b.getAttribute('data-copy')));
   ok(lc.length === 2, '목록 펼친 줄에도 복사 단추 ' + JSON.stringify(lc));
+  const lacc = await p.evaluate(() => { const r = document.querySelector('#list .row.tr[data-name="월세"]'); return r ? r.textContent : ''; });
+  ok(/토스뱅크 4661/.test(lacc), '목록 펼친 줄 결제 수단은 그대로 보임');
   await p.evaluate(() => navigator.clipboard.writeText(''));
   await p.click('#list .cpy[data-copy="01012345678"]'); await sleep(p, 300);
   ok(await p.evaluate(() => navigator.clipboard.readText()) === '01012345678' && (await toastState(p)).txt === '전화번호를 복사했어요', '목록에서 눌러도 복사');
