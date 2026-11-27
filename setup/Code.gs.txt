@@ -3255,7 +3255,7 @@ var APP_HTML = [
   "    return d > 0 ? d + '일 뒤' : (-d) + '일 지남';",
   "  }",
   "  function shortAcct(a) { a = String(a || '').trim(); if (!a || a === '?') return ''; return a.replace(/\\s*\\(.*\\)\\s*$/, ''); }",
-  "  /** '농협 메인 (302-1320-4661-91)' → { main: '농협 메인', sub: '302-1320-4661-91' } */",
+  "  /** '농협 메인 (301-0000-1111-21)' → { main: '농협 메인', sub: '301-0000-1111-21' } */",
   "  function splitAcct(a) { var m = /^(.*?)\\s*\\((.*)\\)\\s*$/.exec(String(a || '')); return m && m[1] ? { main: m[1], sub: m[2] } : { main: String(a || ''), sub: '' }; }",
   "  function acctLabel(a) {",
   "    var p = splitAcct(a);",
