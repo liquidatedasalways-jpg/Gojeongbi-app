@@ -2339,6 +2339,11 @@ t('copy-num', async () => {
   await h.shot('t-copy-acc');
   await p.click('#sheetBody .cpy[data-copy="5400111122223333"]'); await sleep(p, 300);
   ok(await p.evaluate(() => navigator.clipboard.readText()) === '5400111122223333' && (await toastState(p)).txt === '카드번호를 복사했어요', '카드번호 복사 + 알림');
+  const cardBg = await p.evaluate(() => { const b = document.querySelector('#sheetBody .cpy[data-copy="5400111122223333"]'), a = document.querySelector('#sheetBody .cpy[data-copy="3010000111121"]'); return { done: b.classList.contains('done'), bg: getComputedStyle(b).backgroundColor, ink: getComputedStyle(b).color, ref: getComputedStyle(document.body).getPropertyValue('--ok-soft').trim(), acc: getComputedStyle(a).backgroundColor }; });
+  ok(cardBg.done && cardBg.bg === 'rgb(176, 184, 193)' && cardBg.bg !== cardBg.acc, '카드 단추는 누르면 한 톤 진한 회색으로 바뀜 ' + JSON.stringify(cardBg));
+  await sleep(p, 1800);
+  ok(await p.evaluate(() => getComputedStyle(document.querySelector('#sheetBody .cpy[data-copy="5400111122223333"]')).backgroundColor) === 'rgb(229, 232, 235)', '잠시 뒤 원래 회색으로 돌아옴');
+  await p.click('#sheetBody .cpy[data-copy="5400111122223333"]'); await sleep(p, 300); await h.shot('t-copy-card-done');
   await back(p);
 
   // 목록 탭: 줄 펼치면 같은 단추, 눌러도 줄이 안 접힘
