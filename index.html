@@ -187,8 +187,8 @@ body.on-cal .calnav { display: flex; }
 .nl { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .nl .nm { min-width: 0; }
 .bdg { flex: none; display: inline-flex; align-items: center; height: 15px; padding: 0 4px; border-radius: 4px; font-size: 10px; font-weight: 700; line-height: 1; letter-spacing: .04em; background: var(--sel); color: var(--accent-text); }
-/* 직접 이체(자동으로 안 나가서 내가 보내야 하는 것): 아래 줄 '직접 이체' 글씨(첫 화면·목록 같음), 진한 체크 동그라미, 달력 날짜 점.
-   이름 옆엔 안 붙임 (NEW 알약과 나란히 붙으면 헷갈려서) */
+/* 직접 이체(자동으로 안 나가서 내가 보내야 하는 것): 이름 옆 진하게 채운 '직접'(연한 NEW와 구분), 아래 줄 '직접 이체', 진한 체크 동그라미, 달력 날짜 점 */
+.bdg.man { height: 16px; padding: 0 4px; font-size: 11px; letter-spacing: -.01em; background: var(--accent); color: var(--accent-ink); }
 .manl { color: var(--accent-text); font-weight: 700; }
 .row.man:not(.checked) .chk i { border-color: var(--accent); border-width: 2px; }
 .cd.man .n::after { content: ""; position: absolute; top: 1px; right: -3px; width: 5px; height: 5px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1.5px var(--card); }
@@ -592,7 +592,6 @@ body.setup-on .tabbar, body.setup-on #menuBtn, body.setup-on #sync, body.setup-o
 .tc.nmc .tgs { display: flex; gap: 6px; line-height: 1.25; white-space: nowrap; overflow: hidden; }
 .tc.nmc .tag { flex: none; font-size: 12px; color: var(--muted); }
 .tc.nmc .tag.lastp { color: var(--grape); }
-.tc.nmc .tag.manl { color: var(--accent-text); font-weight: 700; }
 .tc.amc { justify-content: flex-end; padding-right: 8px; font-weight: 700; letter-spacing: -.02em; white-space: nowrap; }
 .tc.amc .av { min-width: 0; overflow: hidden; }
 .tc.dyc { justify-content: center; flex-direction: column; gap: 0; font-weight: 600; white-space: nowrap; line-height: 1.2; }
@@ -1797,6 +1796,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
     var o = f.options || [];
     return f.kind === 'select' && /^자동이체/.test(f.label) && o.length === 2 && o.indexOf('O') >= 0 && o.indexOf('X') >= 0;
   }
+  var BDG_MAN = '<span class="bdg man" title="직접 이체하는 항목">직접</span>';
   /** 첫 화면 줄의 아래 줄: 직접 이체면 앞에 '직접 이체', 그다음 결제 수단 */
   function homeLine2(it) {
     var a = acctTxt(it);
@@ -1804,7 +1804,7 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   function bdgHtml(it, due) {
     if (it.section === 5) return '';
-    var h = '';
+    var h = isManual(it) ? BDG_MAN : '';
     if (due ? (isNew(it) && isFirstDue(it, due)) : isNew(it)) h += BDG_NEW;
     if (it.last && (!due || due === it.next)) h += BDG_LAST;
     return h;
@@ -2119,10 +2119,9 @@ window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault()
   }
   /** no: 맨 앞 번호(지금 보이는 순서). 분류 색 아이콘 대신 번호를 두고, 분류는 이름 아래 회색 글자로 (한 분류만 골라 볼 땐 생략) */
   function trHtml(it, no) {
-    // 이름 옆: NEW·LAST 작은 표시. 이름 아래 작은 줄: 분류, 직접 이체, 끝남
+    // 이름 옆: NEW·LAST 작은 표시. 이름 아래 작은 줄: 분류, 끝남
     var tags = '';
     if (!lv.cat) tags += '<span class="tag ctg" data-c="' + (catByK[catKey(it)] || catByK['기타']).c + '">' + esc(catText(it)) + '</span>';
-    if (it.section !== 5 && isManual(it)) tags += '<span class="tag manl">직접 이체</span>';
     if (it.section === 5) tags += '<span class="tag">' + (it.status === '종료' ? '종료' : '끝남') + '</span>';
     var nameHtml = '<span class="nw"><span class="nl"><span class="nm">' + esc(it.name) + '</span>' + bdgHtml(it) + '</span>' + (tags ? '<span class="tgs">' + tags + '</span>' : '') + '</span>';
     var amt = it.amount != null ? '<span class="av" data-fit data-short="' + esc(man(it.amount)) + '">' + esc(num(it.amount)) + '</span>' : '<span class="emp">금액 없음</span>';

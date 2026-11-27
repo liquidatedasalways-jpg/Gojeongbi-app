@@ -2194,14 +2194,14 @@ t('manual-pay', async () => {
     const r = document.querySelector('#home .row[data-name="' + n + '"]');
     if (!r) return null;
     const ring = getComputedStyle(r.querySelector('.chk i')).borderTopWidth;
-    return { man: r.classList.contains('man'), bdg: !!r.querySelector('.bdg.man'), new: !!r.querySelector('.bdg.new'), l2: (r.querySelector('.t2') || {}).textContent || '', ring };
+    return { man: r.classList.contains('man'), bdg: !!r.querySelector('.bdg.man'), l2: (r.querySelector('.t2') || {}).textContent || '', ring };
   }, n);
   const m = await row('모임 회비');
-  ok(m && m.man && !m.bdg && /^직접 이체 · 토스뱅크 4661$/.test(m.l2) && m.ring === '2px', '자동이체 X → 진한 동그라미 + 아래 "직접 이체" (이름 옆 표시는 없음, NEW와 헷갈려서): ' + JSON.stringify(m));
+  ok(m && m.man && m.bdg && /^직접 이체 · 토스뱅크 4661$/.test(m.l2) && m.ring === '2px', '자동이체 X → 진한 동그라미 + 이름 옆 "직접" + 아래 "직접 이체": ' + JSON.stringify(m));
   const a = await row('정수기 렌탈');
   ok(a && !a.man && !a.bdg && a.l2 === '토스뱅크 4661' && a.ring !== '2px', '자동이체 O → 표시 없음: ' + JSON.stringify(a));
   const g = await row('관리비');
-  ok(g && g.man && !g.bdg && /^직접 이체/.test(g.l2), '자동이체 칸이 비고 결제 방식이 수동이체 → 직접으로 짐작');
+  ok(g && g.man && g.bdg, '자동이체 칸이 비고 결제 방식이 수동이체 → 직접으로 짐작');
   const c = await row('넷플릭스');
   ok(c && !c.man, '자동이체 칸이 비고 결제 수단이 카드 → 자동으로 짐작 (표시 없음)');
   const u = await row('헬스장');
@@ -2254,11 +2254,10 @@ t('manual-pay', async () => {
   await p.click('#saveBtn'); await h.idle(900);
   ok(srvItem(h, '헬스장').auto === '', '안 정함으로 저장');
 
-  // 고정비 목록 탭: 이름 아래 작은 줄에 '직접 이체' (이름 옆 알약은 NEW·LAST만)
+  // 고정비 목록 탭: 이름 옆 '직접'
   await p.click('.tabbar [data-tab="list"]'); await h.idle(500);
-  const lt = await p.evaluate(() => [...document.querySelectorAll('#list .tgs .tag.manl')].map((b) => b.textContent === '직접 이체' && b.closest('[data-name]') && b.closest('[data-name]').getAttribute('data-name')).sort());
-  ok(JSON.stringify(lt) === JSON.stringify(['관리비', '모임 회비', '부모님 용돈', '월세']), '목록 탭: 이름 아래 "직접 이체": ' + JSON.stringify(lt));
-  ok(await p.evaluate(() => !document.querySelector('.bdg.man')), '이름 옆 "직접" 알약은 어디에도 없음');
+  const lt = await p.evaluate(() => [...document.querySelectorAll('#list .bdg.man')].map((b) => b.closest('[data-name]') && b.closest('[data-name]').getAttribute('data-name')).sort());
+  ok(JSON.stringify(lt) === JSON.stringify(['관리비', '모임 회비', '부모님 용돈', '월세']), '목록 탭에도 이름 옆 "직접": ' + JSON.stringify(lt));
   await p.click('.tabbar [data-tab="cal"]'); await h.idle(400);
 
   // 설정 > 자동·직접 정하기
